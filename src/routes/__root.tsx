@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+
 import { useTheme } from "@/lib/theme";
 
 function RootComponent() {
@@ -16,6 +17,7 @@ function RootComponent() {
 }
 
 export const Route = createRootRoute({
+  component: RootComponent,
   head: () => ({
     meta: [
       {
@@ -26,5 +28,4 @@ export const Route = createRootRoute({
       { title: "Look Scanned — PDF Seperti Hasil Scan" },
     ],
   }),
-  component: RootComponent,
 });

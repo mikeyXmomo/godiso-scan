@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
+
 import { CONCEPT_STATUSES, normalizeConceptForm } from "./concept-catalog.mjs";
 // Defined in roll-selection.mjs for the same reason WELL_TIERS is: this file
 // reads the filesystem, and the roll API imports the taxonomy to validate its
@@ -10,6 +11,7 @@ import {
   isGrain,
   isPlatform,
 } from "./roll-selection.mjs";
+
 export { COMPOSITION_GRAINS, COMPOSITION_PLATFORMS, isGrain, isPlatform };
 
 // Catalog B: compositions rather than styles. A composition organizes attention,
@@ -172,8 +174,8 @@ export function validateCompositionEntry(
 }
 
 export function readCompositionCatalog(catalogPath, reviewsPath) {
-  const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
-  const reviewData = JSON.parse(readFileSync(reviewsPath, "utf8"));
+  const catalog = JSON.parse(readFileSync(catalogPath, "utf-8"));
+  const reviewData = JSON.parse(readFileSync(reviewsPath, "utf-8"));
   const reviews = reviewData.reviews || {};
   const familiesById = new Map(
     (catalog.families || []).map((family) => [family.id, family])
@@ -181,10 +183,10 @@ export function readCompositionCatalog(catalogPath, reviewsPath) {
   const compositions = (catalog.compositions || []).map((composition) => ({
     ...composition,
     familyLabel: familiesById.get(composition.familyId)?.label || null,
-    status: reviews[composition.id]?.status || "pending",
     review: reviews[composition.id] || null,
+    status: reviews[composition.id]?.status || "pending",
   }));
-  return { catalog, reviewData, reviews, compositions };
+  return { catalog, compositions, reviewData, reviews };
 }
 
 export function validateCompositionCatalog(
@@ -210,10 +212,12 @@ export function validateCompositionCatalog(
     errors.push("composition catalog needs at least four families");
   }
   for (const family of catalog?.families || []) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(family.id || ""))
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(family.id || "")) {
       errors.push(`invalid composition family id: ${String(family.id)}`);
-    if (familyIds.has(family.id))
+    }
+    if (familyIds.has(family.id)) {
       errors.push(`duplicate composition family id: ${family.id}`);
+    }
     familyIds.add(family.id);
     if (
       typeof family.description !== "string" ||
@@ -225,8 +229,9 @@ export function validateCompositionCatalog(
     }
   }
   for (const composition of catalog?.compositions || []) {
-    if (ids.has(composition.id))
+    if (ids.has(composition.id)) {
       errors.push(`duplicate composition id: ${composition.id}`);
+    }
     ids.add(composition.id);
     if (!familyIds.has(composition.familyId)) {
       errors.push(
@@ -237,7 +242,9 @@ export function validateCompositionCatalog(
       ...validateCompositionEntry(composition, { existingForms: forms })
     );
     const normalized = normalizeConceptForm(composition.form);
-    if (normalized) forms.set(normalized, composition.id);
+    if (normalized) {
+      forms.set(normalized, composition.id);
+    }
   }
   if (
     minimumTotal !== undefined &&
@@ -248,10 +255,12 @@ export function validateCompositionCatalog(
     );
   }
   for (const [id, review] of Object.entries(reviewData?.reviews || {})) {
-    if (!ids.has(id))
+    if (!ids.has(id)) {
       errors.push(`composition review references missing entry: ${id}`);
-    if (!CONCEPT_STATUSES.has(review?.status))
+    }
+    if (!CONCEPT_STATUSES.has(review?.status)) {
       errors.push(`invalid composition review status for ${id}`);
+    }
     if (typeof review?.formHash !== "string" || !review.formHash.trim()) {
       errors.push(`composition review ${id} needs a formHash`);
     } else {
@@ -289,11 +298,11 @@ export function validateCompositionCatalog(
   return {
     errors,
     stats: {
-      families: familyIds.size,
-      compositions: (catalog?.compositions || []).length,
       approved: Object.values(reviewData?.reviews || {}).filter(
         (review) => review?.status === "approved"
       ).length,
+      compositions: (catalog?.compositions || []).length,
+      families: familyIds.size,
       rejected: Object.values(reviewData?.reviews || {}).filter(
         (review) => review?.status === "rejected"
       ).length,

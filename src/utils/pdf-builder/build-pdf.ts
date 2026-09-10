@@ -1,18 +1,13 @@
-import {
-  degrees,
-  PDFDocument,
-  type PDFFont,
-  type PDFImage,
-  type PDFPage,
-  rgb,
-  StandardFonts,
-} from "pdf-lib";
-import {
-  PAPER_DIMENSIONS_PT,
-  type ScanConfig,
-  type Stamp,
-  type Watermark,
+import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
+
+import { PAPER_DIMENSIONS_PT } from "@/utils/scan-renderer/config.types";
+import type {
+  ScanConfig,
+  Stamp,
+  Watermark,
 } from "@/utils/scan-renderer/config.types";
+
 import type { ImageInfo } from "./types";
 
 export interface BuildPDFOptions {
@@ -276,12 +271,7 @@ function parseColor(value: string) {
   }
   const hex = trimmed.slice(1);
   const normalized =
-    hex.length === 3
-      ? hex
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : hex;
+    hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
   if (normalized.length !== 6 && normalized.length !== 8) {
     return rgb(0.5, 0.5, 0.5);
   }

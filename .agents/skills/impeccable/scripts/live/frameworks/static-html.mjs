@@ -9,18 +9,18 @@
  */
 
 export const staticHtml = {
-  name: "static-html",
-
   detect() {
     return { via: "fallback" };
   },
 
   inject: { kind: "tag" },
 
+  name: "static-html",
+
   source: {
+    commentSyntax: "html",
     extensions: [".html", ".htm"],
     preview: "source",
     styleMode: "scoped",
-    commentSyntax: "html",
   },
 };

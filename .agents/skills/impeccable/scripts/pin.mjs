@@ -24,7 +24,7 @@ import {
 import { basename, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 
 // All known harness directories
 const HARNESS_DIRS = [
@@ -93,7 +93,9 @@ function findProjectRoot(startDir = process.cwd()) {
       return dir;
     }
     const parent = resolve(dir, "..");
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     dir = parent;
   }
   return resolve(startDir);
@@ -219,10 +221,14 @@ function unpin(command, projectRoot) {
 
   for (const skillsDir of harnessDirs) {
     const skillDir = join(skillsDir, command);
-    if (!existsSync(skillDir)) continue;
+    if (!existsSync(skillDir)) {
+      continue;
+    }
 
     const skillMd = join(skillDir, "SKILL.md");
-    if (!existsSync(skillMd)) continue;
+    if (!existsSync(skillMd)) {
+      continue;
+    }
 
     // Safety: only remove if it's a pinned skill
     const content = readFileSync(skillMd, "utf-8");
@@ -231,7 +237,7 @@ function unpin(command, projectRoot) {
       continue;
     }
 
-    rmSync(skillDir, { recursive: true, force: true });
+    rmSync(skillDir, { force: true, recursive: true });
     console.log(`  - ${skillDir}`);
     removed++;
   }

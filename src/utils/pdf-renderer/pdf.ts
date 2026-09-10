@@ -1,8 +1,5 @@
-import {
-  GlobalWorkerOptions,
-  getDocument,
-  type PDFDocumentProxy,
-} from "pdfjs-dist";
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
@@ -13,7 +10,7 @@ export class PDF implements PDFRenderer {
   private readonly pdf: File;
   private pdfDocument?: PDFDocumentProxy;
   private readonly initPromise: Promise<void>;
-  private readonly pagePromises: Map<string, Promise<PDFPageInfo>> = new Map();
+  private readonly pagePromises = new Map<string, Promise<PDFPageInfo>>();
 
   constructor(pdf: File) {
     this.pdf = pdf;

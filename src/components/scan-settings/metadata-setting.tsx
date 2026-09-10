@@ -1,16 +1,17 @@
 import { useCallback } from "react";
+
 import { Card, CardPanel } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useScannerStore } from "@/lib/scanner-store";
 import type { PDFMetadata } from "@/utils/scan-renderer/config.types";
 
-const METADATA_FIELDS: Array<{
+const METADATA_FIELDS: {
   description: string;
   field: keyof PDFMetadata;
   label: string;
   placeholder: string;
-}> = [
+}[] = [
   {
     description: "Judul yang ditampilkan di pembaca PDF.",
     field: "title",

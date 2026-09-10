@@ -43,36 +43,50 @@ export const LIVE_TEMPLATE_EXTENSIONS = Object.freeze([
  * the common case for server-side templates) or bare strings as shorthand.
  */
 export function normalizeExtensionEntries(entries) {
-  if (!Array.isArray(entries)) return [];
+  if (!Array.isArray(entries)) {
+    return [];
+  }
   const out = [];
   for (const entry of entries) {
     const raw = typeof entry === "string" ? entry : entry?.ext;
-    if (typeof raw !== "string") continue;
+    if (typeof raw !== "string") {
+      continue;
+    }
     let ext = raw.trim().toLowerCase();
-    if (!ext) continue;
-    if (!ext.startsWith(".")) ext = `.${ext}`;
+    if (!ext) {
+      continue;
+    }
+    if (!ext.startsWith(".")) {
+      ext = `.${ext}`;
+    }
     const engine =
       !(typeof entry === "string") && entry?.engine === "text"
         ? "text"
         : "html";
-    out.push({ ext, engine });
+    out.push({ engine, ext });
   }
   return out;
 }
 
 export function mergeExtensions(existing, incoming) {
   const map = new Map();
-  for (const entry of normalizeExtensionEntries(existing))
+  for (const entry of normalizeExtensionEntries(existing)) {
     map.set(entry.ext, entry);
-  for (const entry of normalizeExtensionEntries(incoming))
+  }
+  for (const entry of normalizeExtensionEntries(incoming)) {
     map.set(entry.ext, entry);
-  return Array.from(map.values());
+  }
+  return [...map.values()];
 }
 
 export function matchConfiguredExtension(filePath, extensions) {
-  if (!Array.isArray(extensions) || extensions.length === 0) return null;
+  if (!Array.isArray(extensions) || extensions.length === 0) {
+    return null;
+  }
   const name = path.basename(String(filePath || "")).toLowerCase();
-  if (!name) return null;
+  if (!name) {
+    return null;
+  }
   // The longest matching suffix wins, so `.blade.php` beats a broader `.php`
   // entry regardless of config order.
   let best = null;
@@ -98,9 +112,13 @@ export function matchConfiguredExtension(filePath, extensions) {
  */
 export function matchesTemplateExtension(filePath, extensions) {
   const name = path.basename(String(filePath || "")).toLowerCase();
-  if (!name) return false;
+  if (!name) {
+    return false;
+  }
   for (const ext of extensions) {
-    if (name.length > ext.length && name.endsWith(ext)) return true;
+    if (name.length > ext.length && name.endsWith(ext)) {
+      return true;
+    }
   }
   return false;
 }
@@ -116,7 +134,9 @@ export function matchesTemplateExtension(filePath, extensions) {
  */
 export function resolveLiveTemplateExtensions(cwd = process.cwd()) {
   const cached = extensionCache.get(cwd);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
   const resolved = readLiveTemplateExtensions(cwd);
   extensionCache.set(cwd, resolved);
   return resolved;
@@ -145,7 +165,9 @@ function readLiveTemplateExtensions(cwd) {
   const seen = new Set(LIVE_TEMPLATE_EXTENSIONS);
   const out = [...LIVE_TEMPLATE_EXTENSIONS];
   for (const { ext } of configured) {
-    if (seen.has(ext)) continue;
+    if (seen.has(ext)) {
+      continue;
+    }
     seen.add(ext);
     out.push(ext);
   }

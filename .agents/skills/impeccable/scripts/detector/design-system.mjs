@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { finding } from "./findings.mjs";
-import { GENERIC_FONTS } from "./shared/constants.mjs";
 import { parseAnyColor, resolveLengthPx } from "./rules/checks.mjs";
+import { GENERIC_FONTS } from "./shared/constants.mjs";
 
 const DESIGN_NAMES = ["DESIGN.md", "Design.md", "design.md"];
 const FALLBACK_DIRS = [".agents/context", "docs"];
@@ -57,19 +57,25 @@ const STATIC_DESIGN_SKIP_TAGS = new Set([
 function firstExisting(dir, names) {
   for (const name of names) {
     const abs = path.join(dir, name);
-    if (fs.existsSync(abs)) return abs;
+    if (fs.existsSync(abs)) {
+      return abs;
+    }
   }
   return null;
 }
 
 function resolveDesignMdPath(cwd = process.cwd()) {
   const root = firstExisting(cwd, DESIGN_NAMES);
-  if (root) return { path: root, contextDir: cwd };
+  if (root) {
+    return { contextDir: cwd, path: root };
+  }
 
   for (const rel of FALLBACK_DIRS) {
     const dir = path.resolve(cwd, rel);
     const found = firstExisting(dir, DESIGN_NAMES);
-    if (found) return { path: found, contextDir: dir };
+    if (found) {
+      return { contextDir: dir, path: found };
+    }
   }
 
   return null;
@@ -91,7 +97,9 @@ function resolveDesignSidecarPath(cwd = process.cwd(), contextDir = cwd) {
 
 function parseFrontmatter(md) {
   const lines = String(md || "").split(/\r?\n/);
-  if (lines[0]?.trim() !== "---") return null;
+  if (lines[0]?.trim() !== "---") {
+    return null;
+  }
   let end = -1;
   for (let i = 1; i < lines.length; i++) {
     if (lines[i].trim() === "---") {
@@ -99,7 +107,9 @@ function parseFrontmatter(md) {
       break;
     }
   }
-  if (end === -1) return null;
+  if (end === -1) {
+    return null;
+  }
   try {
     return parseYamlSubset(lines.slice(1, end).join("\n"));
   } catch {
@@ -112,18 +122,23 @@ function parseYamlSubset(yaml) {
   const stack = [{ indent: -1, obj: root }];
 
   for (const raw of String(yaml || "").split(/\r?\n/)) {
-    if (!raw.trim() || /^\s*#/.test(raw)) continue;
+    if (!raw.trim() || /^\s*#/.test(raw)) {
+      continue;
+    }
     const indent = raw.match(/^\s*/)[0].length;
     const content = raw.slice(indent);
     const colonIdx = findTopLevelColon(content);
-    if (colonIdx === -1) continue;
+    if (colonIdx === -1) {
+      continue;
+    }
 
-    while (stack.length > 1 && stack[stack.length - 1].indent >= indent)
+    while (stack.length > 1 && stack.at(-1).indent >= indent) {
       stack.pop();
+    }
 
     const key = unquoteYamlKey(content.slice(0, colonIdx).trim());
     const rest = stripInlineYamlComment(content.slice(colonIdx + 1).trim());
-    const parent = stack[stack.length - 1].obj;
+    const parent = stack.at(-1).obj;
 
     if (rest === "") {
       const obj = {};
@@ -142,7 +157,9 @@ function findTopLevelColon(s) {
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (inQuote) {
-      if (ch === inQuote && s[i - 1] !== "\\") inQuote = null;
+      if (ch === inQuote && s[i - 1] !== "\\") {
+        inQuote = null;
+      }
     } else if (ch === '"' || ch === "'") {
       inQuote = ch;
     } else if (ch === ":") {
@@ -167,7 +184,9 @@ function stripInlineYamlComment(s) {
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (inQuote) {
-      if (ch === inQuote && s[i - 1] !== "\\") inQuote = null;
+      if (ch === inQuote && s[i - 1] !== "\\") {
+        inQuote = null;
+      }
     } else if (ch === '"' || ch === "'") {
       inQuote = ch;
     } else if (ch === "#" && i > 0 && /\s/.test(s[i - 1])) {
@@ -185,25 +204,25 @@ function stripInlineYamlComment(s) {
 // backslash handling stays readable.
 // The full YAML 1.2 double-quote escape set (spec section 5.7).
 const YAML_SIMPLE_ESCAPES = {
-  0: "\0",
-  a: "\x07",
-  b: "\b",
-  t: "\t",
-  n: "\n",
-  v: "\v",
-  f: "\f",
-  r: "\r",
-  e: "\x1b",
   " ": " ",
   '"': '"',
   "/": "/",
-  "\\": "\\",
-  N: "\u0085",
-  _: "\u00a0",
+  0: "\0",
   L: "\u2028",
+  N: "\u0085",
   P: "\u2029",
+  "\\": "\\",
+  _: "\u00A0",
+  a: "\u0007",
+  b: "\b",
+  e: "\u001B",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+  v: "\v",
 };
-const YAML_HEX_ESCAPE_LENGTHS = { x: 2, u: 4, U: 8 };
+const YAML_HEX_ESCAPE_LENGTHS = { U: 8, u: 4, x: 2 };
 
 function unescapeYamlDoubleQuoted(body) {
   let out = "";
@@ -214,7 +233,7 @@ function unescapeYamlDoubleQuoted(body) {
       continue;
     }
     const next = body[i + 1];
-    if (Object.prototype.hasOwnProperty.call(YAML_SIMPLE_ESCAPES, next)) {
+    if (Object.hasOwn(YAML_SIMPLE_ESCAPES, next)) {
       out += YAML_SIMPLE_ESCAPES[next];
       i++;
       continue;
@@ -226,9 +245,9 @@ function unescapeYamlDoubleQuoted(body) {
       const hex = body.slice(i + 2, i + 2 + hexLen);
       const codePoint =
         hex.length === hexLen && /^[0-9a-fA-F]+$/.test(hex)
-          ? parseInt(hex, 16)
+          ? Number.parseInt(hex, 16)
           : -1;
-      if (codePoint >= 0 && codePoint <= 0x10ffff) {
+      if (codePoint >= 0 && codePoint <= 0x10_ff_ff) {
         out += String.fromCodePoint(codePoint);
         i += 1 + hexLen;
         continue;
@@ -248,16 +267,28 @@ function parseScalar(raw) {
   if (s.length >= 2 && s.startsWith("'") && s.endsWith("'")) {
     return s.slice(1, -1).split("''").join("'");
   }
-  if (s === "true") return true;
-  if (s === "false") return false;
-  if (s === "null" || s === "~") return null;
-  if (/^-?\d+$/.test(s)) return Number(s);
-  if (/^-?\d*\.\d+$/.test(s)) return Number(s);
+  if (s === "true") {
+    return true;
+  }
+  if (s === "false") {
+    return false;
+  }
+  if (s === "null" || s === "~") {
+    return null;
+  }
+  if (/^-?\d+$/.test(s)) {
+    return Number(s);
+  }
+  if (/^-?\d*\.\d+$/.test(s)) {
+    return Number(s);
+  }
   return s;
 }
 
 function safeReadJson(filePath) {
-  if (!filePath) return null;
+  if (!filePath) {
+    return null;
+  }
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
   } catch {
@@ -270,9 +301,9 @@ function normalizeFontName(value) {
     .trim()
     .replace(/\s*!important\s*$/i, "")
     .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll(/^["']|["']$/g, "")
+    .replaceAll("+", " ")
+    .replaceAll(/\s+/g, " ")
     .toLowerCase();
 }
 
@@ -285,7 +316,9 @@ function splitFontStack(stack) {
 }
 
 function primaryFont(stack) {
-  if (!stack || /var\(/i.test(stack) || !isLiteralFontStack(stack)) return "";
+  if (!stack || /var\(/i.test(stack) || !isLiteralFontStack(stack)) {
+    return "";
+  }
   return splitFontStack(stack).find((font) => !GENERIC_FONTS.has(font)) || "";
 }
 
@@ -297,16 +330,20 @@ function isLiteralFontStack(stack) {
 function cssColorLabel(raw) {
   return String(raw || "")
     .trim()
-    .replace(/\s+/g, " ");
+    .replaceAll(/\s+/g, " ");
 }
 
 function colorKey(color) {
-  if (!color) return "";
+  if (!color) {
+    return "";
+  }
   return `${color.r},${color.g},${color.b}`;
 }
 
 function colorsClose(a, b) {
-  if (!a || !b) return false;
+  if (!a || !b) {
+    return false;
+  }
   return (
     Math.max(Math.abs(a.r - b.r), Math.abs(a.g - b.g), Math.abs(a.b - b.b)) <=
     COLOR_CHANNEL_TOLERANCE
@@ -318,36 +355,48 @@ function hslToRgb(H, S, L, alpha = 1) {
   const s = Math.max(0, Math.min(1, S));
   const l = Math.max(0, Math.min(1, L));
   const hue2rgb = (p, q, t) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    if (t < 0) {
+      t += 1;
+    }
+    if (t > 1) {
+      t -= 1;
+    }
+    if (t < 1 / 6) {
+      return p + (q - p) * 6 * t;
+    }
+    if (t < 1 / 2) {
+      return q;
+    }
+    if (t < 2 / 3) {
+      return p + (q - p) * (2 / 3 - t) * 6;
+    }
     return p;
   };
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
   return {
-    r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
-    g: Math.round(hue2rgb(p, q, h) * 255),
-    b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
     a: alpha,
+    b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+    g: Math.round(hue2rgb(p, q, h) * 255),
+    r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
   };
 }
 
 function parseDesignColor(value) {
   const text = String(value || "").trim();
   const parsed = parseAnyColor(text);
-  if (parsed) return parsed;
+  if (parsed) {
+    return parsed;
+  }
   const hsl = text.match(
     /hsla?\(\s*([-\d.]+)(?:deg)?\s*,?\s*([\d.]+)%\s*,?\s*([\d.]+)%(?:\s*[,/]\s*([\d.]+))?\s*\)/i
   );
   if (hsl) {
     return hslToRgb(
-      parseFloat(hsl[1]),
-      parseFloat(hsl[2]) / 100,
-      parseFloat(hsl[3]) / 100,
-      hsl[4] !== undefined ? parseFloat(hsl[4]) : 1
+      Number.parseFloat(hsl[1]),
+      Number.parseFloat(hsl[2]) / 100,
+      Number.parseFloat(hsl[3]) / 100,
+      hsl[4] === undefined ? 1 : Number.parseFloat(hsl[4])
     );
   }
   return null;
@@ -355,7 +404,9 @@ function parseDesignColor(value) {
 
 function addDesignColor(out, value, label) {
   const parsed = parseDesignColor(value);
-  if (!parsed) return;
+  if (!parsed) {
+    return;
+  }
   const key = colorKey(parsed);
   if (!out.allowedColorKeys.has(key)) {
     out.allowedColorKeys.set(key, { color: parsed, labels: [] });
@@ -364,7 +415,9 @@ function addDesignColor(out, value, label) {
 }
 
 function addColorObject(out, colors, prefix = "colors") {
-  if (!colors || typeof colors !== "object") return;
+  if (!colors || typeof colors !== "object") {
+    return;
+  }
   for (const [name, value] of Object.entries(colors)) {
     if (typeof value === "string") {
       addDesignColor(out, value, `${prefix}.${name}`);
@@ -374,28 +427,42 @@ function addColorObject(out, colors, prefix = "colors") {
 
 function addSidecarColors(out, sidecar) {
   const colorMeta = sidecar?.extensions?.colorMeta;
-  if (!colorMeta || typeof colorMeta !== "object") return;
+  if (!colorMeta || typeof colorMeta !== "object") {
+    return;
+  }
 
   for (const [name, meta] of Object.entries(colorMeta)) {
-    if (!meta || typeof meta !== "object") continue;
-    if (typeof meta.canonical === "string")
+    if (!meta || typeof meta !== "object") {
+      continue;
+    }
+    if (typeof meta.canonical === "string") {
       addDesignColor(out, meta.canonical, `sidecar.${name}`);
+    }
     if (Array.isArray(meta.tonalRamp)) {
       for (const [index, value] of meta.tonalRamp.entries()) {
-        if (typeof value === "string")
+        if (typeof value === "string") {
           addDesignColor(out, value, `sidecar.${name}.tonalRamp[${index}]`);
+        }
       }
     }
   }
 }
 
 function addTypographyFonts(out, typography) {
-  if (!typography || typeof typography !== "object") return;
+  if (!typography || typeof typography !== "object") {
+    return;
+  }
   for (const role of Object.values(typography)) {
-    if (!role || typeof role !== "object") continue;
-    if (typeof role.fontFamily !== "string") continue;
+    if (!role || typeof role !== "object") {
+      continue;
+    }
+    if (typeof role.fontFamily !== "string") {
+      continue;
+    }
     for (const font of splitFontStack(role.fontFamily)) {
-      if (!GENERIC_FONTS.has(font)) out.allowedFonts.add(font);
+      if (!GENERIC_FONTS.has(font)) {
+        out.allowedFonts.add(font);
+      }
     }
   }
 }
@@ -404,10 +471,14 @@ function addFontSizeStep(out, raw, { fluid = false } = {}) {
   const text = String(raw ?? "")
     .trim()
     .toLowerCase();
-  if (!FONT_SIZE_LITERAL_RE.test(text)) return;
+  if (!FONT_SIZE_LITERAL_RE.test(text)) {
+    return;
+  }
   const px = resolveLengthPx(text, 16);
-  if (px == null || !Number.isFinite(px) || px <= 0) return;
-  out.allowedFontSizes.push({ value: text, px, fluid });
+  if (px == null || !Number.isFinite(px) || px <= 0) {
+    return;
+  }
+  out.allowedFontSizes.push({ fluid, px, value: text });
 }
 
 // Split a fluid value into its three terms, or null when it is not a
@@ -415,7 +486,9 @@ function addFontSizeStep(out, raw, { fluid = false } = {}) {
 // validate fluid values in source, so the two stay symmetric.
 function parseClampArgs(raw) {
   const match = /^clamp\(\s*([\s\S]+)\s*\)$/i.exec(String(raw ?? "").trim());
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const args = splitTopLevelArgs(match[1]);
   return args.length === 3 ? args : null;
 }
@@ -427,7 +500,9 @@ function parseClampArgs(raw) {
 // `hasFontSizes` below for why that distinction has to survive.
 function addClampEndpoints(out, raw) {
   const args = parseClampArgs(raw);
-  if (!args) return false;
+  if (!args) {
+    return false;
+  }
   addFontSizeStep(out, args[0], { fluid: true });
   addFontSizeStep(out, args[2], { fluid: true });
   return true;
@@ -438,8 +513,11 @@ function splitTopLevelArgs(s) {
   let depth = 0;
   let current = "";
   for (const ch of String(s)) {
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
+    if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+    }
     if (ch === "," && depth === 0) {
       args.push(current.trim());
       current = "";
@@ -447,36 +525,50 @@ function splitTopLevelArgs(s) {
     }
     current += ch;
   }
-  if (current.trim()) args.push(current.trim());
+  if (current.trim()) {
+    args.push(current.trim());
+  }
   return args;
 }
 
 function addTypographySizes(out, typography) {
-  if (!typography || typeof typography !== "object") return;
+  if (!typography || typeof typography !== "object") {
+    return;
+  }
 
   // `scale` is the enumerated ramp: a name -> size map, since the frontmatter
   // parser has no list support. It sits alongside the named roles.
-  const scale = typography.scale;
+  const { scale } = typography;
   if (scale && typeof scale === "object") {
     for (const value of Object.values(scale)) {
-      if (typeof value !== "string" && typeof value !== "number") continue;
+      if (typeof value !== "string" && typeof value !== "number") {
+        continue;
+      }
       addFontSizeStep(out, value);
     }
   }
 
   for (const [name, role] of Object.entries(typography)) {
-    if (name === "scale") continue;
-    if (!role || typeof role !== "object") continue;
+    if (name === "scale") {
+      continue;
+    }
+    if (!role || typeof role !== "object") {
+      continue;
+    }
     const raw = String(role.fontSize ?? "")
       .trim()
       .toLowerCase();
-    if (addClampEndpoints(out, raw)) continue;
+    if (addClampEndpoints(out, raw)) {
+      continue;
+    }
     addFontSizeStep(out, raw);
   }
 }
 
 function addRoundedScale(out, rounded) {
-  if (!rounded || typeof rounded !== "object") return;
+  if (!rounded || typeof rounded !== "object") {
+    return;
+  }
   for (const [rawName, value] of Object.entries(rounded)) {
     const name = unquoteYamlKey(rawName).toLowerCase();
     addRoundedToken(out, name, value);
@@ -484,19 +576,28 @@ function addRoundedScale(out, rounded) {
 }
 
 function addRoundedToken(out, name, value) {
-  if (typeof value !== "string" && typeof value !== "number") return;
+  if (typeof value !== "string" && typeof value !== "number") {
+    return;
+  }
   const raw = String(value).trim();
-  if (!raw || /var\(/i.test(raw) || raw.includes("%")) return;
+  if (!raw || /var\(/i.test(raw) || raw.includes("%")) {
+    return;
+  }
   const px = resolveLengthPx(raw, 16);
-  if (px == null || !Number.isFinite(px)) return;
-  out.allowedRadii.push({ name, value: raw, px });
-  if (/(^|\.)(full|pill|round|rounded-full)$/.test(name))
+  if (px == null || !Number.isFinite(px)) {
+    return;
+  }
+  out.allowedRadii.push({ name, px, value: raw });
+  if (/(^|\.)(full|pill|round|rounded-full)$/.test(name)) {
     out.hasPillRadius = true;
+  }
 }
 
 function addSidecarRadii(out, sidecar) {
   const roundedMeta = sidecar?.extensions?.roundedMeta;
-  if (!roundedMeta || typeof roundedMeta !== "object") return;
+  if (!roundedMeta || typeof roundedMeta !== "object") {
+    return;
+  }
 
   for (const [rawName, meta] of Object.entries(roundedMeta)) {
     const name = unquoteYamlKey(rawName).toLowerCase();
@@ -504,14 +605,18 @@ function addSidecarRadii(out, sidecar) {
       addRoundedToken(out, `sidecar.${name}`, meta);
       continue;
     }
-    if (!meta || typeof meta !== "object") continue;
+    if (!meta || typeof meta !== "object") {
+      continue;
+    }
     for (const key of ["canonical", "value"]) {
       if (typeof meta[key] === "string" || typeof meta[key] === "number") {
         addRoundedToken(out, `sidecar.${name}.${key}`, meta[key]);
       }
     }
     for (const key of ["values", "aliases"]) {
-      if (!Array.isArray(meta[key])) continue;
+      if (!Array.isArray(meta[key])) {
+        continue;
+      }
       for (const [index, value] of meta[key].entries()) {
         addRoundedToken(out, `sidecar.${name}.${key}[${index}]`, value);
       }
@@ -533,13 +638,19 @@ function addSidecarRadii(out, sidecar) {
 // colorKey), which is the hole issue #547 warns against.
 function addSidecarShadows(out, sidecar) {
   const shadows = sidecar?.extensions?.shadows;
-  if (!Array.isArray(shadows)) return;
+  if (!Array.isArray(shadows)) {
+    return;
+  }
 
   for (const entry of shadows) {
-    if (typeof entry?.value !== "string") continue;
+    if (typeof entry?.value !== "string") {
+      continue;
+    }
     for (const match of entry.value.matchAll(CSS_COLOR_RE)) {
       const parsed = parseDesignColor(match[0]);
-      if (parsed) out.allowedShadowColors.push({ color: parsed });
+      if (parsed) {
+        out.allowedShadowColors.push({ color: parsed });
+      }
     }
   }
 }
@@ -548,16 +659,16 @@ function normalizeDesignSystem(input = {}) {
   const frontmatter = input.frontmatter || {};
   const sidecar = input.sidecar || null;
   const out = {
-    present: true,
-    sourcePath: input.sourcePath || null,
-    sidecarPath: input.sidecarPath || null,
-    mdNewerThanJson: input.mdNewerThanJson === true,
-    allowedFonts: new Set(),
     allowedColorKeys: new Map(),
-    allowedRadii: [],
     allowedFontSizes: [],
+    allowedFonts: new Set(),
+    allowedRadii: [],
     allowedShadowColors: [],
     hasPillRadius: false,
+    mdNewerThanJson: input.mdNewerThanJson === true,
+    present: true,
+    sidecarPath: input.sidecarPath || null,
+    sourcePath: input.sourcePath || null,
   };
 
   addTypographyFonts(out, frontmatter.typography);
@@ -580,7 +691,9 @@ function normalizeDesignSystem(input = {}) {
 
 function loadDesignSystemForCwd(cwd = process.cwd()) {
   const md = resolveDesignMdPath(cwd);
-  if (!md) return null;
+  if (!md) {
+    return null;
+  }
 
   let frontmatter = null;
   let mdStat = null;
@@ -590,27 +703,31 @@ function loadDesignSystemForCwd(cwd = process.cwd()) {
   } catch {
     return null;
   }
-  if (!frontmatter || typeof frontmatter !== "object") return null;
+  if (!frontmatter || typeof frontmatter !== "object") {
+    return null;
+  }
 
   const sidecarPath = resolveDesignSidecarPath(cwd, md.contextDir);
   const sidecar = safeReadJson(sidecarPath);
   let sidecarStat = null;
   try {
-    if (sidecarPath) sidecarStat = fs.statSync(sidecarPath);
+    if (sidecarPath) {
+      sidecarStat = fs.statSync(sidecarPath);
+    }
   } catch {
     sidecarStat = null;
   }
 
   return normalizeDesignSystem({
     frontmatter,
-    sidecar,
-    sourcePath: md.path,
-    sidecarPath,
     mdNewerThanJson: !!(
       mdStat &&
       sidecarStat &&
       mdStat.mtimeMs > sidecarStat.mtimeMs + 1000
     ),
+    sidecar,
+    sidecarPath,
+    sourcePath: md.path,
   });
 }
 
@@ -647,24 +764,30 @@ function readWorkspacePatternGroups(dir) {
   }
   const pkg = [];
   const workspaces = safeReadJson(path.join(dir, "package.json"))?.workspaces;
-  if (Array.isArray(workspaces)) pkg.push(...workspaces);
-  else if (Array.isArray(workspaces?.packages))
+  if (Array.isArray(workspaces)) {
+    pkg.push(...workspaces);
+  } else if (Array.isArray(workspaces?.packages)) {
     pkg.push(...workspaces.packages);
+  }
   const lernaPackages = safeReadJson(path.join(dir, "lerna.json"))?.packages;
-  if (Array.isArray(lernaPackages)) pkg.push(...lernaPackages);
+  if (Array.isArray(lernaPackages)) {
+    pkg.push(...lernaPackages);
+  }
   try {
     let inPackages = false;
     for (const line of fs
       .readFileSync(path.join(dir, "pnpm-workspace.yaml"), "utf-8")
       .split(/\r?\n/)) {
       const trimmed = stripInlineYamlComment(line).trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
       const flow = trimmed.match(/^packages:\s*\[(.*)\]\s*$/);
       if (flow) {
         pkg.push(
           ...flow[1]
             .split(",")
-            .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ""))
+            .map((entry) => entry.trim().replaceAll(/^['"]|['"]$/g, ""))
             .filter(Boolean)
         );
         break;
@@ -673,10 +796,15 @@ function readWorkspacePatternGroups(dir) {
         inPackages = true;
         continue;
       }
-      if (!inPackages) continue;
+      if (!inPackages) {
+        continue;
+      }
       const item = trimmed.match(/^-\s*(.+)$/);
-      if (item) pkg.push(item[1].trim().replace(/^['"]|['"]$/g, ""));
-      else if (/^[A-Za-z0-9_-]+:\s*/.test(trimmed)) break;
+      if (item) {
+        pkg.push(item[1].trim().replaceAll(/^['"]|['"]$/g, ""));
+      } else if (/^[A-Za-z0-9_-]+:\s*/.test(trimmed)) {
+        break;
+      }
     }
   } catch {
     /* no pnpm-workspace.yaml */
@@ -693,12 +821,14 @@ function isMonorepoRoot(dir) {
     readWorkspacePatterns(dir).some(
       (pattern) => !String(pattern).trim().startsWith("!")
     )
-  )
+  ) {
     return true;
+  }
   if (
     !MONOREPO_MARKER_FILES.some((file) => fs.existsSync(path.join(dir, file)))
-  )
+  ) {
     return false;
+  }
   return MONOREPO_FALLBACK_PROJECT_DIRS.some((name) => {
     try {
       return fs
@@ -712,42 +842,58 @@ function isMonorepoRoot(dir) {
 
 function monorepoOwnsPath(root, boundaryDir) {
   const rel = path.relative(root, boundaryDir);
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return false;
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return false;
+  }
   const relSegments = rel.split(path.sep).filter(Boolean);
 
   function normalizeWorkspacePattern(pattern) {
     return String(pattern || "")
       .trim()
-      .replace(/^['"]|['"]$/g, "")
+      .replaceAll(/^['"]|['"]$/g, "")
       .replace(/^\.\//, "")
       .replace(/\/+$/, "");
   }
 
   function escapeRegExp(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return s.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function segmentMatches(patternSegment, relSegment) {
-    if (patternSegment === "*") return true;
-    if (!patternSegment.includes("*")) return patternSegment === relSegment;
+    if (patternSegment === "*") {
+      return true;
+    }
+    if (!patternSegment.includes("*")) {
+      return patternSegment === relSegment;
+    }
     const re = new RegExp(
-      `^${escapeRegExp(patternSegment).replace(/\\\*/g, "[^/]*")}$`
+      `^${escapeRegExp(patternSegment).replaceAll("\\*", "[^/]*")}$`
     );
     return re.test(relSegment);
   }
 
   function matchGlobSegments(patternSegments, relSegments) {
     function rec(pi, ri) {
-      if (pi === patternSegments.length) return ri === relSegments.length;
+      if (pi === patternSegments.length) {
+        return ri === relSegments.length;
+      }
       if (patternSegments[pi] === "**") {
-        if (pi === patternSegments.length - 1) return true;
+        if (pi === patternSegments.length - 1) {
+          return true;
+        }
         for (let k = ri; k <= relSegments.length; k++) {
-          if (rec(pi + 1, k)) return true;
+          if (rec(pi + 1, k)) {
+            return true;
+          }
         }
         return false;
       }
-      if (ri >= relSegments.length) return false;
-      if (!segmentMatches(patternSegments[pi], relSegments[ri])) return false;
+      if (ri >= relSegments.length) {
+        return false;
+      }
+      if (!segmentMatches(patternSegments[pi], relSegments[ri])) {
+        return false;
+      }
       return rec(pi + 1, ri + 1);
     }
     return rec(0, 0);
@@ -758,12 +904,19 @@ function monorepoOwnsPath(root, boundaryDir) {
     const patternSegments = normalizeWorkspacePattern(pattern)
       .split("/")
       .filter(Boolean);
-    if (!patternSegments.length) return false;
-    if (patternSegments.includes("**"))
+    if (!patternSegments.length) {
+      return false;
+    }
+    if (patternSegments.includes("**")) {
       return matchGlobSegments(patternSegments, relSegments);
-    if (relSegments.length < patternSegments.length) return false;
+    }
+    if (relSegments.length < patternSegments.length) {
+      return false;
+    }
     for (let i = 0; i < patternSegments.length; i++) {
-      if (!segmentMatches(patternSegments[i], relSegments[i])) return false;
+      if (!segmentMatches(patternSegments[i], relSegments[i])) {
+        return false;
+      }
     }
     return true;
   }
@@ -775,14 +928,23 @@ function monorepoOwnsPath(root, boundaryDir) {
     const patternSegments = normalizeWorkspacePattern(pattern)
       .split("/")
       .filter(Boolean);
-    if (!patternSegments.length) return false;
-    if (patternSegments.includes("**"))
-      return matchGlobSegments(patternSegments, relSegments);
-    if (relSegments.length < patternSegments.length) return false;
-    for (let i = 0; i < patternSegments.length; i++) {
-      if (!segmentMatches(patternSegments[i], relSegments[i])) return false;
+    if (!patternSegments.length) {
+      return false;
     }
-    if (relSegments.length === patternSegments.length) return true;
+    if (patternSegments.includes("**")) {
+      return matchGlobSegments(patternSegments, relSegments);
+    }
+    if (relSegments.length < patternSegments.length) {
+      return false;
+    }
+    for (let i = 0; i < patternSegments.length; i++) {
+      if (!segmentMatches(patternSegments[i], relSegments[i])) {
+        return false;
+      }
+    }
+    if (relSegments.length === patternSegments.length) {
+      return true;
+    }
     const ancestorDir = path.join(
       root,
       ...relSegments.slice(0, patternSegments.length)
@@ -792,23 +954,33 @@ function monorepoOwnsPath(root, boundaryDir) {
 
   function groupOwns(rawPatterns) {
     const patterns = rawPatterns.map(normalizeWorkspacePattern).filter(Boolean);
-    if (!patterns.length) return null;
+    if (!patterns.length) {
+      return null;
+    }
     const excluded = patterns.some(
       (pattern) => pattern.startsWith("!") && matchesNegation(pattern.slice(1))
     );
     const included = patterns
       .filter((pattern) => !pattern.startsWith("!"))
       .some(positiveOwns);
-    if (!excluded && !included) return null;
-    if (excluded) return false;
+    if (!excluded && !included) {
+      return null;
+    }
+    if (excluded) {
+      return false;
+    }
     return true;
   }
 
   const [impeccable, pkg] = readWorkspacePatternGroups(root);
   const fromImpeccable = groupOwns(impeccable);
-  if (fromImpeccable !== null) return fromImpeccable;
+  if (fromImpeccable !== null) {
+    return fromImpeccable;
+  }
   const fromPkg = groupOwns(pkg);
-  if (fromPkg !== null) return fromPkg;
+  if (fromPkg !== null) {
+    return fromPkg;
+  }
   if (
     [...impeccable, ...pkg].some(
       (pattern) => !normalizeWorkspacePattern(pattern).startsWith("!")
@@ -862,7 +1034,9 @@ export function findDesignRoot(startDir) {
   const homeDirs = homeDirForms();
   let boundary = null;
   while (true) {
-    if (!boundary && resolveDesignMdPath(dir)) return { dir, hasDesign: true };
+    if (!boundary && resolveDesignMdPath(dir)) {
+      return { dir, hasDesign: true };
+    }
     if (boundary) {
       // Past the boundary the walk only looks for the monorepo root that owns
       // the workspace path (workspace globs including negations, or marker-only
@@ -873,11 +1047,14 @@ export function findDesignRoot(startDir) {
       // owning root, same as context.mjs's findMonorepoRoot, which stops at
       // homeDir before its monorepo check.
       if (!homeDirs.has(dir) && isMonorepoRoot(dir)) {
-        if (monorepoOwnsPath(dir, boundary.dir))
+        if (monorepoOwnsPath(dir, boundary.dir)) {
           return { dir, hasDesign: !!resolveDesignMdPath(dir) };
+        }
         return boundary;
       }
-      if (fs.existsSync(path.join(dir, ".git"))) return boundary;
+      if (fs.existsSync(path.join(dir, ".git"))) {
+        return boundary;
+      }
     } else if (
       PROJECT_ROOT_MARKERS.some((marker) =>
         fs.existsSync(path.join(dir, marker))
@@ -886,12 +1063,17 @@ export function findDesignRoot(startDir) {
       boundary = { dir, hasDesign: false };
       // A boundary that is itself a monorepo root, or a separate repository
       // with its own .git, inherits nothing from above.
-      if (isMonorepoRoot(dir) || fs.existsSync(path.join(dir, ".git")))
+      if (isMonorepoRoot(dir) || fs.existsSync(path.join(dir, ".git"))) {
         return boundary;
+      }
     }
-    if (homeDirs.has(dir)) return boundary;
+    if (homeDirs.has(dir)) {
+      return boundary;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) return boundary;
+    if (parent === dir) {
+      return boundary;
+    }
     dir = parent;
   }
 }
@@ -909,20 +1091,30 @@ export function loadDesignSystemForTarget(
   const startDir = designSystemStartDir(targetPath, cwd);
   const found = findDesignRoot(startDir);
   const key = found ? `root:${found.dir}` : "\0none";
-  if (cache && cache.has(key)) return cache.get(key);
+  if (cache && cache.has(key)) {
+    return cache.get(key);
+  }
   const loaded = found?.hasDesign ? loadDesignSystemForCwd(found.dir) : null;
-  if (cache) cache.set(key, loaded);
+  if (cache) {
+    cache.set(key, loaded);
+  }
   return loaded;
 }
 
 function isAllowedFont(font, designSystem) {
-  if (!font || GENERIC_FONTS.has(font)) return true;
-  if (!designSystem?.hasFonts) return true;
+  if (!font || GENERIC_FONTS.has(font)) {
+    return true;
+  }
+  if (!designSystem?.hasFonts) {
+    return true;
+  }
   return designSystem.allowedFonts.has(font);
 }
 
 function isAllowedColorRaw(raw, designSystem) {
-  if (!designSystem?.hasColors) return true;
+  if (!designSystem?.hasColors) {
+    return true;
+  }
   const text = String(raw || "")
     .trim()
     .toLowerCase();
@@ -932,14 +1124,23 @@ function isAllowedColorRaw(raw, designSystem) {
     text === "currentcolor" ||
     text === "inherit" ||
     text === "initial"
-  )
+  ) {
     return true;
-  if (text.includes("var(")) return true;
+  }
+  if (text.includes("var(")) {
+    return true;
+  }
   const parsed = parseDesignColor(text);
-  if (!parsed) return true;
-  if ((parsed.a ?? 1) <= 0.05) return true;
+  if (!parsed) {
+    return true;
+  }
+  if ((parsed.a ?? 1) <= 0.05) {
+    return true;
+  }
   for (const entry of designSystem.allowedColorKeys.values()) {
-    if (colorsClose(parsed, entry.color)) return true;
+    if (colorsClose(parsed, entry.color)) {
+      return true;
+    }
   }
   return false;
 }
@@ -949,13 +1150,17 @@ function isAllowedColorRaw(raw, designSystem) {
 // here because colorKey()/colorsClose() drop it, and a match on r/g/b alone
 // would let every black at every alpha through.
 function isAllowedShadowColorRaw(raw, designSystem) {
-  if (!designSystem?.allowedShadowColors?.length) return false;
+  if (!designSystem?.allowedShadowColors?.length) {
+    return false;
+  }
   const parsed = parseDesignColor(
     String(raw || "")
       .trim()
       .toLowerCase()
   );
-  if (!parsed) return false;
+  if (!parsed) {
+    return false;
+  }
   return designSystem.allowedShadowColors.some(
     (entry) =>
       colorsClose(parsed, entry.color) &&
@@ -964,7 +1169,9 @@ function isAllowedShadowColorRaw(raw, designSystem) {
 }
 
 function isAllowedRadiusRaw(raw, designSystem) {
-  if (!designSystem?.hasRadii) return true;
+  if (!designSystem?.hasRadii) {
+    return true;
+  }
   const text = String(raw || "")
     .trim()
     .toLowerCase();
@@ -974,13 +1181,19 @@ function isAllowedRadiusRaw(raw, designSystem) {
     text === "none" ||
     text === "initial" ||
     text === "inherit"
-  )
+  ) {
     return true;
-  if (text.includes("var(") || text.includes("%")) return true;
+  }
+  if (text.includes("var(") || text.includes("%")) {
+    return true;
+  }
   const px = resolveLengthPx(text, 16);
-  if (px == null || !Number.isFinite(px) || px <= RADIUS_TOLERANCE_PX)
+  if (px == null || !Number.isFinite(px) || px <= RADIUS_TOLERANCE_PX) {
     return true;
-  if (designSystem.hasPillRadius && px >= 99) return true;
+  }
+  if (designSystem.hasPillRadius && px >= 99) {
+    return true;
+  }
   return designSystem.allowedRadii.some(
     (entry) => Math.abs(entry.px - px) <= RADIUS_TOLERANCE_PX
   );
@@ -993,9 +1206,13 @@ function fontSizeStepStatus(raw, designSystem) {
   const text = String(raw || "")
     .trim()
     .toLowerCase();
-  if (!FONT_SIZE_LITERAL_RE.test(text)) return "unjudgeable";
+  if (!FONT_SIZE_LITERAL_RE.test(text)) {
+    return "unjudgeable";
+  }
   const px = resolveLengthPx(text, 16);
-  if (px == null || !Number.isFinite(px) || px <= 0) return "unjudgeable";
+  if (px == null || !Number.isFinite(px) || px <= 0) {
+    return "unjudgeable";
+  }
   return designSystem.allowedFontSizes.some(
     (entry) => Math.abs(entry.px - px) <= FONT_SIZE_TOLERANCE_PX
   )
@@ -1011,26 +1228,34 @@ function fontSizeStepStatus(raw, designSystem) {
 // usage would let `clamp(99rem, 1vw, 200rem)` through, which is how a fluid
 // declaration stayed invisible until someone measured computed styles.
 export function offRampClampEndpoints(raw, designSystem) {
-  if (!designSystem?.hasFontSizes) return null;
+  if (!designSystem?.hasFontSizes) {
+    return null;
+  }
   const args = parseClampArgs(
     String(raw || "")
       .trim()
       .replace(/\s*!important\s*$/i, "")
   );
-  if (!args) return null;
+  if (!args) {
+    return null;
+  }
   return [args[0], args[2]].filter(
     (endpoint) => fontSizeStepStatus(endpoint, designSystem) === "off-ramp"
   );
 }
 
 function isAllowedFontSizeRaw(raw, designSystem) {
-  if (!designSystem?.hasFontSizes) return true;
+  if (!designSystem?.hasFontSizes) {
+    return true;
+  }
   const text = String(raw || "")
     .trim()
     .toLowerCase()
     .replace(/\s*!important\s*$/, "");
   const offRampEndpoints = offRampClampEndpoints(text, designSystem);
-  if (offRampEndpoints) return offRampEndpoints.length === 0;
+  if (offRampEndpoints) {
+    return offRampEndpoints.length === 0;
+  }
   return fontSizeStepStatus(text, designSystem) !== "off-ramp";
 }
 
@@ -1047,18 +1272,26 @@ function lineLooksCommented(line) {
 function isProbablyColorLiteral(line, match) {
   const raw = match?.[0] || "";
   const index = match.index ?? -1;
-  if (index < 0) return false;
-  if (isInsideCssAttributeSelector(line, index)) return false;
+  if (index < 0) {
+    return false;
+  }
+  if (isInsideCssAttributeSelector(line, index)) {
+    return false;
+  }
 
   const before = line.slice(0, index);
   const after = line.slice(index + raw.length);
 
   if (raw.startsWith("#")) {
-    if (before.endsWith("&")) return false; // HTML numeric entity, e.g. &#8596;
+    if (before.endsWith("&")) {
+      return false;
+    } // HTML numeric entity, e.g. &#8596;
 
     const prevNonSpace = before.match(/\S(?=\s*$)/)?.[0] || "";
     const nextNonSpace = after.match(/^\s*(\S)/)?.[1] || "";
-    if (prevNonSpace === ">" && nextNonSpace === "<") return false; // plain text, e.g. PR #155
+    if (prevNonSpace === ">" && nextNonSpace === "<") {
+      return false;
+    } // plain text, e.g. PR #155
   }
 
   const styleContext =
@@ -1107,7 +1340,9 @@ const SHADOW_JS_CONTEXT_RE = new RegExp(
 // sites and deliberately discards which property matched.
 function isShadowPropertyContext(line, match) {
   const index = match.index ?? -1;
-  if (index < 0) return false;
+  if (index < 0) {
+    return false;
+  }
   const before = line.slice(0, index);
   return (
     SHADOW_CSS_CONTEXT_RE.test(before) || SHADOW_JS_CONTEXT_RE.test(before)
@@ -1115,12 +1350,18 @@ function isShadowPropertyContext(line, match) {
 }
 
 function isInsideCssAttributeSelector(line, index) {
-  if (index < 0) return false;
+  if (index < 0) {
+    return false;
+  }
   const before = line.slice(0, index);
   const lastOpen = before.lastIndexOf("[");
-  if (lastOpen === -1) return false;
+  if (lastOpen === -1) {
+    return false;
+  }
   const lastClose = before.lastIndexOf("]");
-  if (lastClose > lastOpen) return false;
+  if (lastClose > lastOpen) {
+    return false;
+  }
   const after = line.slice(index);
   const close = after.indexOf("]");
   const block = after.indexOf("{");
@@ -1134,7 +1375,7 @@ function makeDesignFinding(id, filePath, snippet, line = 0, extras = {}) {
 function decodeGoogleFamily(value) {
   const family = String(value || "")
     .split(":")[0]
-    .replace(/\+/g, " ");
+    .replaceAll("+", " ");
   try {
     return decodeURIComponent(family);
   } catch {
@@ -1144,8 +1385,10 @@ function decodeGoogleFamily(value) {
 
 function checkFontStack(stack, filePath, line, designSystem, context) {
   const primary = primaryFont(stack);
-  if (!primary || isAllowedFont(primary, designSystem)) return [];
-  const display = primary.replace(/\b\w/g, (ch) => ch.toUpperCase());
+  if (!primary || isAllowedFont(primary, designSystem)) {
+    return [];
+  }
+  const display = primary.replaceAll(/\b\w/g, (ch) => ch.toUpperCase());
   return [
     makeDesignFinding(
       "design-system-font",
@@ -1159,7 +1402,7 @@ function checkFontStack(stack, filePath, line, designSystem, context) {
 
 function extractRadiusTokens(value) {
   return String(value || "")
-    .replace(/\s*\/\s*/g, " ")
+    .replaceAll(/\s*\/\s*/g, " ")
     .split(/\s+/)
     .map((token) => token.trim())
     .filter(Boolean);
@@ -1168,7 +1411,9 @@ function extractRadiusTokens(value) {
 function checkRadiusValue(value, filePath, line, designSystem, context) {
   const findings = [];
   for (const token of extractRadiusTokens(value)) {
-    if (isAllowedRadiusRaw(token, designSystem)) continue;
+    if (isAllowedRadiusRaw(token, designSystem)) {
+      continue;
+    }
     findings.push(
       makeDesignFinding(
         "design-system-radius",
@@ -1184,7 +1429,9 @@ function checkRadiusValue(value, filePath, line, designSystem, context) {
 
 function checkFontSizeValue(value, filePath, line, designSystem, context) {
   const token = String(value || "").trim();
-  if (isAllowedFontSizeRaw(token, designSystem)) return [];
+  if (isAllowedFontSizeRaw(token, designSystem)) {
+    return [];
+  }
 
   // Name the offending endpoint on a fluid value; the whole clamp() string is
   // not actionable on its own, and it makes a poor ignore-value.
@@ -1218,15 +1465,19 @@ function checkFontSizeValue(value, filePath, line, designSystem, context) {
 }
 
 function checkSourceDesignSystem(content, filePath, options = {}) {
-  const designSystem = options.designSystem;
-  if (!designSystem?.present) return [];
+  const { designSystem } = options;
+  if (!designSystem?.present) {
+    return [];
+  }
 
   const findings = [];
   const lines = String(content || "").split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineNum = i + 1;
-    if (lineLooksCommented(line)) continue;
+    if (lineLooksCommented(line)) {
+      continue;
+    }
 
     if (designSystem.hasFonts) {
       for (const match of line.matchAll(FONT_DECL_RE)) {
@@ -1255,7 +1506,9 @@ function checkSourceDesignSystem(content, filePath, options = {}) {
         const url = match[0];
         for (const familyMatch of url.matchAll(/[?&]family=([^&]+)/g)) {
           const font = normalizeFontName(decodeGoogleFamily(familyMatch[1]));
-          if (!font || isAllowedFont(font, designSystem)) continue;
+          if (!font || isAllowedFont(font, designSystem)) {
+            continue;
+          }
           const display = decodeGoogleFamily(familyMatch[1]);
           findings.push(
             makeDesignFinding(
@@ -1272,14 +1525,19 @@ function checkSourceDesignSystem(content, filePath, options = {}) {
 
     if (designSystem.hasColors) {
       for (const match of line.matchAll(CSS_COLOR_RE)) {
-        if (!isProbablyColorLiteral(line, match)) continue;
+        if (!isProbablyColorLiteral(line, match)) {
+          continue;
+        }
         const raw = cssColorLabel(match[0]);
-        if (isAllowedColorRaw(raw, designSystem)) continue;
+        if (isAllowedColorRaw(raw, designSystem)) {
+          continue;
+        }
         if (
           isShadowPropertyContext(line, match) &&
           isAllowedShadowColorRaw(raw, designSystem)
-        )
+        ) {
           continue;
+        }
         findings.push(
           makeDesignFinding(
             "design-system-color",
@@ -1358,14 +1616,14 @@ function checkSourceDesignSystem(content, filePath, options = {}) {
 }
 
 function hasDirectText(el) {
-  return Array.from(el.childNodes || []).some(
+  return [...(el.childNodes || [])].some(
     (node) => node.nodeType === 3 && node.textContent.trim().length > 0
   );
 }
 
 function sampleText(el) {
   const text = String(el.textContent || "")
-    .replace(/\s+/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
   return text ? ` "${text.slice(0, 40)}"` : "";
 }
@@ -1378,14 +1636,18 @@ function collectStaticDesignSystemFindings(
   filePath,
   designSystem
 ) {
-  if (!designSystem?.present) return [];
+  if (!designSystem?.present) {
+    return [];
+  }
   const findings = [];
   const seenFonts = new Set();
   const seenColors = new Set();
   const seenRadii = new Set();
 
   for (const el of document.querySelectorAll("*")) {
-    if (shouldSkipStaticDesignElement(el, window)) continue;
+    if (shouldSkipStaticDesignElement(el, window)) {
+      continue;
+    }
     const tag = el.tagName?.toLowerCase?.() || "unknown";
     const style = window.getComputedStyle(el);
 
@@ -1407,25 +1669,33 @@ function collectStaticDesignSystemFindings(
 
     if (designSystem.hasColors) {
       const colorChecks = [];
-      if (hasDirectText(el)) colorChecks.push(["text color", style.color]);
-      if (!isTransparentCss(style.backgroundColor))
+      if (hasDirectText(el)) {
+        colorChecks.push(["text color", style.color]);
+      }
+      if (!isTransparentCss(style.backgroundColor)) {
         colorChecks.push(["background", style.backgroundColor]);
+      }
       for (const side of ["Top", "Right", "Bottom", "Left"]) {
-        if ((parseFloat(style[`border${side}Width`]) || 0) > 0) {
+        if ((Number.parseFloat(style[`border${side}Width`]) || 0) > 0) {
           colorChecks.push([
             `border-${side.toLowerCase()}`,
             style[`border${side}Color`],
           ]);
         }
       }
-      if ((parseFloat(style.outlineWidth) || 0) > 0)
+      if ((Number.parseFloat(style.outlineWidth) || 0) > 0) {
         colorChecks.push(["outline", style.outlineColor]);
+      }
 
       for (const [kind, raw] of colorChecks) {
         const label = cssColorLabel(raw);
-        if (isAllowedColorRaw(label, designSystem)) continue;
+        if (isAllowedColorRaw(label, designSystem)) {
+          continue;
+        }
         const key = `${kind}:${label}`;
-        if (seenColors.has(key)) continue;
+        if (seenColors.has(key)) {
+          continue;
+        }
         seenColors.add(key);
         findings.push(
           makeDesignFinding(
@@ -1441,10 +1711,16 @@ function collectStaticDesignSystemFindings(
 
     if (designSystem.hasRadii) {
       const rawRadius = String(style.borderRadius || "").trim();
-      if (!rawRadius) continue;
+      if (!rawRadius) {
+        continue;
+      }
       for (const token of extractRadiusTokens(rawRadius)) {
-        if (isAllowedRadiusRaw(token, designSystem)) continue;
-        if (seenRadii.has(token)) continue;
+        if (isAllowedRadiusRaw(token, designSystem)) {
+          continue;
+        }
+        if (seenRadii.has(token)) {
+          continue;
+        }
         seenRadii.add(token);
         findings.push(
           makeDesignFinding(
@@ -1464,15 +1740,18 @@ function collectStaticDesignSystemFindings(
 
 function shouldSkipStaticDesignElement(el, window) {
   const tag = el.tagName?.toLowerCase?.() || "";
-  if (STATIC_DESIGN_SKIP_TAGS.has(tag)) return true;
+  if (STATIC_DESIGN_SKIP_TAGS.has(tag)) {
+    return true;
+  }
 
   let current = el;
   while (current) {
     if (
       current.getAttribute?.("hidden") !== null ||
       current.getAttribute?.("aria-hidden") === "true"
-    )
+    ) {
       return true;
+    }
     const style = window.getComputedStyle(current);
     const display = String(style.display || "").toLowerCase();
     const visibility = String(style.visibility || "").toLowerCase();
@@ -1480,8 +1759,9 @@ function shouldSkipStaticDesignElement(el, window) {
       display === "none" ||
       visibility === "hidden" ||
       visibility === "collapse"
-    )
+    ) {
       return true;
+    }
     current = current.parentElement;
   }
   return false;
@@ -1491,13 +1771,17 @@ function isTransparentCss(value) {
   const text = String(value || "")
     .trim()
     .toLowerCase();
-  if (!text || text === "transparent") return true;
+  if (!text || text === "transparent") {
+    return true;
+  }
   const parsed = parseDesignColor(text);
   return parsed ? (parsed.a ?? 1) <= 0.05 : false;
 }
 
 function canonicalDesignFindingKey(item) {
-  if (!item?.antipattern?.startsWith?.("design-system-")) return null;
+  if (!item?.antipattern?.startsWith?.("design-system-")) {
+    return null;
+  }
   const value = item.ignoreValue || item.value || "";
   if (item.antipattern === "design-system-font") {
     const context = /google fonts/i.test(item.snippet || "")
@@ -1508,14 +1792,17 @@ function canonicalDesignFindingKey(item) {
   }
   if (item.antipattern === "design-system-color") {
     const parsed = parseDesignColor(value);
-    if (parsed) return `${item.antipattern}:color:${colorKey(parsed)}`;
+    if (parsed) {
+      return `${item.antipattern}:color:${colorKey(parsed)}`;
+    }
     const label = cssColorLabel(value).toLowerCase();
     return label ? `${item.antipattern}:color:${label}` : null;
   }
   if (item.antipattern === "design-system-radius") {
     const px = resolveLengthPx(String(value || "").trim(), 16);
-    if (px != null && Number.isFinite(px))
+    if (px != null && Number.isFinite(px)) {
       return `${item.antipattern}:radius:${Math.round(px * 100) / 100}`;
+    }
     const label = String(value || "")
       .trim()
       .toLowerCase();
@@ -1523,8 +1810,9 @@ function canonicalDesignFindingKey(item) {
   }
   if (item.antipattern === "design-system-font-size") {
     const px = resolveLengthPx(String(value || "").trim(), 16);
-    if (px != null && Number.isFinite(px))
+    if (px != null && Number.isFinite(px)) {
       return `${item.antipattern}:font-size:${Math.round(px * 100) / 100}`;
+    }
     const label = String(value || "")
       .trim()
       .toLowerCase();
@@ -1542,8 +1830,9 @@ function mergeDesignSystemFindings(...groups) {
       if (key) {
         if (seen.has(key)) {
           const existing = out[seen.get(key)];
-          if ((existing.line || 0) <= 0 && (item.line || 0) > 0)
+          if ((existing.line || 0) <= 0 && (item.line || 0) > 0) {
             existing.line = item.line;
+          }
           continue;
         }
         seen.set(key, out.length);
@@ -1563,7 +1852,9 @@ function dedupeDesignFindings(findings) {
       item.line || 0,
       normalizeFontName(item.ignoreValue || item.snippet || ""),
     ].join("\0");
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      continue;
+    }
     seen.add(key);
     out.push(item);
   }

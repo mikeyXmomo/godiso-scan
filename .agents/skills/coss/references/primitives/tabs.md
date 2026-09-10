@@ -22,7 +22,7 @@ The CLI installs the shared `@coss/segmented-control` registry dependency automa
 ## Canonical imports
 
 ```tsx
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 ```
 
 ## Minimal pattern
@@ -64,7 +64,9 @@ Sizes are set on `TabsList` and inherited by its tabs. An individual `TabsTab` c
 ```tsx
 <TabsList size="sm">
   <TabsTab value="tab-1">Tab 1</TabsTab>
-  <TabsTab size="lg" value="tab-2">Tab 2</TabsTab>
+  <TabsTab size="lg" value="tab-2">
+    Tab 2
+  </TabsTab>
 </TabsList>
 ```
 

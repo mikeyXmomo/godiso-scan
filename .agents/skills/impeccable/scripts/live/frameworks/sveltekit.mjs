@@ -16,8 +16,6 @@ import {
 } from "../sveltekit-adapter.mjs";
 
 export const sveltekit = {
-  name: "sveltekit",
-
   detect(cwd, config) {
     return detectSvelteKitProject(cwd, config);
   },
@@ -26,11 +24,11 @@ export const sveltekit = {
     kind: "adapter",
 
     apply({ cwd, port, token, config }) {
-      return applySvelteKitLiveAdapter({ cwd, port, token, config });
+      return applySvelteKitLiveAdapter({ config, cwd, port, token });
     },
 
     remove({ cwd, config }) {
-      return removeSvelteKitLiveAdapter({ cwd, config });
+      return removeSvelteKitLiveAdapter({ config, cwd });
     },
 
     // The generated root component and the `src/lib/impeccable/` runtime paths
@@ -43,15 +41,15 @@ export const sveltekit = {
       return [
         {
           kind: "created",
-          path: SVELTE_LIVE_ROOT_COMPONENT,
           marker: "impeccable-live-root",
+          path: SVELTE_LIVE_ROOT_COMPONENT,
           pruneTo: "src",
         },
         {
           kind: "patched",
-          path: project?.layoutFile || "src/routes/+layout.svelte",
-          patch: "sveltekit-layout",
           markers: [SVELTE_LAYOUT_MARKER_OPEN],
+          patch: "sveltekit-layout",
+          path: project?.layoutFile || "src/routes/+layout.svelte",
         },
       ];
     },
@@ -60,6 +58,8 @@ export const sveltekit = {
       "sveltekit-layout": unpatchSvelteLayout,
     },
   },
+
+  name: "sveltekit",
 
   source: {
     extensions: [".svelte"],

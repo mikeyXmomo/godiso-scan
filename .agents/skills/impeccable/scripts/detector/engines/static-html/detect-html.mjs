@@ -1,14 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { GENERIC_FONTS, OVERUSED_FONTS } from "../../shared/constants.mjs";
 import {
   checkSourceDesignSystem,
   collectStaticDesignSystemFindings,
   mergeDesignSystemFindings,
 } from "../../design-system.mjs";
-import { isFullPage } from "../../shared/page.mjs";
-import { applyInlineIgnores } from "../../shared/inline-ignores.mjs";
 import { finding } from "../../findings.mjs";
 import {
   profileFindings,
@@ -40,6 +37,9 @@ import {
   resolveBackground,
   resolveBorderRadiusPx,
 } from "../../rules/checks.mjs";
+import { GENERIC_FONTS, OVERUSED_FONTS } from "../../shared/constants.mjs";
+import { applyInlineIgnores } from "../../shared/inline-ignores.mjs";
+import { isFullPage } from "../../shared/page.mjs";
 import { detectText, runTextContentAnalyzers } from "../regex/detect-text.mjs";
 import {
   StaticDocument,
@@ -58,18 +58,24 @@ function checkStaticPageTypography(document, window) {
     const hasText = el.childNodes.some(
       (n) => n.nodeType === 3 && n.textContent.trim().length > 0
     );
-    if (!hasText) continue;
+    if (!hasText) {
+      continue;
+    }
     const ff = window.getComputedStyle(el).fontFamily || "";
     const stack = ff.split(",").map((f) =>
       f
         .trim()
-        .replace(/^['"]|['"]$/g, "")
+        .replaceAll(/^['"]|['"]$/g, "")
         .toLowerCase()
     );
     const primary = stack.find((f) => f && !GENERIC_FONTS.has(f));
-    if (!primary) continue;
+    if (!primary) {
+      continue;
+    }
     fonts.add(primary);
-    if (OVERUSED_FONTS.has(primary)) overusedFound.add(primary);
+    if (OVERUSED_FONTS.has(primary)) {
+      overusedFound.add(primary);
+    }
   }
   for (const font of overusedFound) {
     findings.push({ id: "overused-font", snippet: `Primary font: ${font}` });
@@ -78,17 +84,18 @@ function checkStaticPageTypography(document, window) {
   for (const el of document.querySelectorAll(
     "h1, h2, h3, h4, h5, h6, p, span, a, li, td, th, label, button, div"
   )) {
-    const fontSize = parseFloat(window.getComputedStyle(el).fontSize);
-    if (fontSize >= 8 && fontSize < 200)
+    const fontSize = Number.parseFloat(window.getComputedStyle(el).fontSize);
+    if (fontSize >= 8 && fontSize < 200) {
       sizes.add(Math.round(fontSize * 10) / 10);
+    }
   }
   if (sizes.size >= 3) {
     const sorted = [...sizes].sort((a, b) => a - b);
-    const ratio = sorted[sorted.length - 1] / sorted[0];
-    if (ratio < 2.0) {
+    const ratio = sorted.at(-1) / sorted[0];
+    if (ratio < 2) {
       findings.push({
         id: "flat-type-hierarchy",
-        snippet: `Sizes: ${sorted.map((s) => s + "px").join(", ")} (ratio ${ratio.toFixed(1)}:1)`,
+        snippet: `Sizes: ${sorted.map((s) => `${s}px`).join(", ")} (ratio ${ratio.toFixed(1)}:1)`,
       });
     }
   }
@@ -112,92 +119,97 @@ function checkElementBrokenImage(el) {
 const STATIC_ELEMENT_RULES = [
   {
     id: "border-rules",
-    selector: "*",
     run: (el, tag, style, window, customPropMap) =>
       checkElementBorders(
         tag,
         style,
         null,
-        resolveBorderRadiusPx(el, style, parseFloat(style.width) || 0, window),
+        resolveBorderRadiusPx(
+          el,
+          style,
+          Number.parseFloat(style.width) || 0,
+          window
+        ),
         el
       ),
+    selector: "*",
   },
   {
     id: "color-rules",
-    selector: "*",
     run: (el, tag, style, window, customPropMap) =>
       checkElementColors(el, style, tag, window, customPropMap, false),
+    selector: "*",
   },
   {
     id: "hover-color-rules",
-    selector: "*",
     run: (el, tag, style, window) =>
       checkElementHoverContrast(el, style, tag, window),
+    selector: "*",
   },
   {
     id: "dark-glow",
-    selector: "*",
     run: (el, tag, style, window, customPropMap) =>
       checkElementGlow(
         tag,
         style,
         resolveBackground(el.parentElement || el, window, customPropMap)
       ),
+    selector: "*",
   },
   {
     id: "motion-rules",
-    selector: "*",
     run: (el, tag, style) => checkElementMotion(tag, style),
+    selector: "*",
   },
   {
     id: "icon-tile-stack",
-    selector: "h1,h2,h3,h4,h5,h6",
     run: (el, tag, _style, window) => checkElementIconTile(el, tag, window),
+    selector: "h1,h2,h3,h4,h5,h6",
   },
   {
     id: "italic-serif-display",
-    selector: "h1,h2",
     run: (el, tag, style) => checkElementItalicSerif(el, style, tag),
+    selector: "h1,h2",
   },
   {
     id: "hero-eyebrow-chip",
-    selector: "h1",
     run: (el, tag, style, window, customPropMap) =>
       checkElementHeroEyebrow(el, style, tag, window, customPropMap),
+    selector: "h1",
   },
   {
     id: "broken-image",
-    selector: "img",
     run: (el) => checkElementBrokenImage(el),
+    selector: "img",
   },
   {
     id: "quality-rules",
-    selector: "*",
     run: (el, tag, style, window) =>
       checkElementQuality(el, style, tag, window),
+    selector: "*",
   },
   {
     id: "oversized-h1",
-    selector: "h1",
     run: (el, tag, style, window) =>
       checkElementOversizedH1(el, style, tag, window),
+    selector: "h1",
   },
   {
     id: "clipped-overflow-container",
-    selector: "*",
     run: (el, tag, style, window) =>
       checkElementClippedOverflow(el, style, tag, window),
+    selector: "*",
   },
   {
     id: "gpt-thin-border-wide-shadow",
-    selector: "*",
     run: (el, tag, style) => checkElementGptBorderShadow(el, style),
+    selector: "*",
   },
   {
     id: "radial-spotlight-glow",
-    selector: "*",
     run: (el, tag, style, window) =>
       checkElementRadialSpotlight(el, style, tag, window),
+    selector: "*",
   },
 ];
 
@@ -232,16 +244,16 @@ async function detectHtml(filePath, options = {}) {
           import("domutils"),
         ]);
         return {
-          parseDocument: htmlparser2.parseDocument,
-          selectAll: cssSelect.selectAll,
-          selectOne: cssSelect.selectOne,
           compile: cssSelect.compile,
           csstree,
           domutils,
+          parseDocument: htmlparser2.parseDocument,
+          selectAll: cssSelect.selectAll,
+          selectOne: cssSelect.selectOne,
         };
       }
     );
-  } catch (err) {
+  } catch {
     if (!globalThis.__impeccableStaticHtmlWarned) {
       globalThis.__impeccableStaticHtmlWarned = true;
 
@@ -308,7 +320,9 @@ async function detectHtml(filePath, options = {}) {
       )) {
         // Element-scoped waivers: a data-impeccable-ignore ancestor suppresses
         // matching findings for its subtree, same as the browser walk.
-        if (scopedIgnoreActive(el, f.id)) continue;
+        if (scopedIgnoreActive(el, f.id)) {
+          continue;
+        }
         findings.push(finding(f.id, filePath, f.snippet));
       }
     }
@@ -403,13 +417,17 @@ async function detectHtml(filePath, options = {}) {
     const classAttrParts = [];
     for (const el of document.querySelectorAll("*")) {
       const styleAttr = el.getAttribute("style");
-      if (styleAttr) styleAttrParts.push(`style="${styleAttr}"`);
+      if (styleAttr) {
+        styleAttrParts.push(`style="${styleAttr}"`);
+      }
       const classAttr = el.getAttribute("class");
-      if (classAttr) classAttrParts.push(classAttr);
+      if (classAttr) {
+        classAttrParts.push(classAttr);
+      }
     }
     const patternCorpora = {
-      styleText: [cssText, ...styleAttrParts].join("\n"),
       classText: classAttrParts.join("\n"),
+      styleText: [cssText, ...styleAttrParts].join("\n"),
     };
     for (const f of runPageCheck("html-patterns", () =>
       checkHtmlPatterns(html, patternCorpora).filter(
@@ -425,7 +443,7 @@ async function detectHtml(filePath, options = {}) {
         try {
           matches = document.querySelectorAll(
             String(f.selector)
-              .replace(/::?[a-zA-Z-]+(\([^)]*\))?/g, "")
+              .replaceAll(/::?[a-zA-Z-]+(\([^)]*\))?/g, "")
               .trim()
           );
         } catch {
@@ -435,14 +453,17 @@ async function detectHtml(filePath, options = {}) {
           matches &&
           matches.length > 0 &&
           [...matches].every((el) => scopedIgnoreActive(el, f.id))
-        )
+        ) {
           continue;
+        }
       }
       const item = finding(f.id, filePath, f.snippet);
       // Position-aware severity promotion: checks may attach a per-finding
       // severity (e.g. a pulsing dot inside a header/nav landmark) that
       // overrides the registry default.
-      if (f.severity) item.severity = f.severity;
+      if (f.severity) {
+        item.severity = f.severity;
+      }
       findings.push(item);
     }
     // Text-content analyzers (em-dash overuse, marketing buzzwords,

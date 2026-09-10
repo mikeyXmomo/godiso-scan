@@ -1,4 +1,5 @@
 import path from "node:path";
+
 import { resolveProjectRoot } from "./context.mjs";
 import { parseTargetPath } from "./lib/target-args.mjs";
 
@@ -7,12 +8,12 @@ export function resolveLiveTarget(cwd = process.cwd(), args = []) {
   let targetPath = null;
   try {
     targetPath = parseTargetPath(args, { strict: true });
-  } catch (err) {
-    if (err?.name === "TargetArgError") {
-      process.stderr.write(`${err.message}\n`);
+  } catch (error) {
+    if (error?.name === "TargetArgError") {
+      process.stderr.write(`${error.message}\n`);
       process.exit(1);
     }
-    throw err;
+    throw error;
   }
   const absoluteTargetPath = targetPath
     ? path.isAbsolute(targetPath)
@@ -23,10 +24,10 @@ export function resolveLiveTarget(cwd = process.cwd(), args = []) {
     ? resolveProjectRoot(originalCwd, { targetPath: absoluteTargetPath })
     : originalCwd;
   return {
+    absoluteTargetPath,
     originalCwd,
     projectRoot,
-    targetPath,
-    absoluteTargetPath,
     targetOptions: absoluteTargetPath ? { targetPath: absoluteTargetPath } : {},
+    targetPath,
   };
 }

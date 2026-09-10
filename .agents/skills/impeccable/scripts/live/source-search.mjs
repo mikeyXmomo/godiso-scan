@@ -15,6 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
 import { IMPECCABLE_DIR } from "../lib/impeccable-paths.mjs";
 import { matchesTemplateExtension } from "../lib/template-extensions.mjs";
 
@@ -80,15 +81,21 @@ export function findSourceFile({
   const seen = new Set();
   for (const dir of SOURCE_SEARCH_DIRS) {
     const absDir = path.join(cwd, dir);
-    if (!fs.existsSync(absDir)) continue;
+    if (!fs.existsSync(absDir)) {
+      continue;
+    }
     const result = walk(absDir, query, extensions, skip, fileFilter, seen, 0);
-    if (result) return result;
+    if (result) {
+      return result;
+    }
   }
   return null;
 }
 
 function walk(dir, query, extensions, skip, fileFilter, seen, depth) {
-  if (depth > MAX_DEPTH) return null;
+  if (depth > MAX_DEPTH) {
+    return null;
+  }
   // A broken symlink anywhere in the tree used to throw straight out of
   // live-wrap's copy of this walk, killing the whole wrap.
   let realDir;
@@ -97,7 +104,9 @@ function walk(dir, query, extensions, skip, fileFilter, seen, depth) {
   } catch {
     return null;
   }
-  if (seen.has(realDir)) return null;
+  if (seen.has(realDir)) {
+    return null;
+  }
   seen.add(realDir);
 
   let entries;
@@ -110,20 +119,32 @@ function walk(dir, query, extensions, skip, fileFilter, seen, depth) {
   // Files before directories: a match in the current directory beats one
   // nested deeper.
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!matchesTemplateExtension(entry.name, extensions)) continue;
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (!matchesTemplateExtension(entry.name, extensions)) {
+      continue;
+    }
     const filePath = path.join(dir, entry.name);
-    if (fileFilter && !fileFilter(filePath)) continue;
+    if (fileFilter && !fileFilter(filePath)) {
+      continue;
+    }
     try {
-      if (fs.readFileSync(filePath, "utf-8").includes(query)) return filePath;
+      if (fs.readFileSync(filePath, "utf-8").includes(query)) {
+        return filePath;
+      }
     } catch {
       /* unreadable, skip */
     }
   }
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (skip.has(entry.name)) continue;
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    if (skip.has(entry.name)) {
+      continue;
+    }
     const result = walk(
       path.join(dir, entry.name),
       query,
@@ -133,7 +154,9 @@ function walk(dir, query, extensions, skip, fileFilter, seen, depth) {
       seen,
       depth + 1
     );
-    if (result) return result;
+    if (result) {
+      return result;
+    }
   }
 
   return null;

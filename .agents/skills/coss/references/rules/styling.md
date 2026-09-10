@@ -37,7 +37,7 @@ Apply this section only when the task touches global theme/layout setup (not nor
 coss components use three CSS custom properties for typography:
 
 | Variable | Used by | Default fallback |
-|---|---|---|
+| --- | --- | --- |
 | `--font-sans` | Body text, buttons, labels, most UI | `ui-sans-serif, system-ui, sans-serif` |
 | `--font-mono` | `<code>`, `<kbd>`, `<pre>`, code blocks | `ui-monospace, monospace` |
 | `--font-heading` | Dialog/AlertDialog titles, headings | `var(--font-sans)` (override with `--font-heading`) |

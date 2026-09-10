@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const candidates = [
   path.join(__dirname, "detector", "detect-antipatterns.mjs"),
   path.join(__dirname, "..", "..", "cli", "engine", "detect-antipatterns.mjs"),

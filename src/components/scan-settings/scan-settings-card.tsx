@@ -1,7 +1,9 @@
 import { RotateCcw } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { useScannerStore } from "@/lib/scanner-store";
+
 import { BlurSetting } from "./blur-setting";
 import { BorderSetting } from "./border-setting";
 import { BrightnessSetting } from "./brightness-setting";

@@ -21,7 +21,9 @@ import zlib from "node:zlib";
 
 function arg(name, fallback = null) {
   const i = process.argv.indexOf(`--${name}`);
-  if (i === -1) return fallback;
+  if (i === -1) {
+    return fallback;
+  }
   const v = process.argv[i + 1];
   return v && !v.startsWith("--") ? v : fallback;
 }
@@ -40,10 +42,10 @@ function arg(name, fallback = null) {
 
 // FNV-1a 32-bit: tiny, dependency-free, stable across runs and platforms.
 function hash32(str) {
-  let h = 0x811c9dc5;
+  let h = 0x81_1c_9d_c5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+    h = Math.imul(h, 0x01_00_01_93);
   }
   return h >>> 0;
 }
@@ -54,11 +56,21 @@ function hslToRgb(hDeg, s, l) {
   const p = 2 * l - q;
   const hue = (t) => {
     let tt = t;
-    if (tt < 0) tt += 1;
-    if (tt > 1) tt -= 1;
-    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
-    if (tt < 1 / 2) return q;
-    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    if (tt < 0) {
+      tt += 1;
+    }
+    if (tt > 1) {
+      tt -= 1;
+    }
+    if (tt < 1 / 6) {
+      return p + (q - p) * 6 * tt;
+    }
+    if (tt < 1 / 2) {
+      return q;
+    }
+    if (tt < 2 / 3) {
+      return p + (q - p) * (2 / 3 - tt) * 6;
+    }
     return p;
   };
   return [hue(h + 1 / 3), hue(h), hue(h - 1 / 3)].map((c) =>
@@ -67,7 +79,7 @@ function hslToRgb(hDeg, s, l) {
 }
 
 const toHex = ([r, g, b]) =>
-  "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+  `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 
 // Two or three deterministic swatches derived from the prompt hash. The band
 // count itself is prompt-derived, so different prompts differ in palette.
@@ -95,21 +107,27 @@ function svgFake(prompt, [w, h]) {
     .join("");
   // Greedy word wrap tuned to the canvas width so the prompt stays legible.
   const perLine = Math.max(12, Math.floor(w / 26));
-  const words = String(prompt).replace(/\s+/g, " ").trim().split(" ");
+  const words = String(prompt).replaceAll(/\s+/g, " ").trim().split(" ");
   const lines = [];
   let cur = "";
   for (const word of words) {
-    if ((cur + " " + word).trim().length > perLine) {
-      if (cur) lines.push(cur);
+    if (`${cur} ${word}`.trim().length > perLine) {
+      if (cur) {
+        lines.push(cur);
+      }
       cur = word;
     } else {
-      cur = (cur + " " + word).trim();
+      cur = `${cur} ${word}`.trim();
     }
-    if (lines.length >= 10) break;
+    if (lines.length >= 10) {
+      break;
+    }
   }
-  if (cur && lines.length < 11) lines.push(cur);
+  if (cur && lines.length < 11) {
+    lines.push(cur);
+  }
   const escape = (s) =>
-    String(s).replace(
+    String(s).replaceAll(
       /[&<>]/g,
       (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]
     );
@@ -137,12 +155,14 @@ function svgFake(prompt, [w, h]) {
 // prompt, so a .png/.webp fake stays a decodable image and still contains the
 // "SYNTHETIC" bytes downstream tools look for.
 function crc32(buf) {
-  let c = 0xffffffff;
+  let c = 0xff_ff_ff_ff;
   for (let i = 0; i < buf.length; i++) {
     c ^= buf[i];
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xed_b8_83_20 ^ (c >>> 1) : c >>> 1;
+    }
   }
-  return (c ^ 0xffffffff) >>> 0;
+  return (c ^ 0xff_ff_ff_ff) >>> 0;
 }
 
 function pngChunk(type, data) {
@@ -183,7 +203,7 @@ function pngFake(prompt, [w, h]) {
     Buffer.from("Comment", "latin1"),
     Buffer.from([0]),
     Buffer.from(
-      `SYNTHETIC COMP: ${String(prompt).replace(/\s+/g, " ").trim()}`,
+      `SYNTHETIC COMP: ${String(prompt).replaceAll(/\s+/g, " ").trim()}`,
       "latin1"
     ),
   ]);
@@ -198,14 +218,16 @@ function pngFake(prompt, [w, h]) {
 
 function parseSize(sizeStr) {
   const m = String(sizeStr).match(/^(\d+)x(\d+)$/);
-  if (!m) return [1536, 1024];
+  if (!m) {
+    return [1536, 1024];
+  }
   return [Number(m[1]), Number(m[2])];
 }
 
 if (process.env.IMPECCABLE_IMAGE_GEN_FAKE) {
   const fakePromptFile = arg("prompt-file");
   const fakePrompt = fakePromptFile
-    ? fs.readFileSync(fakePromptFile, "utf8")
+    ? fs.readFileSync(fakePromptFile, "utf-8")
     : arg("prompt");
   const fakeOut = arg("out");
   if (!fakePrompt || !fakeOut) {
@@ -216,7 +238,7 @@ if (process.env.IMPECCABLE_IMAGE_GEN_FAKE) {
   }
   const dims = parseSize(arg("size", "1536x1024"));
   const bytes = fakeOut.endsWith(".svg")
-    ? Buffer.from(svgFake(fakePrompt, dims), "utf8")
+    ? Buffer.from(svgFake(fakePrompt, dims), "utf-8")
     : pngFake(fakePrompt, dims);
   fs.writeFileSync(fakeOut, bytes);
   console.log(
@@ -233,7 +255,9 @@ if (!key) {
   process.exit(1);
 }
 const promptFile = arg("prompt-file");
-const prompt = promptFile ? fs.readFileSync(promptFile, "utf8") : arg("prompt");
+const prompt = promptFile
+  ? fs.readFileSync(promptFile, "utf-8")
+  : arg("prompt");
 const out = arg("out");
 if (!prompt || !out) {
   console.error(
@@ -255,8 +279,9 @@ const refs = (() => {
       process.argv[i] === "--ref" &&
       process.argv[i + 1] &&
       !process.argv[i + 1].startsWith("--")
-    )
+    ) {
       found.push(process.argv[i + 1]);
+    }
   }
   return found;
 })();
@@ -279,18 +304,18 @@ if (refs.length) {
     form.append("image[]", new Blob([bytes], { type }), ref.split("/").pop());
   }
   response = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
     body: form,
+    headers: { Authorization: `Bearer ${key}` },
+    method: "POST",
   });
 } else {
   response = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
+    body: JSON.stringify({ model: "gpt-image-2", n: 1, prompt, quality, size }),
     headers: {
       Authorization: `Bearer ${key}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ model: "gpt-image-2", prompt, size, quality, n: 1 }),
+    method: "POST",
   });
 }
 if (!response.ok) {
@@ -314,7 +339,7 @@ try {
   spawnSync(
     process.execPath,
     [
-      new URL("./embed-prompt.mjs", import.meta.url).pathname,
+      new URL("embed-prompt.mjs", import.meta.url).pathname,
       out,
       "--prompt",
       prompt,
@@ -325,10 +350,10 @@ try {
     `${out}.json`,
     JSON.stringify(
       {
-        prompt,
         createdAt: new Date().toISOString(),
-        tool: "generate-image.mjs",
         model: "gpt-image-2",
+        prompt,
+        tool: "generate-image.mjs",
         ...(refs.length ? { refs } : {}),
       },
       null,

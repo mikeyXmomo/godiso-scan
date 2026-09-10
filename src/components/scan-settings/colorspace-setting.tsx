@@ -1,6 +1,8 @@
 import { useCallback } from "react";
+
 import { Switch } from "@/components/ui/switch";
 import { useScannerStore } from "@/lib/scanner-store";
+
 import { SettingField } from "./setting-field";
 
 export function ColorspaceSetting() {

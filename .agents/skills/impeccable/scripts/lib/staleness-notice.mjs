@@ -55,12 +55,15 @@ function readCache() {
 function pruneCache(cache, now) {
   const projects = {};
   for (const [key, entries] of Object.entries(cache.projects || {})) {
-    if (!entries || typeof entries !== "object") continue;
+    if (!entries || typeof entries !== "object") {
+      continue;
+    }
     const stamps = Object.values(entries).filter(
       (value) => typeof value === "number"
     );
-    if (stamps.length && now - Math.max(...stamps) < RENOTIFY_INTERVAL_MS)
+    if (stamps.length && now - Math.max(...stamps) < RENOTIFY_INTERVAL_MS) {
       projects[key] = entries;
+    }
   }
   return { projects };
 }
@@ -90,10 +93,14 @@ function readJson(filePath) {
  * updateCheck resolves.
  */
 export function stalenessCheckDisabled(roots = [process.cwd()]) {
-  if (process.env.IMPECCABLE_NO_STALENESS_CHECK) return true;
+  if (process.env.IMPECCABLE_NO_STALENESS_CHECK) {
+    return true;
+  }
   let value;
   for (const root of roots) {
-    if (!root) continue;
+    if (!root) {
+      continue;
+    }
     for (const name of ["config.json", "config.local.json"]) {
       const raw = readJson(path.join(root, ".impeccable", name));
       if (
@@ -117,10 +124,14 @@ export function filterFreshFindings(
   findings,
   { projectRoot, now = Date.now() } = {}
 ) {
-  if (!findings.length) return [];
+  if (!findings.length) {
+    return [];
+  }
   const auto = findings.filter((entry) => entry.severity === "auto");
   const notifiable = findings.filter((entry) => entry.severity !== "auto");
-  if (!notifiable.length) return auto;
+  if (!notifiable.length) {
+    return auto;
+  }
 
   const key = path.resolve(projectRoot || process.cwd());
   const cache = readCache();
@@ -142,7 +153,9 @@ export function filterFreshFindings(
   const next = Object.fromEntries(
     Object.entries(seen).filter(([id]) => live.has(id))
   );
-  for (const entry of fresh) next[entry.id] = now;
+  for (const entry of fresh) {
+    next[entry.id] = now;
+  }
 
   const changed = JSON.stringify(next) !== JSON.stringify(seen);
   if (changed) {
@@ -157,14 +170,16 @@ export function filterFreshFindings(
  * Render the single boot directive, or null when nothing survived throttling.
  */
 export function buildStalenessDirective(findings) {
-  if (!findings.length) return null;
+  if (!findings.length) {
+    return null;
+  }
   const payload = findings.map((entry) => ({
-    id: entry.id,
     artifact: entry.artifact,
+    fix: entry.fix,
+    id: entry.id,
     path: entry.path,
     severity: entry.severity,
     summary: entry.summary,
-    fix: entry.fix,
   }));
 
   const hasReportable = findings.some((entry) => entry.severity !== "auto");

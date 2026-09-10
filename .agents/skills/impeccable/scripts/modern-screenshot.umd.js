@@ -1,39 +1,42 @@
 (function (y, v) {
-  typeof exports == "object" && typeof module != "undefined"
+  typeof exports === "object" && typeof module !== "undefined"
     ? v(exports)
-    : typeof define == "function" && define.amd
+    : typeof define === "function" && define.amd
       ? define(["exports"], v)
-      : ((y = typeof globalThis != "undefined" ? globalThis : y || self),
+      : ((y = typeof globalThis === "undefined" ? y || self : globalThis),
         v((y.modernScreenshot = {})));
-})(this, function (y) {
+})(this, (y) => {
   "use strict";
-  var rr = Object.defineProperty,
-    nr = Object.defineProperties;
-  var or = Object.getOwnPropertyDescriptors;
-  var Z = Object.getOwnPropertySymbols;
-  var xe = Object.prototype.hasOwnProperty,
-    Me = Object.prototype.propertyIsEnumerable;
-  var Oe = Math.pow,
-    Le = (y, v, N) =>
-      v in y
-        ? rr(y, v, { enumerable: !0, configurable: !0, writable: !0, value: N })
-        : (y[v] = N),
-    D = (y, v) => {
-      for (var N in v || (v = {})) xe.call(v, N) && Le(y, N, v[N]);
-      if (Z) for (var N of Z(v)) Me.call(v, N) && Le(y, N, v[N]);
-      return y;
-    },
-    M = (y, v) => nr(y, or(v));
-  var je = (y, v) => {
-    var N = {};
-    for (var R in y) xe.call(y, R) && v.indexOf(R) < 0 && (N[R] = y[R]);
-    if (y != null && Z)
+  const rr = Object.defineProperty;
+  const nr = Object.defineProperties;
+  const or = Object.getOwnPropertyDescriptors;
+  const Z = Object.getOwnPropertySymbols;
+  const xe = Object.prototype.hasOwnProperty;
+  const Me = Object.prototype.propertyIsEnumerable;
+  const Oe = Math.pow;
+  const Le = (y, v, N) =>
+    v in y
+      ? rr(y, v, { enumerable: !0, configurable: !0, writable: !0, value: N })
+      : (y[v] = N);
+  const D = (y, v) => {
+    for (var N in v || (v = {})) xe.call(v, N) && Le(y, N, v[N]);
+    if (Z) for (var N of Z(v)) Me.call(v, N) && Le(y, N, v[N]);
+    return y;
+  };
+  const M = (y, v) => nr(y, or(v));
+  const je = (y, v) => {
+    const N = {};
+    for (var R in y) {
+      xe.call(y, R) && v.indexOf(R) < 0 && (N[R] = y[R]);
+    }
+    if (y != null && Z) {
       for (var R of Z(y)) v.indexOf(R) < 0 && Me.call(y, R) && (N[R] = y[R]);
+    }
     return N;
   };
-  var C = (y, v, N) =>
+  const C = (y, v, N) =>
     new Promise((R, O) => {
-      var X = (P) => {
+      const X = (P) => {
           try {
             q(N.next(P));
           } catch (W) {
@@ -50,7 +53,7 @@
         q = (P) => (P.done ? R(P.value) : Promise.resolve(P.value).then(X, j));
       q((N = N.apply(y, v)).next());
     });
-  var Be;
+  let Be;
   function v(e, t) {
     return (
       (e[13] = 1),
@@ -61,16 +64,18 @@
       e
     );
   }
-  const N = 112,
-    R = 72,
-    O = 89,
-    X = 115;
+  const N = 112;
+  const O = 89;
+  const R = 72;
+  const X = 115;
   let j;
   function q() {
     const e = new Int32Array(256);
     for (let t = 0; t < 256; t++) {
       let r = t;
-      for (let n = 0; n < 8; n++) r = r & 1 ? 3988292384 ^ (r >>> 1) : r >>> 1;
+      for (let n = 0; n < 8; n++) {
+        r = r & 1 ? 3_988_292_384 ^ (r >>> 1) : r >>> 1;
+      }
       e[t] = r;
     }
     return e;
@@ -78,25 +83,29 @@
   function P(e) {
     let t = -1;
     j || (j = q());
-    for (let r = 0; r < e.length; r++) t = j[(t ^ e[r]) & 255] ^ (t >>> 8);
+    for (let r = 0; r < e.length; r++) {
+      t = j[(t ^ e[r]) & 255] ^ (t >>> 8);
+    }
     return t ^ -1;
   }
   function W(e) {
     const t = e.length - 1;
-    for (let r = t; r >= 4; r--)
+    for (let r = t; r >= 4; r--) {
       if (
         e[r - 4] === 9 &&
         e[r - 3] === N &&
         e[r - 2] === R &&
         e[r - 1] === O &&
         e[r] === X
-      )
+      ) {
         return r - 3;
+      }
+    }
     return 0;
   }
   function ae(e, t, r = !1) {
     const n = new Uint8Array(13);
-    (t *= 39.3701),
+    ((t *= 39.3701),
       (n[0] = N),
       (n[1] = R),
       (n[2] = O),
@@ -109,9 +118,9 @@
       (n[9] = n[5]),
       (n[10] = n[6]),
       (n[11] = n[7]),
-      (n[12] = 1);
-    const i = P(n),
-      a = new Uint8Array(4);
+      (n[12] = 1));
+    const i = P(n);
+    const a = new Uint8Array(4);
     if (
       ((a[0] = i >>> 24),
       (a[1] = i >>> 16),
@@ -120,54 +129,55 @@
       r)
     ) {
       const s = W(e);
-      return e.set(n, s), e.set(a, s + 13), e;
-    } else {
-      const s = new Uint8Array(4);
-      (s[0] = 0), (s[1] = 0), (s[2] = 0), (s[3] = 9);
-      const o = new Uint8Array(54);
-      return o.set(e, 0), o.set(s, 33), o.set(n, 37), o.set(a, 50), o;
+      return (e.set(n, s), e.set(a, s + 13), e);
     }
+    const s = new Uint8Array(4);
+    ((s[0] = 0), (s[1] = 0), (s[2] = 0), (s[3] = 9));
+    const o = new Uint8Array(54);
+    return (o.set(e, 0), o.set(s, 33), o.set(n, 37), o.set(a, 50), o);
   }
-  const qe = "AAlwSFlz",
-    We = "AAAJcEhZ",
-    He = "AAAACXBI";
+  const He = "AAAACXBI";
+  const We = "AAAJcEhZ";
+  const qe = "AAlwSFlz";
   function Ve(e) {
     let t = e.indexOf(qe);
-    return t === -1 && (t = e.indexOf(We)), t === -1 && (t = e.indexOf(He)), t;
+    return (
+      t === -1 && (t = e.indexOf(We)), t === -1 && (t = e.indexOf(He)), t
+    );
   }
-  const se = "[modern-screenshot]",
-    U = typeof window != "undefined",
-    ze = U && "Worker" in window,
-    ie = U && "atob" in window,
-    Xe = U && "btoa" in window,
-    ee = U ? ((Be = window.navigator) == null ? void 0 : Be.userAgent) : "",
-    le = ee.includes("Chrome"),
-    G = ee.includes("AppleWebKit") && !le,
-    te = ee.includes("Firefox"),
-    Ge = (e) => e && "__CONTEXT__" in e,
-    Ye = (e) => e.constructor.name === "CSSFontFaceRule",
-    Je = (e) => e.constructor.name === "CSSImportRule",
-    Ke = (e) => e.constructor.name === "CSSLayerBlockRule",
-    I = (e) => e.nodeType === 1,
-    H = (e) => typeof e.className == "object",
-    ce = (e) => e.tagName === "image",
-    Qe = (e) => e.tagName === "use",
-    V = (e) => I(e) && typeof e.style != "undefined" && !H(e),
-    Ze = (e) => e.nodeType === 8,
-    et = (e) => e.nodeType === 3,
-    $ = (e) => e.tagName === "IMG",
-    Y = (e) => e.tagName === "VIDEO",
-    tt = (e) => e.tagName === "CANVAS",
-    rt = (e) => e.tagName === "TEXTAREA",
-    nt = (e) => e.tagName === "INPUT",
-    ot = (e) => e.tagName === "STYLE",
-    at = (e) => e.tagName === "SCRIPT",
-    st = (e) => e.tagName === "SELECT",
-    it = (e) => e.tagName === "SLOT",
-    lt = (e) => e.tagName === "IFRAME",
-    ct = (...e) => console.warn(se, ...e);
+  const se = "[modern-screenshot]";
+  const U = typeof window !== "undefined";
+  const ze = U && "Worker" in window;
+  const ie = U && "atob" in window;
+  const Xe = U && "btoa" in window;
+  const ee = U ? ((Be = window.navigator) == null ? void 0 : Be.userAgent) : "";
+  const le = ee.includes("Chrome");
+  const G = ee.includes("AppleWebKit") && !le;
+  const te = ee.includes("Firefox");
+  const Ge = (e) => e && "__CONTEXT__" in e;
+  const Ye = (e) => e.constructor.name === "CSSFontFaceRule";
+  const Je = (e) => e.constructor.name === "CSSImportRule";
+  const Ke = (e) => e.constructor.name === "CSSLayerBlockRule";
+  const I = (e) => e.nodeType === 1;
+  const H = (e) => typeof e.className === "object";
+  const ce = (e) => e.tagName === "image";
+  const Qe = (e) => e.tagName === "use";
+  const V = (e) => I(e) && e.style !== undefined && !H(e);
+  const Ze = (e) => e.nodeType === 8;
+  const et = (e) => e.nodeType === 3;
+  const $ = (e) => e.tagName === "IMG";
+  const Y = (e) => e.tagName === "VIDEO";
+  const tt = (e) => e.tagName === "CANVAS";
+  const rt = (e) => e.tagName === "TEXTAREA";
+  const nt = (e) => e.tagName === "INPUT";
+  const ot = (e) => e.tagName === "STYLE";
+  const at = (e) => e.tagName === "SCRIPT";
+  const st = (e) => e.tagName === "SELECT";
+  const it = (e) => e.tagName === "SLOT";
+  const lt = (e) => e.tagName === "IFRAME";
+  const ct = (...e) => console.warn(se, ...e);
   function ut(e) {
-    var r;
+    let r;
     const t =
       (r = e == null ? void 0 : e.createElement) == null
         ? void 0
@@ -181,25 +191,31 @@
   }
   const re = (e) => e.startsWith("data:");
   function ue(e, t) {
-    if (e.match(/^[a-z]+:\/\//i)) return e;
-    if (U && e.match(/^\/\//)) return window.location.protocol + e;
-    if (e.match(/^[a-z]+:/i) || !U) return e;
-    const r = J().implementation.createHTMLDocument(),
-      n = r.createElement("base"),
-      i = r.createElement("a");
+    if (/^[a-z]+:\/\//i.test(e)) {
+      return e;
+    }
+    if (U && e.match(/^\/\//)) {
+      return window.location.protocol + e;
+    }
+    if (e.match(/^[a-z]+:/i) || !U) {
+      return e;
+    }
+    const r = J().implementation.createHTMLDocument();
+    const n = r.createElement("base");
+    const i = r.createElement("a");
     return (
-      r.head.appendChild(n),
-      r.body.appendChild(i),
+      r.head.append(n),
+      r.body.append(i),
       t && (n.href = t),
       (i.href = e),
       i.href
     );
   }
   function J(e) {
-    var t;
-    return (t = e && I(e) ? (e == null ? void 0 : e.ownerDocument) : e) != null
-      ? t
-      : window.document;
+    let t;
+    return (t = e && I(e) ? (e == null ? void 0 : e.ownerDocument) : e) == null
+      ? window.document
+      : t;
   }
   const K = "http://www.w3.org/2000/svg";
   function fe(e, t, r) {
@@ -215,7 +231,7 @@
     let r = new XMLSerializer().serializeToString(e);
     return (
       t &&
-        (r = r.replace(
+        (r = r.replaceAll(
           /[\u0000-\u0008\v\f\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/gu,
           ""
         )),
@@ -234,98 +250,111 @@
             r
           );
         });
-      } catch (n) {
-        if (ie) return dt(e.toDataURL(t, r));
-        throw n;
+      } catch (error) {
+        if (ie) {
+          return dt(e.toDataURL(t, r));
+        }
+        throw error;
       }
     });
   }
   function dt(e) {
-    var o, c;
-    const [t, r] = e.split(","),
-      n =
-        (c = (o = t.match(/data:(.+);/)) == null ? void 0 : o[1]) != null
-          ? c
-          : void 0,
-      i = window.atob(r),
-      a = i.length,
-      s = new Uint8Array(a);
-    for (let u = 0; u < a; u += 1) s[u] = i.charCodeAt(u);
+    let c, o;
+    const [t, r] = e.split(",");
+    const n =
+      (c = (o = t.match(/data:(.+);/)) == null ? void 0 : o[1]) == null
+        ? void 0
+        : c;
+    const i = window.atob(r);
+    const a = i.length;
+    const s = new Uint8Array(a);
+    for (let u = 0; u < a; u += 1) {
+      s[u] = i.charCodeAt(u);
+    }
     return new Blob([s], { type: n });
   }
   function ge(e, t) {
     return new Promise((r, n) => {
       const i = new FileReader();
-      (i.onload = () => r(i.result)),
+      ((i.onload = () => r(i.result)),
         (i.onerror = () => n(i.error)),
         (i.onabort = () => n(new Error(`Failed read blob to ${t}`))),
         t === "dataUrl"
           ? i.readAsDataURL(e)
-          : t === "arrayBuffer" && i.readAsArrayBuffer(e);
+          : t === "arrayBuffer" && i.readAsArrayBuffer(e));
     });
   }
-  const gt = (e) => ge(e, "dataUrl"),
-    mt = (e) => ge(e, "arrayBuffer");
+  const gt = (e) => ge(e, "dataUrl");
+  const mt = (e) => ge(e, "arrayBuffer");
   function _(e, t) {
     const r = J(t).createElement("img");
-    return (r.decoding = "sync"), (r.loading = "eager"), (r.src = e), r;
+    return ((r.decoding = "sync"), (r.loading = "eager"), (r.src = e), r);
   }
   function L(e, t) {
     return new Promise((r) => {
       const {
-          timeout: n,
-          ownerDocument: i,
-          onError: a,
-          onWarn: s,
-        } = t != null ? t : {},
-        o = typeof e == "string" ? _(e, J(i)) : e;
-      let c = null,
-        u = null;
+        timeout: n,
+        ownerDocument: i,
+        onError: a,
+        onWarn: s,
+      } = t == null ? {} : t;
+      const o = typeof e === "string" ? _(e, J(i)) : e;
+      let c = null;
+      let u = null;
       function l() {
-        r(o), c && clearTimeout(c), u == null || u();
+        (r(o), c && clearTimeout(c), u == null || u());
       }
       if ((n && (c = setTimeout(l, n)), Y(o))) {
         const d = o.currentSrc || o.src;
-        if (!d) return o.poster ? L(o.poster, t).then(r) : l();
-        if (o.readyState >= 2) return l();
-        const m = l,
-          f = (h) => {
-            s == null || s("Failed video load", d, h), a == null || a(h), l();
-          };
-        (u = () => {
-          o.removeEventListener("loadeddata", m),
-            o.removeEventListener("error", f);
+        if (!d) {
+          return o.poster ? L(o.poster, t).then(r) : l();
+        }
+        if (o.readyState >= 2) {
+          return l();
+        }
+        const m = l;
+        const f = (h) => {
+          (s == null || s("Failed video load", d, h), a == null || a(h), l());
+        };
+        ((u = () => {
+          (o.removeEventListener("loadeddata", m),
+            o.removeEventListener("error", f));
         }),
           o.addEventListener("loadeddata", m, { once: !0 }),
-          o.addEventListener("error", f, { once: !0 });
+          o.addEventListener("error", f, { once: !0 }));
       } else {
         const d = ce(o) ? o.href.baseVal : o.currentSrc || o.src;
-        if (!d) return l();
+        if (!d) {
+          return l();
+        }
         const m = () =>
-            C(this, null, function* () {
-              if ($(o) && "decode" in o)
-                try {
-                  yield o.decode();
-                } catch (h) {
-                  s == null ||
-                    s(
-                      "Failed to decode image, trying to render anyway",
-                      o.dataset.originalSrc || d,
-                      h
-                    );
-                }
-              l();
-            }),
-          f = (h) => {
-            s == null || s("Failed image load", o.dataset.originalSrc || d, h),
-              l();
-          };
-        if ($(o) && o.complete) return m();
-        (u = () => {
-          o.removeEventListener("load", m), o.removeEventListener("error", f);
+          C(this, null, function* m() {
+            if ($(o) && "decode" in o) {
+              try {
+                yield o.decode();
+              } catch (error) {
+                s == null ||
+                  s(
+                    "Failed to decode image, trying to render anyway",
+                    o.dataset.originalSrc || d,
+                    error
+                  );
+              }
+            }
+            l();
+          });
+        const f = (h) => {
+          (s == null || s("Failed image load", o.dataset.originalSrc || d, h),
+            l());
+        };
+        if ($(o) && o.complete) {
+          return m();
+        }
+        ((u = () => {
+          (o.removeEventListener("load", m), o.removeEventListener("error", f));
         }),
           o.addEventListener("load", m, { once: !0 }),
-          o.addEventListener("error", f, { once: !0 });
+          o.addEventListener("error", f, { once: !0 }));
       }
     });
   }
@@ -336,12 +365,12 @@
           ? yield L(e, t)
           : yield Promise.all(
               ["img", "video"].flatMap((r) =>
-                Array.from(e.querySelectorAll(r)).map((n) => L(n, t))
+                [...e.querySelectorAll(r)].map((n) => L(n, t))
               )
             ));
     });
   }
-  const he = (function () {
+  const he = (function he() {
     let t = 0;
     const r = () =>
       `0000${((Math.random() * Oe(36, 4)) << 0).toString(36)}`.slice(-4);
@@ -352,7 +381,7 @@
       ? void 0
       : e
           .split(",")
-          .map((t) => t.trim().replace(/"|'/g, "").toLowerCase())
+          .map((t) => t.trim().replaceAll(/"|'/g, "").toLowerCase())
           .filter(Boolean);
   }
   let pe = 0;
@@ -377,193 +406,197 @@
   }
   function ye(e, t) {
     return C(this, null, function* () {
-      var f, h, g, p, E;
-      const { scale: r = 1, workerUrl: n, workerNumber: i = 1 } = t || {},
-        a = !!(t != null && t.debug),
-        s = (f = t == null ? void 0 : t.features) != null ? f : !0,
-        o = (h = e.ownerDocument) != null ? h : U ? window.document : void 0,
-        c =
-          (p = (g = e.ownerDocument) == null ? void 0 : g.defaultView) != null
-            ? p
-            : U
-              ? window
-              : void 0,
-        u = new Map(),
-        l = M(
-          D(
-            {
-              width: 0,
-              height: 0,
-              quality: 1,
-              type: "image/png",
-              scale: r,
-              backgroundColor: null,
-              style: null,
-              filter: null,
-              maximumCanvasSize: 0,
-              timeout: 3e4,
-              progress: null,
-              debug: a,
-              fetch: D(
-                {
-                  requestInit: wt(
-                    (E = t == null ? void 0 : t.fetch) == null
-                      ? void 0
-                      : E.bypassingCache
-                  ),
-                  placeholderImage:
-                    "data:image/png;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
-                  bypassingCache: !1,
-                },
-                t == null ? void 0 : t.fetch
-              ),
-              fetchFn: null,
-              font: {},
-              drawImageInterval: 100,
-              workerUrl: null,
-              workerNumber: i,
-              onCloneEachNode: null,
-              onCloneNode: null,
-              onEmbedNode: null,
-              onCreateForeignObjectSvg: null,
-              includeStyleProperties: null,
-              autoDestruct: !1,
-            },
-            t
-          ),
+      let E, f, g, h, p;
+      const { scale: r = 1, workerUrl: n, workerNumber: i = 1 } = t || {};
+      const a = !!(t != null && t.debug);
+      const s = (f = t == null ? void 0 : t.features) == null ? !0 : f;
+      const o =
+        (h = e.ownerDocument) == null ? (U ? window.document : void 0) : h;
+      const c =
+        (p = (g = e.ownerDocument) == null ? void 0 : g.defaultView) == null
+          ? U
+            ? window
+            : void 0
+          : p;
+      const u = new Map();
+      const l = M(
+        D(
           {
-            __CONTEXT__: !0,
-            log: ht(a),
-            node: e,
-            ownerDocument: o,
-            ownerWindow: c,
-            dpi: r === 1 ? null : 96 * r,
-            svgStyleElement: be(o),
-            svgDefsElement: o == null ? void 0 : o.createElementNS(K, "defs"),
-            svgStyles: new Map(),
-            defaultComputedStyles: new Map(),
-            workers: [...Array.from({ length: ze && n && i ? i : 0 })]
-              .map(() => {
-                try {
-                  const b = new Worker(n);
-                  return (
-                    (b.onmessage = (w) =>
-                      C(this, null, function* () {
-                        var A, F, B, $e;
-                        const { url: S, result: T } = w.data;
-                        T
-                          ? (F = (A = u.get(S)) == null ? void 0 : A.resolve) ==
-                              null || F.call(A, T)
-                          : ($e = (B = u.get(S)) == null ? void 0 : B.reject) ==
-                              null ||
-                            $e.call(
-                              B,
-                              new Error(
-                                `Error receiving message from worker: ${S}`
-                              )
-                            );
-                      })),
-                    (b.onmessageerror = (w) => {
-                      var T, A;
-                      const { url: S } = w.data;
-                      (A = (T = u.get(S)) == null ? void 0 : T.reject) ==
-                        null ||
-                        A.call(
-                          T,
-                          new Error(`Error receiving message from worker: ${S}`)
-                        );
-                    }),
-                    b
-                  );
-                } catch (b) {
-                  return l.log.warn("Failed to new Worker", b), null;
-                }
-              })
-              .filter(Boolean),
-            fontFamilies: new Map(),
-            fontCssTexts: new Map(),
-            acceptOfImage: `${[ut(o) && "image/webp", "image/svg+xml", "image/*", "*/*"].filter(Boolean).join(",")};q=0.8`,
-            requests: u,
-            drawImageCount: 0,
-            tasks: [],
-            features: s,
-            isEnable: (b) => {
-              var w, S;
-              return b === "restoreScrollPosition"
-                ? typeof s == "boolean"
+            autoDestruct: !1,
+            backgroundColor: null,
+            debug: a,
+            drawImageInterval: 100,
+            fetch: D(
+              {
+                bypassingCache: !1,
+                placeholderImage:
+                  "data:image/png;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+                requestInit: wt(
+                  (E = t == null ? void 0 : t.fetch) == null
+                    ? void 0
+                    : E.bypassingCache
+                ),
+              },
+              t == null ? void 0 : t.fetch
+            ),
+            fetchFn: null,
+            filter: null,
+            font: {},
+            height: 0,
+            includeStyleProperties: null,
+            maximumCanvasSize: 0,
+            onCloneEachNode: null,
+            onCloneNode: null,
+            onCreateForeignObjectSvg: null,
+            onEmbedNode: null,
+            progress: null,
+            quality: 1,
+            scale: r,
+            style: null,
+            timeout: 3e4,
+            type: "image/png",
+            width: 0,
+            workerNumber: i,
+            workerUrl: null,
+          },
+          t
+        ),
+        {
+          __CONTEXT__: !0,
+          acceptOfImage: `${[ut(o) && "image/webp", "image/svg+xml", "image/*", "*/*"].filter(Boolean).join(",")};q=0.8`,
+          defaultComputedStyles: new Map(),
+          dpi: r === 1 ? null : 96 * r,
+          drawImageCount: 0,
+          features: s,
+          fontCssTexts: new Map(),
+          fontFamilies: new Map(),
+          isEnable: (b) => {
+            let w, S;
+            return b === "restoreScrollPosition"
+              ? typeof s === "boolean"
+                ? !1
+                : (w = s[b]) == null
                   ? !1
-                  : (w = s[b]) != null
-                    ? w
-                    : !1
-                : typeof s == "boolean"
-                  ? s
-                  : (S = s[b]) != null
-                    ? S
-                    : !0;
-            },
-            shadowRoots: [],
-          }
-        );
-      l.log.time("wait until load"),
-        yield me(e, { timeout: l.timeout, onWarn: l.log.warn }),
-        l.log.timeEnd("wait until load");
+                  : w
+              : typeof s === "boolean"
+                ? s
+                : (S = s[b]) == null
+                  ? !0
+                  : S;
+          },
+          log: ht(a),
+          node: e,
+          ownerDocument: o,
+          ownerWindow: c,
+          requests: u,
+          shadowRoots: [],
+          svgDefsElement: o == null ? void 0 : o.createElementNS(K, "defs"),
+          svgStyleElement: be(o),
+          svgStyles: new Map(),
+          tasks: [],
+          workers: Array.from({ length: ze && n && i ? i : 0 })
+            .map(() => {
+              try {
+                const b = new Worker(n);
+                return (
+                  (b.onmessage = (w) =>
+                    C(this, null, function* onmessage() {
+                      let A, F, B, $e;
+                      const { url: S, result: T } = w.data;
+                      T
+                        ? (F = (A = u.get(S)) == null ? void 0 : A.resolve) ==
+                            null || F.call(A, T)
+                        : ($e = (B = u.get(S)) == null ? void 0 : B.reject) ==
+                            null ||
+                          $e.call(
+                            B,
+                            new Error(
+                              `Error receiving message from worker: ${S}`
+                            )
+                          );
+                    })),
+                  (b.onmessageerror = (w) => {
+                    let T, A;
+                    const { url: S } = w.data;
+                    (A = (T = u.get(S)) == null ? void 0 : T.reject) == null ||
+                      A.call(
+                        T,
+                        new Error(`Error receiving message from worker: ${S}`)
+                      );
+                  }),
+                  b
+                );
+              } catch (error) {
+                return (l.log.warn("Failed to new Worker", error), null);
+              }
+            })
+            .filter(Boolean),
+        }
+      );
+      (l.log.time("wait until load"),
+        yield me(e, { onWarn: l.log.warn, timeout: l.timeout }),
+        l.log.timeEnd("wait until load"));
       const { width: d, height: m } = pt(e, l);
-      return (l.width = d), (l.height = m), l;
+      return ((l.width = d), (l.height = m), l);
     });
   }
   function be(e) {
-    if (!e) return;
-    const t = e.createElement("style"),
-      r = t.ownerDocument.createTextNode(`
+    if (!e) {
+      return;
+    }
+    const t = e.createElement("style");
+    const r = t.ownerDocument.createTextNode(`
 .______background-clip--text {
   background-clip: text;
   -webkit-background-clip: text;
 }
 `);
-    return t.appendChild(r), t;
+    return (t.append(r), t);
   }
   function pt(e, t) {
     let { width: r, height: n } = t;
     if (I(e) && (!r || !n)) {
       const i = e.getBoundingClientRect();
-      (r = r || i.width || Number(e.getAttribute("width")) || 0),
-        (n = n || i.height || Number(e.getAttribute("height")) || 0);
+      ((r = r || i.width || Number(e.getAttribute("width")) || 0),
+        (n = n || i.height || Number(e.getAttribute("height")) || 0));
     }
-    return { width: r, height: n };
+    return { height: n, width: r };
   }
   function yt(e, t) {
     return C(this, null, function* () {
       const { log: r, timeout: n, drawImageCount: i, drawImageInterval: a } = t;
       r.time("image to canvas");
-      const s = yield L(e, { timeout: n, onWarn: t.log.warn }),
-        { canvas: o, context2d: c } = bt(e.ownerDocument, t),
-        u = () => {
-          try {
-            c == null || c.drawImage(s, 0, 0, o.width, o.height);
-          } catch (l) {
-            t.log.warn("Failed to drawImage", l);
-          }
-        };
-      if ((u(), t.isEnable("fixSvgXmlDecode")))
-        for (let l = 0; l < i; l++)
+      const s = yield L(e, { onWarn: t.log.warn, timeout: n });
+      const { canvas: o, context2d: c } = bt(e.ownerDocument, t);
+      const u = () => {
+        try {
+          c == null || c.drawImage(s, 0, 0, o.width, o.height);
+        } catch (error) {
+          t.log.warn("Failed to drawImage", error);
+        }
+      };
+      if ((u(), t.isEnable("fixSvgXmlDecode"))) {
+        for (let l = 0; l < i; l++) {
           yield new Promise((d) => {
             setTimeout(() => {
-              c == null || c.clearRect(0, 0, o.width, o.height), u(), d();
+              (c == null || c.clearRect(0, 0, o.width, o.height), u(), d());
             }, l + a);
           });
-      return (t.drawImageCount = 0), r.timeEnd("image to canvas"), o;
+        }
+      }
+      return ((t.drawImageCount = 0), r.timeEnd("image to canvas"), o);
     });
   }
   function bt(e, t) {
     const {
-        width: r,
-        height: n,
-        scale: i,
-        backgroundColor: a,
-        maximumCanvasSize: s,
-      } = t,
-      o = e.createElement("canvas");
-    (o.width = Math.floor(r * i)),
+      width: r,
+      height: n,
+      scale: i,
+      backgroundColor: a,
+      maximumCanvasSize: s,
+    } = t;
+    const o = e.createElement("canvas");
+    ((o.width = Math.floor(r * i)),
       (o.height = Math.floor(n * i)),
       (o.style.width = `${r}px`),
       (o.style.height = `${n}px`),
@@ -575,7 +608,7 @@
             : ((o.width *= s / o.height), (o.height = s))
           : o.width > s
             ? ((o.height *= s / o.width), (o.width = s))
-            : ((o.width *= s / o.height), (o.height = s)));
+            : ((o.width *= s / o.height), (o.height = s))));
     const c = o.getContext("2d");
     return (
       c && a && ((c.fillStyle = a), c.fillRect(0, 0, o.width, o.height)),
@@ -583,36 +616,40 @@
     );
   }
   function Se(e, t) {
-    if (e.ownerDocument)
+    if (e.ownerDocument) {
       try {
         const a = e.toDataURL();
-        if (a !== "data:,") return _(a, e.ownerDocument);
-      } catch (a) {
-        t.log.warn("Failed to clone canvas", a);
+        if (a !== "data:,") {
+          return _(a, e.ownerDocument);
+        }
+      } catch (error) {
+        t.log.warn("Failed to clone canvas", error);
       }
-    const r = e.cloneNode(!1),
-      n = e.getContext("2d"),
-      i = r.getContext("2d");
+    }
+    const r = e.cloneNode(!1);
+    const n = e.getContext("2d");
+    const i = r.getContext("2d");
     try {
       return (
         n && i && i.putImageData(n.getImageData(0, 0, e.width, e.height), 0, 0),
         r
       );
-    } catch (a) {
-      t.log.warn("Failed to clone canvas", a);
+    } catch (error) {
+      t.log.warn("Failed to clone canvas", error);
     }
     return r;
   }
   function St(e, t) {
-    var r;
+    let r;
     try {
       if (
         (r = e == null ? void 0 : e.contentDocument) != null &&
         r.documentElement
-      )
+      ) {
         return ne(e.contentDocument.documentElement, t);
-    } catch (n) {
-      t.log.warn("Failed to clone iframe", n);
+      }
+    } catch (error) {
+      t.log.warn("Failed to clone iframe", error);
     }
     return e.cloneNode(!1);
   }
@@ -628,28 +665,30 @@
   }
   function Ct(e, t) {
     return C(this, null, function* () {
-      if (e.ownerDocument && !e.currentSrc && e.poster)
+      if (e.ownerDocument && !e.currentSrc && e.poster) {
         return _(e.poster, e.ownerDocument);
+      }
       const r = e.cloneNode(!1);
-      (r.crossOrigin = "anonymous"),
-        e.currentSrc && e.currentSrc !== e.src && (r.src = e.currentSrc);
+      ((r.crossOrigin = "anonymous"),
+        e.currentSrc && e.currentSrc !== e.src && (r.src = e.currentSrc));
       const n = r.ownerDocument;
       if (n) {
         let i = !0;
-        if ((yield L(r, { onError: () => (i = !1), onWarn: t.log.warn }), !i))
+        if ((yield L(r, { onError: () => (i = !1), onWarn: t.log.warn }), !i)) {
           return e.poster ? _(e.poster, e.ownerDocument) : r;
-        (r.currentTime = e.currentTime),
+        }
+        ((r.currentTime = e.currentTime),
           yield new Promise((s) => {
             r.addEventListener("seeked", s, { once: !0 });
-          });
+          }));
         const a = n.createElement("canvas");
-        (a.width = e.offsetWidth), (a.height = e.offsetHeight);
+        ((a.width = e.offsetWidth), (a.height = e.offsetHeight));
         try {
           const s = a.getContext("2d");
           s && s.drawImage(r, 0, 0, a.width, a.height);
-        } catch (s) {
+        } catch (error) {
           return (
-            t.log.warn("Failed to clone video", s),
+            t.log.warn("Failed to clone video", error),
             e.poster ? _(e.poster, e.ownerDocument) : r
           );
         }
@@ -681,94 +720,104 @@
           (t.height = "0"),
           (t.style.visibility = "hidden"),
           (t.style.position = "fixed"),
-          r.body.appendChild(t),
+          r.body.append(t),
           (t.srcdoc =
             '<!DOCTYPE html><meta charset="UTF-8"><title></title><body>'),
           (e.sandbox = t));
-      } catch (n) {
-        e.log.warn("Failed to getSandBox", n);
+      } catch (error) {
+        e.log.warn("Failed to getSandBox", error);
       }
     }
     return t;
   }
-  const At = ["width", "height", "-webkit-text-fill-color"],
-    Nt = ["stroke", "fill"];
+  const At = new Set(["width", "height", "-webkit-text-fill-color"]);
+  const Nt = ["stroke", "fill"];
   function Ee(e, t, r) {
-    const { defaultComputedStyles: n } = r,
-      i = e.nodeName.toLowerCase(),
-      a = H(e) && i !== "svg",
-      s = a
-        ? Nt.map((g) => [g, e.getAttribute(g)]).filter(([, g]) => g !== null)
-        : [],
-      o = [a && "svg", i, s.map((g, p) => `${g}=${p}`).join(","), t]
-        .filter(Boolean)
-        .join(":");
-    if (n.has(o)) return n.get(o);
-    const c = vt(r),
-      u = c == null ? void 0 : c.contentWindow;
-    if (!u) return new Map();
+    const { defaultComputedStyles: n } = r;
+    const i = e.nodeName.toLowerCase();
+    const a = H(e) && i !== "svg";
+    const s = a
+      ? Nt.map((g) => [g, e.getAttribute(g)]).filter(([, g]) => g !== null)
+      : [];
+    const o = [a && "svg", i, s.map((g, p) => `${g}=${p}`).join(","), t]
+      .filter(Boolean)
+      .join(":");
+    if (n.has(o)) {
+      return n.get(o);
+    }
+    const c = vt(r);
+    const u = c == null ? void 0 : c.contentWindow;
+    if (!u) {
+      return new Map();
+    }
     const l = u == null ? void 0 : u.document;
-    let d, m;
-    a
+    let d;
+    let m;
+    (a
       ? ((d = l.createElementNS(K, "svg")),
         (m = d.ownerDocument.createElementNS(d.namespaceURI, i)),
         s.forEach(([g, p]) => {
           m.setAttributeNS(null, g, p);
         }),
-        d.appendChild(m))
+        d.append(m))
       : (d = m = l.createElement(i)),
       (m.textContent = " "),
-      l.body.appendChild(d);
-    const f = u.getComputedStyle(m, t),
-      h = new Map();
+      l.body.append(d));
+    const f = u.getComputedStyle(m, t);
+    const h = new Map();
     for (let g = f.length, p = 0; p < g; p++) {
       const E = f.item(p);
-      At.includes(E) || h.set(E, f.getPropertyValue(E));
+      At.has(E) || h.set(E, f.getPropertyValue(E));
     }
-    return l.body.removeChild(d), n.set(o, h), h;
+    return (l.body.removeChild(d), n.set(o, h), h);
   }
   function Ce(e, t, r) {
-    var o;
-    const n = new Map(),
-      i = [],
-      a = new Map();
-    if (r) for (const c of r) s(c);
-    else
+    let o;
+    const n = new Map();
+    const i = [];
+    const a = new Map();
+    if (r) {
+      for (const c of r) {
+        s(c);
+      }
+    } else {
       for (let c = e.length, u = 0; u < c; u++) {
         const l = e.item(u);
         s(l);
       }
-    for (let c = i.length, u = 0; u < c; u++)
+    }
+    for (let c = i.length, u = 0; u < c; u++) {
       (o = a.get(i[u])) == null || o.forEach((l, d) => n.set(d, l));
+    }
     function s(c) {
-      const u = e.getPropertyValue(c),
-        l = e.getPropertyPriority(c),
-        d = c.lastIndexOf("-"),
-        m = d > -1 ? c.substring(0, d) : void 0;
+      const u = e.getPropertyValue(c);
+      const l = e.getPropertyPriority(c);
+      const d = c.lastIndexOf("-");
+      const m = d === -1 ? void 0 : c.substring(0, d);
       if (m) {
         let f = a.get(m);
-        f || ((f = new Map()), a.set(m, f)), f.set(c, [u, l]);
+        (f || ((f = new Map()), a.set(m, f)), f.set(c, [u, l]));
       }
       (t.get(c) === u && !l) || (m ? i.push(m) : n.set(c, [u, l]));
     }
     return n;
   }
   function Rt(e, t, r, n) {
-    var d, m, f, h;
+    let d, f, h, m;
     const {
-        ownerWindow: i,
-        includeStyleProperties: a,
-        currentParentNodeStyle: s,
-      } = n,
-      o = t.style,
-      c = i.getComputedStyle(e),
-      u = Ee(e, null, n);
+      ownerWindow: i,
+      includeStyleProperties: a,
+      currentParentNodeStyle: s,
+    } = n;
+    const o = t.style;
+    const c = i.getComputedStyle(e);
+    const u = Ee(e, null, n);
     s == null ||
       s.forEach((g, p) => {
         u.delete(p);
       });
     const l = Ce(c, u, a);
-    l.delete("transition-property"),
+    (l.delete("transition-property"),
       l.delete("all"),
       l.delete("d"),
       l.delete("content"),
@@ -792,8 +841,10 @@
           ((h = l.get("text-overflow")) == null ? void 0 : h[0]) ===
             "ellipsis" &&
           e.scrollWidth === e.clientWidth &&
-          l.set("text-overflow", ["clip", ""]));
-    for (let g = o.length, p = 0; p < g; p++) o.removeProperty(o.item(p));
+          l.set("text-overflow", ["clip", ""])));
+    for (let g = o.length, p = 0; p < g; p++) {
+      o.removeProperty(o.item(p));
+    }
     return (
       l.forEach(([g, p], E) => {
         o.setProperty(E, g, p);
@@ -804,16 +855,16 @@
   function It(e, t) {
     (rt(e) || nt(e) || st(e)) && t.setAttribute("value", e.value);
   }
-  const kt = ["::before", "::after"],
-    Dt = [
-      "::-webkit-scrollbar",
-      "::-webkit-scrollbar-button",
-      "::-webkit-scrollbar-thumb",
-      "::-webkit-scrollbar-track",
-      "::-webkit-scrollbar-track-piece",
-      "::-webkit-scrollbar-corner",
-      "::-webkit-resizer",
-    ];
+  const kt = ["::before", "::after"];
+  const Dt = [
+    "::-webkit-scrollbar",
+    "::-webkit-scrollbar-button",
+    "::-webkit-scrollbar-thumb",
+    "::-webkit-scrollbar-track",
+    "::-webkit-scrollbar-track-piece",
+    "::-webkit-scrollbar-corner",
+    "::-webkit-resizer",
+  ];
   function Pt(e, t, r, n, i) {
     const {
       ownerWindow: a,
@@ -821,80 +872,93 @@
       svgStyles: o,
       currentNodeStyle: c,
     } = n;
-    if (!s || !a) return;
+    if (!s || !a) {
+      return;
+    }
     function u(l) {
-      var w;
+      let w;
       const d = a.getComputedStyle(e, l);
       let m = d.getPropertyValue("content");
-      if (!m || m === "none") return;
-      i == null || i(m), (m = m.replace(/(')|(")|(counter\(.+\))/g, ""));
-      const f = [he()],
-        h = Ee(e, l, n);
+      if (!m || m === "none") {
+        return;
+      }
+      (i == null || i(m), (m = m.replaceAll(/(')|(")|(counter\(.+\))/g, "")));
+      const f = [he()];
+      const h = Ee(e, l, n);
       c == null ||
         c.forEach((S, T) => {
           h.delete(T);
         });
       const g = Ce(d, h, n.includeStyleProperties);
-      g.delete("content"),
+      (g.delete("content"),
         g.delete("-webkit-locale"),
         ((w = g.get("background-clip")) == null ? void 0 : w[0]) === "text" &&
-          t.classList.add("______background-clip--text");
+          t.classList.add("______background-clip--text"));
       const p = [`content: '${m}';`];
       if (
         (g.forEach(([S, T], A) => {
           p.push(`${A}: ${S}${T ? " !important" : ""};`);
         }),
         p.length === 1)
-      )
+      ) {
         return;
+      }
       try {
         t.className = [t.className, ...f].join(" ");
-      } catch (S) {
-        n.log.warn("Failed to copyPseudoClass", S);
+      } catch (error) {
+        n.log.warn("Failed to copyPseudoClass", error);
         return;
       }
       const E = p.join(`
   `);
       let b = o.get(E);
-      b || ((b = []), o.set(E, b)), b.push(`.${f[0]}${l}`);
+      (b || ((b = []), o.set(E, b)), b.push(`.${f[0]}${l}`));
     }
-    kt.forEach(u), r && Dt.forEach(u);
+    (kt.forEach(u), r && Dt.forEach(u));
   }
   const Te = new Set(["symbol"]);
   function ve(e, t, r, n, i) {
     return C(this, null, function* () {
-      if ((I(r) && (ot(r) || at(r))) || (n.filter && !n.filter(r))) return;
+      if ((I(r) && (ot(r) || at(r))) || (n.filter && !n.filter(r))) {
+        return;
+      }
       Te.has(t.nodeName) || Te.has(r.nodeName)
         ? (n.currentParentNodeStyle = void 0)
         : (n.currentParentNodeStyle = n.currentNodeStyle);
       const a = yield ne(r, n, !1, i);
-      n.isEnable("restoreScrollPosition") && Ut(e, a), t.appendChild(a);
+      (n.isEnable("restoreScrollPosition") && Ut(e, a), t.append(a));
     });
   }
   function Ae(e, t, r, n) {
     return C(this, null, function* () {
-      var a;
+      let a;
       let i = e.firstChild;
       I(e) &&
         e.shadowRoot &&
         ((i = (a = e.shadowRoot) == null ? void 0 : a.firstChild),
         r.shadowRoots.push(e.shadowRoot));
-      for (let s = i; s; s = s.nextSibling)
-        if (!Ze(s))
+      for (let s = i; s; s = s.nextSibling) {
+        if (!Ze(s)) {
           if (I(s) && it(s) && typeof s.assignedNodes == "function") {
             const o = s.assignedNodes();
             for (let c = 0; c < o.length; c++) yield ve(e, t, o[c], r, n);
           } else yield ve(e, t, s, r, n);
+        }
+      }
     });
   }
   function Ut(e, t) {
-    if (!V(e) || !V(t)) return;
+    if (!V(e) || !V(t)) {
+      return;
+    }
     const { scrollTop: r, scrollLeft: n } = e;
-    if (!r && !n) return;
-    const { transform: i } = t.style,
-      a = new DOMMatrix(i),
-      { a: s, b: o, c, d: u } = a;
-    (a.a = 1),
+    if (!r && !n) {
+      return;
+    }
+    const { transform: i } = t.style;
+    const a = new DOMMatrix(i);
+    const { a: s, b: o, c, d: u } = a;
+    ((a.a = 1),
       (a.b = 0),
       (a.c = 0),
       (a.d = 1),
@@ -903,31 +967,35 @@
       (a.b = o),
       (a.c = c),
       (a.d = u),
-      (t.style.transform = a.toString());
+      (t.style.transform = a.toString()));
   }
   function _t(e, t) {
-    const { backgroundColor: r, width: n, height: i, style: a } = t,
-      s = e.style;
+    const { backgroundColor: r, width: n, height: i, style: a } = t;
+    const s = e.style;
     if (
       (r && s.setProperty("background-color", r, "important"),
       n && s.setProperty("width", `${n}px`, "important"),
       i && s.setProperty("height", `${i}px`, "important"),
       a)
-    )
-      for (const o in a) s[o] = a[o];
+    ) {
+      for (const o in a) {
+        s[o] = a[o];
+      }
+    }
   }
   const Ft = /^[\w-:]+$/;
   function ne(e, t, r = !1, n) {
     return C(this, null, function* () {
-      var u, l, d, m;
+      let d, l, m, u;
       const {
         ownerDocument: i,
         ownerWindow: a,
         fontFamilies: s,
         onCloneEachNode: o,
       } = t;
-      if (i && et(e))
-        return n && /\S/.test(e.data) && n(e.data), i.createTextNode(e.data);
+      if (i && et(e)) {
+        return (n && /\S/.test(e.data) && n(e.data), i.createTextNode(e.data));
+      }
       if (i && a && I(e) && (V(e) || H(e))) {
         const f = yield Tt(e, t);
         if (t.isEnable("removeAbnormalAttributes")) {
@@ -941,33 +1009,32 @@
         r && _t(f, t);
         let g = !1;
         if (t.isEnable("copyScrollbar")) {
-          const w = [
+          const w = new Set([
             (u = h.get("overflow-x")) == null ? void 0 : u[0],
             (l = h.get("overflow-y")) == null ? void 0 : l[0],
-          ];
+          ]);
           g =
-            w.includes("scroll") ||
-            ((w.includes("auto") || w.includes("overlay")) &&
+            w.has("scroll") ||
+            ((w.has("auto") || w.has("overlay")) &&
               (e.scrollHeight > e.clientHeight ||
                 e.scrollWidth > e.clientWidth));
         }
-        const p = (d = h.get("text-transform")) == null ? void 0 : d[0],
-          E = we((m = h.get("font-family")) == null ? void 0 : m[0]),
-          b = E
-            ? (w) => {
-                p === "uppercase"
-                  ? (w = w.toUpperCase())
-                  : p === "lowercase"
-                    ? (w = w.toLowerCase())
-                    : p === "capitalize" &&
-                      (w = w[0].toUpperCase() + w.substring(1)),
-                  E.forEach((S) => {
-                    let T = s.get(S);
-                    T || s.set(S, (T = new Set())),
-                      w.split("").forEach((A) => T.add(A));
-                  });
-              }
-            : void 0;
+        const p = (d = h.get("text-transform")) == null ? void 0 : d[0];
+        const E = we((m = h.get("font-family")) == null ? void 0 : m[0]);
+        const b = E
+          ? (w) => {
+              (p === "uppercase"
+                ? (w = w.toUpperCase())
+                : p === "lowercase"
+                  ? (w = w.toLowerCase())
+                  : p === "capitalize" && (w = w[0].toUpperCase() + w.slice(1)),
+                E.forEach((S) => {
+                  let T = s.get(S);
+                  (T || s.set(S, (T = new Set())),
+                    [...w].forEach((A) => T.add(A)));
+                }));
+            }
+          : void 0;
         return (
           Pt(e, f, g, t, b),
           It(e, f),
@@ -977,7 +1044,7 @@
         );
       }
       const c = e.cloneNode(!1);
-      return yield Ae(e, c, t), yield o == null ? void 0 : o(c), c;
+      return (yield Ae(e, c, t), yield o == null ? void 0 : o(c), c);
     });
   }
   function Ne(e) {
@@ -992,36 +1059,40 @@
     ) {
       try {
         e.sandbox.remove();
-      } catch (t) {
-        e.log.warn("Failed to destroyContext", t);
+      } catch (error) {
+        e.log.warn("Failed to destroyContext", error);
       }
       e.sandbox = void 0;
     }
-    (e.workers = []),
+    ((e.workers = []),
       e.fontFamilies.clear(),
       e.fontCssTexts.clear(),
       e.requests.clear(),
       (e.tasks = []),
-      (e.shadowRoots = []);
+      (e.shadowRoots = []));
   }
   function Bt(e) {
-    const o = e,
-      { url: t, timeout: r, responseType: n } = o,
-      i = je(o, ["url", "timeout", "responseType"]),
-      a = new AbortController(),
-      s = r ? setTimeout(() => a.abort(), r) : void 0;
+    const o = e;
+    const { url: t, timeout: r, responseType: n } = o;
+    const i = je(o, ["url", "timeout", "responseType"]);
+    const a = new AbortController();
+    const s = r ? setTimeout(() => a.abort(), r) : void 0;
     return fetch(t, D({ signal: a.signal }, i))
       .then((c) => {
-        if (!c.ok)
+        if (!c.ok) {
           throw new Error("Failed fetch, not 2xx response", { cause: c });
+        }
         switch (n) {
-          case "arrayBuffer":
+          case "arrayBuffer": {
             return c.arrayBuffer();
-          case "dataUrl":
+          }
+          case "dataUrl": {
             return c.blob().then(gt);
+          }
           case "text":
-          default:
+          default: {
             return c.text();
+          }
         }
       })
       .finally(() => clearTimeout(s));
@@ -1050,9 +1121,9 @@
       m &&
         m instanceof RegExp &&
         m.test(s) &&
-        (s += (/\?/.test(s) ? "&" : "?") + new Date().getTime());
-      const b = n.startsWith("font") && h && h.minify,
-        w = new Set();
+        (s += (/\?/.test(s) ? "&" : "?") + Date.now());
+      const b = n.startsWith("font") && h && h.minify;
+      const w = new Set();
       b &&
         n
           .split(";")[1]
@@ -1060,31 +1131,33 @@
           .forEach((F) => {
             p.has(F) && p.get(F).forEach((B) => w.add(B));
           });
-      const S = b && w.size,
-        T = D(
-          {
-            url: s,
-            timeout: o,
-            responseType: S ? "arrayBuffer" : i,
-            headers: n === "image" ? { accept: c } : void 0,
-          },
-          d
-        );
-      (E = { type: n, resolve: void 0, reject: void 0, response: null }),
-        (E.response = C(this, null, function* () {
+      const S = b && w.size;
+      const T = D(
+        {
+          headers: n === "image" ? { accept: c } : void 0,
+          responseType: S ? "arrayBuffer" : i,
+          timeout: o,
+          url: s,
+        },
+        d
+      );
+      ((E = { reject: void 0, resolve: void 0, response: null, type: n }),
+        (E.response = C(this, null, function* response() {
           if (l && n === "image") {
             const A = yield l(r);
-            if (A) return A;
+            if (A) {
+              return A;
+            }
           }
           return !G && r.startsWith("http") && g.length
             ? new Promise((A, F) => {
-                g[u.size & (g.length - 1)].postMessage(D({ rawUrl: r }, T)),
+                (g[u.size & (g.length - 1)].postMessage(D({ rawUrl: r }, T)),
                   (E.resolve = A),
-                  (E.reject = F);
+                  (E.reject = F));
               })
             : Bt(T);
-        }).catch((A) => {
-          if ((u.delete(r), n === "image" && f))
+        }).catch((error) => {
+          if ((u.delete(r), n === "image" && f)) {
             return (
               e.log.warn(
                 "Failed to fetch image base64, trying to use placeholder image",
@@ -1092,26 +1165,30 @@
               ),
               typeof f == "string" ? f : f(a)
             );
-          throw A;
+          }
+          throw error;
         })),
-        u.set(r, E);
+        u.set(r, E));
     }
     return E.response;
   }
   function Re(e, t, r, n) {
     return C(this, null, function* () {
-      if (!Ie(e)) return e;
-      for (const [i, a] of $t(e, t))
+      if (!Ie(e)) {
+        return e;
+      }
+      for (const [i, a] of $t(e, t)) {
         try {
           const s = yield z(r, {
-            url: a,
             requestType: n ? "image" : "text",
             responseType: "dataUrl",
+            url: a,
           });
           e = e.replace(Lt(i), `$1${s}$3`);
-        } catch (s) {
-          r.log.warn("Failed to fetch css data url", i, s);
+        } catch (error) {
+          r.log.warn("Failed to fetch css data url", i, error);
         }
+      }
       return e;
     });
   }
@@ -1127,7 +1204,7 @@
     );
   }
   function Lt(e) {
-    const t = e.replace(/([.*+?^${}()|\[\]\/\\])/g, "\\$1");
+    const t = e.replaceAll(/([.*+?^${}()|[\]/\\])/g, "\\$1");
     return new RegExp(`(url\\(['"]?)(${t})(['"]?\\))`, "g");
   }
   const xt = [
@@ -1153,27 +1230,28 @@
   function Ot(e, t) {
     if ($(e)) {
       const r = e.currentSrc || e.src;
-      if (!re(r))
+      if (!re(r)) {
         return [
           z(t, {
-            url: r,
             imageDom: e,
             requestType: "image",
             responseType: "dataUrl",
+            url: r,
           }).then((n) => {
             n &&
               ((e.srcset = ""), (e.dataset.originalSrc = r), (e.src = n || ""));
           }),
         ];
+      }
       (G || te) && t.drawImageCount++;
     } else if (H(e) && !re(e.href.baseVal)) {
       const r = e.href.baseVal;
       return [
         z(t, {
-          url: r,
           imageDom: e,
           requestType: "image",
           responseType: "dataUrl",
+          url: r,
         }).then((n) => {
           n && ((e.dataset.originalSrc = r), (e.href.baseVal = n || ""));
         }),
@@ -1182,38 +1260,44 @@
     return [];
   }
   function jt(e, t) {
-    var o;
-    const { ownerDocument: r, svgDefsElement: n } = t,
-      i =
-        (o = e.getAttribute("href")) != null ? o : e.getAttribute("xlink:href");
-    if (!i) return [];
+    let o;
+    const { ownerDocument: r, svgDefsElement: n } = t;
+    const i =
+      (o = e.getAttribute("href")) == null ? e.getAttribute("xlink:href") : o;
+    if (!i) {
+      return [];
+    }
     const [a, s] = i.split("#");
     if (s) {
-      const c = `#${s}`,
-        u = t.shadowRoots.reduce(
-          (l, d) => (l != null ? l : d.querySelector(`svg ${c}`)),
-          r == null ? void 0 : r.querySelector(`svg ${c}`)
-        );
-      if ((a && e.setAttribute("href", c), n != null && n.querySelector(c)))
+      const c = `#${s}`;
+      const u = t.shadowRoots.reduce(
+        (l, d) => (l == null ? d.querySelector(`svg ${c}`) : l),
+        r == null ? void 0 : r.querySelector(`svg ${c}`)
+      );
+      if ((a && e.setAttribute("href", c), n != null && n.querySelector(c))) {
         return [];
-      if (u) return n == null || n.appendChild(u.cloneNode(!0)), [];
-      if (a)
+      }
+      if (u) {
+        return (n == null || n.append(u.cloneNode(!0)), []);
+      }
+      if (a) {
         return [
-          z(t, { url: a, responseType: "text" }).then((l) => {
+          z(t, { responseType: "text", url: a }).then((l) => {
             n == null || n.insertAdjacentHTML("beforeend", l);
           }),
         ];
+      }
     }
     return [];
   }
   function De(e, t) {
     const { tasks: r } = t;
-    I(e) &&
+    (I(e) &&
       (($(e) || ce(e)) && r.push(...Ot(e, t)), Qe(e) && r.push(...jt(e, t))),
       V(e) && r.push(...Mt(e.style, t)),
       e.childNodes.forEach((n) => {
         De(n, t);
-      });
+      }));
   }
   function qt(e, t) {
     return C(this, null, function* () {
@@ -1225,48 +1309,54 @@
         tasks: s,
         font: o,
       } = t;
-      if (!(!r || !n || !i.size))
+      if (!(!r || !n || !i.size)) {
         if (o && o.cssText) {
           const c = Ue(o.cssText, t);
-          n.appendChild(
+          n.append(
             r.createTextNode(`${c}
 `)
           );
         } else {
-          const c = Array.from(r.styleSheets).filter((f) => {
-              try {
-                return "cssRules" in f && !!f.cssRules.length;
-              } catch (h) {
-                return (
-                  t.log.warn(`Error while reading CSS rules from ${f.href}`, h),
-                  !1
-                );
-              }
-            }),
-            u = r.implementation.createHTMLDocument(""),
-            l = u.createElement("style");
-          u.head.appendChild(l);
+          const c = [...r.styleSheets].filter((f) => {
+            try {
+              return "cssRules" in f && !!f.cssRules.length;
+            } catch (error) {
+              return (
+                t.log.warn(
+                  `Error while reading CSS rules from ${f.href}`,
+                  error
+                ),
+                !1
+              );
+            }
+          });
+          const u = r.implementation.createHTMLDocument("");
+          const l = u.createElement("style");
+          u.head.append(l);
           const d = l.sheet;
-          yield Promise.all(
+          (yield Promise.all(
             c.flatMap((f) =>
-              Array.from(f.cssRules).map((h) =>
+              [...f.cssRules].map((h) =>
                 C(this, null, function* () {
                   if (Je(h)) {
                     const g = h.href;
                     let p = "";
                     try {
                       p = yield z(t, {
-                        url: g,
                         requestType: "text",
                         responseType: "text",
+                        url: g,
                       });
-                    } catch (b) {
-                      t.log.warn(`Error fetch remote css import from ${g}`, b);
+                    } catch (error) {
+                      t.log.warn(
+                        `Error fetch remote css import from ${g}`,
+                        error
+                      );
                     }
                     const E = p.replace(ke, (b, w, S) =>
                       b.replace(S, ue(S, g))
                     );
-                    for (const b of Ht(E))
+                    for (const b of Ht(E)) {
                       try {
                         d.insertRule(b, d.cssRules.length);
                       } catch (w) {
@@ -1275,19 +1365,20 @@
                           { rule: b, error: w }
                         );
                       }
+                    }
                   }
                 })
               )
             )
           ),
-            d.cssRules.length && c.push(d);
+            d.cssRules.length && c.push(d));
           const m = [];
-          c.forEach((f) => {
+          (c.forEach((f) => {
             oe(f.cssRules, m);
           }),
             m
               .filter((f) => {
-                var h;
+                let h;
                 return (
                   Ye(f) &&
                   Ie(f.style.getPropertyValue("src")) &&
@@ -1297,10 +1388,10 @@
                 );
               })
               .forEach((f) => {
-                const h = f,
-                  g = a.get(h.cssText);
+                const h = f;
+                const g = a.get(h.cssText);
                 g
-                  ? n.appendChild(
+                  ? n.append(
                       r.createTextNode(`${g}
 `)
                     )
@@ -1310,66 +1401,80 @@
                         h.parentStyleSheet ? h.parentStyleSheet.href : null,
                         t
                       ).then((p) => {
-                        (p = Ue(p, t)),
+                        ((p = Ue(p, t)),
                           a.set(h.cssText, p),
-                          n.appendChild(
+                          n.append(
                             r.createTextNode(`${p}
 `)
-                          );
+                          ));
                       })
                     );
-              });
+              }));
         }
+      }
     });
   }
-  const Wt = /(\/\*[\s\S]*?\*\/)/g,
-    Pe = /((@.*?keyframes [\s\S]*?){([\s\S]*?}\s*?)})/gi;
+  const Pe = /((@.*?keyframes [\s\S]*?){([\s\S]*?}\s*?)})/gi;
+  const Wt = /(\/\*[\s\S]*?\*\/)/g;
   function Ht(e) {
-    if (e == null) return [];
+    if (e == null) {
+      return [];
+    }
     const t = [];
     let r = e.replace(Wt, "");
     for (;;) {
       const a = Pe.exec(r);
-      if (!a) break;
+      if (!a) {
+        break;
+      }
       t.push(a[0]);
     }
     r = r.replace(Pe, "");
-    const n = /@import[\s\S]*?url\([^)]*\)[\s\S]*?;/gi,
-      i = new RegExp(
-        "((\\s*?(?:\\/\\*[\\s\\S]*?\\*\\/)?\\s*?@media[\\s\\S]*?){([\\s\\S]*?)}\\s*?})|(([\\s\\S]*?){([\\s\\S]*?)})",
-        "gi"
-      );
+    const n = /@import[\s\S]*?url\([^)]*\)[\s\S]*?;/gi;
+    const i = new RegExp(
+      "((\\s*?(?:\\/\\*[\\s\\S]*?\\*\\/)?\\s*?@media[\\s\\S]*?){([\\s\\S]*?)}\\s*?})|(([\\s\\S]*?){([\\s\\S]*?)})",
+      "gi"
+    );
     for (;;) {
       let a = n.exec(r);
-      if (a) i.lastIndex = n.lastIndex;
-      else if (((a = i.exec(r)), a)) n.lastIndex = i.lastIndex;
-      else break;
+      if (a) {
+        i.lastIndex = n.lastIndex;
+      } else if (((a = i.exec(r)), a)) {
+        n.lastIndex = i.lastIndex;
+      } else {
+        break;
+      }
       t.push(a[0]);
     }
     return t;
   }
-  const Vt = /url\([^)]+\)\s*format\((["']?)([^"']+)\1\)/g,
-    zt = /src:\s*(?:url\([^)]+\)\s*format\([^)]+\)[,;]\s*)+/g;
+  const Vt = /url\([^)]+\)\s*format\((["']?)([^"']+)\1\)/g;
+  const zt = /src:\s*(?:url\([^)]+\)\s*format\([^)]+\)[,;]\s*)+/g;
   function Ue(e, t) {
-    const { font: r } = t,
-      n = r ? (r == null ? void 0 : r.preferredFormat) : void 0;
+    const { font: r } = t;
+    const n = r ? (r == null ? void 0 : r.preferredFormat) : void 0;
     return n
       ? e.replace(zt, (i) => {
           for (;;) {
             const [a, , s] = Vt.exec(i) || [];
-            if (!s) return "";
-            if (s === n) return `src: ${a};`;
+            if (!s) {
+              return "";
+            }
+            if (s === n) {
+              return `src: ${a};`;
+            }
           }
         })
       : e;
   }
   function oe(e, t = []) {
-    for (const r of Array.from(e))
+    for (const r of [...e]) {
       Ke(r)
         ? t.push(...oe(r.cssRules))
         : "cssRules" in r
           ? oe(r.cssRules, t)
           : t.push(r);
+    }
     return t;
   }
   const Xt = /\bx?link:?href\s*=\s*["'](?!data:)[^"']+["']/i;
@@ -1379,7 +1484,9 @@
   function _e(e, t) {
     return C(this, null, function* () {
       const r = yield k(e, t);
-      if (I(r.node) && H(r.node) && !Gt(r.node)) return r.node;
+      if (I(r.node) && H(r.node) && !Gt(r.node)) {
+        return r.node;
+      }
       const {
         ownerDocument: n,
         log: i,
@@ -1398,16 +1505,16 @@
       const g = yield ne(r.node, r, !0);
       if (s && n) {
         let S = "";
-        c.forEach((T, A) => {
+        (c.forEach((T, A) => {
           S += `${T.join(`,
 `)} {
   ${A}
 }
 `;
         }),
-          s.appendChild(n.createTextNode(S));
+          s.append(n.createTextNode(S)));
       }
-      i.timeEnd("clone node"),
+      (i.timeEnd("clone node"),
         yield m == null ? void 0 : m(g),
         u !== !1 &&
           I(g) &&
@@ -1415,26 +1522,28 @@
           yield qt(g, r),
           i.timeEnd("embed web font")),
         i.time("embed node"),
-        De(g, r);
+        De(g, r));
       const p = a.length;
       let E = 0;
       const b = () =>
-        C(this, null, function* () {
+        C(this, null, function* b() {
           for (;;) {
             const S = a.pop();
-            if (!S) break;
+            if (!S) {
+              break;
+            }
             try {
               yield S;
-            } catch (T) {
-              r.log.warn("Failed to run task", T);
+            } catch (error) {
+              r.log.warn("Failed to run task", error);
             }
             l == null || l(++E, p);
           }
         });
-      l == null || l(E, p),
-        yield Promise.all([...Array.from({ length: 4 })].map(b)),
+      (l == null || l(E, p),
+        yield Promise.all(Array.from({ length: 4 }).map(b)),
         i.timeEnd("embed node"),
-        yield f == null ? void 0 : f(g);
+        yield f == null ? void 0 : f(g));
       const w = Yt(g, r);
       return (
         o && w.insertBefore(o, w.children[0]),
@@ -1446,25 +1555,25 @@
     });
   }
   function Yt(e, t) {
-    const { width: r, height: n } = t,
-      i = fe(r, n, e.ownerDocument),
-      a = i.ownerDocument.createElementNS(i.namespaceURI, "foreignObject");
+    const { width: r, height: n } = t;
+    const i = fe(r, n, e.ownerDocument);
+    const a = i.ownerDocument.createElementNS(i.namespaceURI, "foreignObject");
     return (
       a.setAttributeNS(null, "x", "0%"),
       a.setAttributeNS(null, "y", "0%"),
       a.setAttributeNS(null, "width", "100%"),
       a.setAttributeNS(null, "height", "100%"),
       a.append(e),
-      i.appendChild(a),
+      i.append(a),
       i
     );
   }
   function Q(e, t) {
     return C(this, null, function* () {
-      var s;
-      const r = yield k(e, t),
-        n = yield _e(r),
-        i = de(n, r.isEnable("removeControlCharacter"));
+      let s;
+      const r = yield k(e, t);
+      const n = yield _e(r);
+      const i = de(n, r.isEnable("removeControlCharacter"));
       r.autoDestruct ||
         ((r.svgStyleElement = be(r.ownerDocument)),
         (r.svgDefsElement =
@@ -1478,9 +1587,9 @@
   }
   function Jt(e, t) {
     return C(this, null, function* () {
-      const r = yield k(e, t),
-        { log: n, type: i, quality: a, dpi: s } = r,
-        o = yield Q(r);
+      const r = yield k(e, t);
+      const { log: n, type: i, quality: a, dpi: s } = r;
+      const o = yield Q(r);
       n.time("canvas to blob");
       const c = yield ft(o, i, a);
       if (["image/png", "image/jpeg"].includes(i) && s) {
@@ -1494,60 +1603,64 @@
           new Blob([l, c.slice(33)], { type: i })
         );
       }
-      return n.timeEnd("canvas to blob"), c;
+      return (n.timeEnd("canvas to blob"), c);
     });
   }
   function x(e, t) {
     return C(this, null, function* () {
-      const r = yield k(e, t),
-        { log: n, quality: i, type: a, dpi: s } = r,
-        o = yield Q(r);
+      const r = yield k(e, t);
+      const { log: n, quality: i, type: a, dpi: s } = r;
+      const o = yield Q(r);
       n.time("canvas to data url");
       let c = o.toDataURL(a, i);
       if (["image/png", "image/jpeg"].includes(a) && s && ie && Xe) {
         const [u, l] = c.split(",");
-        let d = 0,
-          m = !1;
+        let d = 0;
+        let m = !1;
         if (a === "image/png") {
           const w = Ve(l);
           w >= 0
             ? ((d = Math.ceil((w + 28) / 3) * 4), (m = !0))
             : (d = (33 / 3) * 4);
-        } else a === "image/jpeg" && (d = (18 / 3) * 4);
-        const f = l.substring(0, d),
-          h = l.substring(d),
-          g = window.atob(f),
-          p = new Uint8Array(g.length);
-        for (let w = 0; w < p.length; w++) p[w] = g.charCodeAt(w);
-        const E = a === "image/png" ? ae(p, s, m) : v(p, s),
-          b = window.btoa(String.fromCharCode(...E));
+        } else {
+          a === "image/jpeg" && (d = (18 / 3) * 4);
+        }
+        const f = l.substring(0, d);
+        const h = l.substring(d);
+        const g = window.atob(f);
+        const p = new Uint8Array(g.length);
+        for (let w = 0; w < p.length; w++) {
+          p[w] = g.charCodeAt(w);
+        }
+        const E = a === "image/png" ? ae(p, s, m) : v(p, s);
+        const b = window.btoa(String.fromCharCode(...E));
         c = [u, ",", b, h].join("");
       }
-      return n.timeEnd("canvas to data url"), c;
+      return (n.timeEnd("canvas to data url"), c);
     });
   }
   function Fe(e, t) {
     return C(this, null, function* () {
-      const r = yield k(e, t),
-        { width: n, height: i, ownerDocument: a } = r,
-        s = yield x(r),
-        o = fe(n, i, a),
-        c = o.ownerDocument.createElementNS(o.namespaceURI, "image");
+      const r = yield k(e, t);
+      const { width: n, height: i, ownerDocument: a } = r;
+      const s = yield x(r);
+      const o = fe(n, i, a);
+      const c = o.ownerDocument.createElementNS(o.namespaceURI, "image");
       return (
         c.setAttributeNS(null, "href", s),
         c.setAttributeNS(null, "height", "100%"),
         c.setAttributeNS(null, "width", "100%"),
-        o.appendChild(c),
+        o.append(c),
         de(o, r.isEnable("removeControlCharacter"))
       );
     });
   }
   function Kt(e, t) {
     return C(this, null, function* () {
-      const r = yield k(e, t),
-        { ownerDocument: n, width: i, height: a, scale: s, type: o } = r,
-        c = o === "image/svg+xml" ? yield Fe(r) : yield x(r),
-        u = _(c, n);
+      const r = yield k(e, t);
+      const { ownerDocument: n, width: i, height: a, scale: s, type: o } = r;
+      const c = o === "image/svg+xml" ? yield Fe(r) : yield x(r);
+      const u = _(c, n);
       return (
         (u.width = Math.floor(i * s)),
         (u.height = Math.floor(a * s)),
@@ -1564,8 +1677,8 @@
   }
   function Zt(e, t) {
     return C(this, null, function* () {
-      const r = yield k(e, t),
-        n = yield Q(r);
+      const r = yield k(e, t);
+      const n = yield Q(r);
       return n.getContext("2d").getImageData(0, 0, n.width, n.height).data;
     });
   }
@@ -1579,7 +1692,7 @@
       return x(yield k(e, M(D({}, t), { type: "image/webp" })));
     });
   }
-  (y.createContext = ye),
+  ((y.createContext = ye),
     (y.destroyContext = Ne),
     (y.domToBlob = Jt),
     (y.domToCanvas = Q),
@@ -1593,5 +1706,5 @@
     (y.domToWebp = tr),
     (y.loadMedia = L),
     (y.waitUntilLoad = me),
-    Object.defineProperty(y, Symbol.toStringTag, { value: "Module" });
+    Object.defineProperty(y, Symbol.toStringTag, { value: "Module" }));
 });

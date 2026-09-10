@@ -15,24 +15,25 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { isGeneratedFile } from "./lib/is-generated.mjs";
+
 import { getLiveDir, safeSessionId } from "./lib/impeccable-paths.mjs";
+import { isGeneratedFile } from "./lib/is-generated.mjs";
 import { resolveLiveTemplateExtensions } from "./lib/template-extensions.mjs";
 import {
   readBuffer as readManualEditsBuffer,
   writeBuffer as writeManualEditsBuffer,
 } from "./live/manual-edits-buffer.mjs";
-import { NEVER_SOURCE_DIRS, findSourceFile } from "./live/source-search.mjs";
+import { enterLiveRoot } from "./live/roots.mjs";
 import { withSourceLockSync } from "./live/source-lock.mjs";
+import { NEVER_SOURCE_DIRS, findSourceFile } from "./live/source-search.mjs";
 import {
   applyDeferredSvelteComponentAccepts,
   findSvelteComponentManifest,
   inlineSvelteComponentAccept,
   removeSvelteComponentSession,
 } from "./live/svelte-component.mjs";
-import { enterLiveRoot } from "./live/roots.mjs";
 
-const ACCEPT_LOCK_WAIT_MS = 1_000;
+const ACCEPT_LOCK_WAIT_MS = 1000;
 // Mirrors VARIANT_ID_PATTERN in live/event-validation.mjs, which gates the same
 // value arriving over HTTP.
 const VARIANT_NUM_PATTERN = /^[0-9]{1,3}$/;
@@ -48,7 +49,7 @@ const VARIANT_NUM_PATTERN = /^[0-9]{1,3}$/;
  * holding the lock), and a crash needs surfacing, not a hand-applied guess.
  */
 function operationFailure(err, extra = {}) {
-  return { handled: false, mode: "error", error: err.message, ...extra };
+  return { error: err.message, handled: false, mode: "error", ...extra };
 }
 
 /**
@@ -144,7 +145,7 @@ Output (JSON):
     console.log(
       JSON.stringify(
         sameOperation
-          ? { ...priorReceipt.result, handled: true, alreadyApplied: true }
+          ? { ...priorReceipt.result, alreadyApplied: true, handled: true }
           : {
               // mode: 'error' is what marks this a real failure rather than a manual
               // handoff. Without it, live/completion.mjs classifies the reply as
@@ -166,8 +167,8 @@ Output (JSON):
     if (result?.handled !== false) {
       writeAcceptReceipt(process.cwd(), id, {
         operation: requestedOperation,
-        variantId: isDiscard ? null : String(variantNum),
         result,
+        variantId: isDiscard ? null : String(variantNum),
       });
     }
     console.log(JSON.stringify(result));
@@ -191,8 +192,8 @@ Output (JSON):
   if (!found && !svelteComponentManifest) {
     console.log(
       JSON.stringify({
+        error: `Session markers not found for id: ${id}`,
         handled: false,
-        error: "Session markers not found for id: " + id,
       })
     );
     process.exit(0);
@@ -223,18 +224,17 @@ Output (JSON):
     try {
       result = withSourceLockSync(
         path.resolve(process.cwd(), sourceFile),
-        requestedOperation + ":" + id,
+        `${requestedOperation}:${id}`,
         runOperation,
         { waitMs: ACCEPT_LOCK_WAIT_MS }
       );
-    } catch (err) {
-      result = operationFailure(err, resultContext);
+    } catch (error) {
+      result = operationFailure(error, resultContext);
     }
     if (result.carbonize) {
-      result.todo =
-        "REQUIRED before next poll: carbonize cleanup in " +
-        result.file +
-        '. See reference/live.md "Required after accept".';
+      result.todo = `REQUIRED before next poll: carbonize cleanup in ${
+        result.file
+      }. See reference/live.md "Required after accept".`;
     }
     emitResult({ handled: result.handled !== false, ...result });
     return;
@@ -250,8 +250,8 @@ Output (JSON):
   if (sourceShadowPreview) {
     console.log(
       JSON.stringify({
-        handled: false,
         error: "source_shadow_preview_deprecated",
+        handled: false,
         hint: "Svelte live mode now uses svelte-component injection. Re-wrap the element and regenerate variants.",
       })
     );
@@ -261,10 +261,10 @@ Output (JSON):
   if (isGeneratedFile(targetFile, { cwd: process.cwd() })) {
     console.log(
       JSON.stringify({
-        handled: false,
-        mode: "fallback",
         file: relFile,
+        handled: false,
         hint: "Session is in a generated file. Persist the accepted variant in source; do not rely on this script.",
+        mode: "fallback",
       })
     );
     process.exit(0);
@@ -277,17 +277,17 @@ Output (JSON):
     // and the agent gets no JSON to act on.
     try {
       result = handleDiscard(id, lines, targetFile);
-    } catch (err) {
-      emitResult(operationFailure(err, { file: relFile }));
+    } catch (error) {
+      emitResult(operationFailure(error, { file: relFile }));
       return;
     }
-    emitResult({ handled: true, file: relFile, carbonize: false, ...result });
+    emitResult({ carbonize: false, file: relFile, handled: true, ...result });
   } else {
     let result;
     try {
       result = handleAccept(id, variantNum, lines, targetFile, paramValues);
-    } catch (err) {
-      emitResult(operationFailure(err, { file: relFile }));
+    } catch (error) {
+      emitResult(operationFailure(error, { file: relFile }));
       return;
     }
     const acceptedOriginalText = result.acceptedOriginalText || "";
@@ -296,10 +296,9 @@ Output (JSON):
     // five-step checklist lives in reference/live.md (loaded once per
     // session); repeating it per-event would waste tokens.
     if (result.carbonize) {
-      result.todo =
-        "REQUIRED before next poll: carbonize cleanup in " +
-        relFile +
-        '. See reference/live.md "Required after accept".';
+      result.todo = `REQUIRED before next poll: carbonize cleanup in ${
+        relFile
+      }. See reference/live.md "Required after accept".`;
     }
     // Scrub stash entries whose text appeared inside the just-replaced
     // original wrap block. The accept embodies those manual edits (wrap was
@@ -315,7 +314,7 @@ Output (JSON):
         // Non-fatal; the buffer stays as-is and the user can discard later.
       }
     }
-    emitResult({ handled: true, file: relFile, ...result });
+    emitResult({ file: relFile, handled: true, ...result });
   }
 }
 
@@ -334,21 +333,33 @@ function scrubManualEditsAgainstOriginalBlock(
   pageUrl = null
 ) {
   const originalBlock = String(originalBlockText || "");
-  if (!originalBlock) return;
-  if (!pageUrl) return;
+  if (!originalBlock) {
+    return;
+  }
+  if (!pageUrl) {
+    return;
+  }
   const buffer = readManualEditsBuffer(cwd);
-  if (buffer.entries.length === 0) return;
+  if (buffer.entries.length === 0) {
+    return;
+  }
   let mutated = false;
   for (const entry of buffer.entries) {
-    if (entry.pageUrl !== pageUrl) continue;
+    if (entry.pageUrl !== pageUrl) {
+      continue;
+    }
     const before = entry.ops.length;
-    entry.ops = entry.ops.filter((op) => {
-      return !manualEditOpAppearsInBlock(op, originalBlock);
-    });
-    if (entry.ops.length !== before) mutated = true;
+    entry.ops = entry.ops.filter(
+      (op) => !manualEditOpAppearsInBlock(op, originalBlock)
+    );
+    if (entry.ops.length !== before) {
+      mutated = true;
+    }
   }
   buffer.entries = buffer.entries.filter((entry) => entry.ops.length > 0);
-  if (mutated) writeManualEditsBuffer(cwd, buffer);
+  if (mutated) {
+    writeManualEditsBuffer(cwd, buffer);
+  }
 }
 
 function manualEditOpAppearsInBlock(op, originalBlock) {
@@ -362,7 +373,9 @@ function manualEditOpAppearsInBlock(op, originalBlock) {
 
 function originalBlockHasExactManualText(originalBlock, text) {
   const needle = normalizeManualEditText(text);
-  if (!needle) return false;
+  if (!needle) {
+    return false;
+  }
   return manualEditTextSegments(originalBlock).some(
     (segment) => segment === needle
   );
@@ -370,9 +383,9 @@ function originalBlockHasExactManualText(originalBlock, text) {
 
 function manualEditTextSegments(source) {
   return String(source || "")
-    .replace(/<[^>]*>/g, "\n")
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "\n")
-    .replace(/<!--[\s\S]*?-->/g, "\n")
+    .replaceAll(/<[^>]*>/g, "\n")
+    .replaceAll(/\{\/\*[\s\S]*?\*\/\}/g, "\n")
+    .replaceAll(/<!--[\s\S]*?-->/g, "\n")
     .split(/\n+/)
     .map(normalizeManualEditText)
     .filter(Boolean);
@@ -380,7 +393,7 @@ function manualEditTextSegments(source) {
 
 function normalizeManualEditText(text) {
   return String(text || "")
-    .replace(/\s+/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 
@@ -402,7 +415,7 @@ function scrubManualEditsAgainstFile(
 function handleDiscard(id, _lines, targetFile) {
   return withSourceLockSync(
     targetFile,
-    "discard:" + id,
+    `discard:${id}`,
     () => {
       const lines = fs.readFileSync(targetFile, "utf-8").split("\n");
       return handleDiscardUnlocked(id, lines, targetFile);
@@ -413,7 +426,9 @@ function handleDiscard(id, _lines, targetFile) {
 
 function handleDiscardUnlocked(id, lines, targetFile) {
   const block = findMarkerBlock(id, lines);
-  if (!block) return { handled: false, error: "Markers not found" };
+  if (!block) {
+    return { error: "Markers not found", handled: false };
+  }
 
   const original = extractOriginal(lines, block);
   const isJsx = detectCommentSyntax(targetFile).open === "{/*";
@@ -468,21 +483,12 @@ function buildCarbonizeReplacement({
     : 'style="display: contents"';
 
   const pushCarbonizeBody = (bodyIndent) => {
-    const bodyRestored = reindentContent(restored, indent, bodyIndent + "  ");
+    const bodyRestored = reindentContent(restored, indent, `${bodyIndent}  `);
     lines.push(
-      bodyIndent +
-        commentSyntax.open +
-        " impeccable-carbonize-start " +
-        id +
-        " " +
+      `${bodyIndent + commentSyntax.open} impeccable-carbonize-start ${id} ${
         commentSyntax.close
-    );
-    lines.push(
-      bodyIndent +
-        '<style data-impeccable-css="' +
-        id +
-        '">' +
-        (isJsx ? "{`" : "")
+      }`,
+      `${bodyIndent}<style data-impeccable-css="${id}">${isJsx ? "{`" : ""}`
     );
     for (const cssLine of cssContent) {
       lines.push(bodyIndent + cssLine.trimStart());
@@ -490,48 +496,30 @@ function buildCarbonizeReplacement({
     lines.push(bodyIndent + (isJsx ? "`}</style>" : "</style>"));
     if (paramValues && Object.keys(paramValues).length > 0) {
       lines.push(
-        bodyIndent +
-          commentSyntax.open +
-          " impeccable-param-values " +
-          id +
-          ": " +
-          JSON.stringify(paramValues) +
-          " " +
-          commentSyntax.close
+        `${bodyIndent + commentSyntax.open} impeccable-param-values ${
+          id
+        }: ${JSON.stringify(paramValues)} ${commentSyntax.close}`
       );
     }
     lines.push(
-      bodyIndent +
-        commentSyntax.open +
-        " impeccable-carbonize-end " +
-        id +
-        " " +
+      `${bodyIndent + commentSyntax.open} impeccable-carbonize-end ${id} ${
         commentSyntax.close
+      }`,
+      `${bodyIndent}<div data-impeccable-variant="${variantNum}" ${
+        variantStyleAttr
+      }>`,
+      ...bodyRestored,
+      `${bodyIndent}</div>`
     );
-    lines.push(
-      bodyIndent +
-        '<div data-impeccable-variant="' +
-        variantNum +
-        '" ' +
-        variantStyleAttr +
-        ">"
-    );
-    lines.push(...bodyRestored);
-    lines.push(bodyIndent + "</div>");
   };
 
   if (isJsx) {
     const wrapperStyle = 'style={{ display: "contents" }}';
     lines.push(
-      indent +
-        '<div data-impeccable-carbonize="' +
-        id +
-        '" ' +
-        wrapperStyle +
-        ">"
+      `${indent}<div data-impeccable-carbonize="${id}" ${wrapperStyle}>`
     );
-    pushCarbonizeBody(indent + "  ");
-    lines.push(indent + "</div>");
+    pushCarbonizeBody(`${indent}  `);
+    lines.push(`${indent}</div>`);
   } else {
     pushCarbonizeBody(indent);
   }
@@ -541,9 +529,12 @@ function buildCarbonizeReplacement({
 
 function reindentContent(contentLines, fromIndent, toIndent) {
   return contentLines.map((line) => {
-    if (line.trim() === "") return "";
-    if (line.startsWith(fromIndent))
+    if (line.trim() === "") {
+      return "";
+    }
+    if (line.startsWith(fromIndent)) {
       return toIndent + line.slice(fromIndent.length);
+    }
     return toIndent + line.trimStart();
   });
 }
@@ -551,7 +542,7 @@ function reindentContent(contentLines, fromIndent, toIndent) {
 function handleAccept(id, variantNum, _lines, targetFile, paramValues) {
   return withSourceLockSync(
     targetFile,
-    "accept:" + id,
+    `accept:${id}`,
     () => {
       const lines = fs.readFileSync(targetFile, "utf-8").split("\n");
       return handleAcceptUnlocked(
@@ -574,11 +565,13 @@ function handleAcceptUnlocked(id, variantNum, lines, targetFile, paramValues) {
     targetFile,
     paramValues
   );
-  if (built.handled === false) return built;
+  if (built.handled === false) {
+    return built;
+  }
   fs.writeFileSync(targetFile, built.content, "utf-8");
   return {
-    carbonize: built.carbonize,
     acceptedOriginalText: built.acceptedOriginalText,
+    carbonize: built.carbonize,
   };
 }
 
@@ -590,7 +583,9 @@ function buildAcceptedWrappedSource(
   paramValues
 ) {
   const block = findMarkerBlock(id, lines);
-  if (!block) return { handled: false, error: "Markers not found" };
+  if (!block) {
+    return { error: "Markers not found", handled: false };
+  }
 
   const commentSyntax = detectCommentSyntax(targetFile);
   const isJsx = commentSyntax.open === "{/*";
@@ -603,8 +598,9 @@ function buildAcceptedWrappedSource(
 
   // Extract the chosen variant's inner content
   const variantContent = extractVariant(lines, block, variantNum);
-  if (!variantContent)
-    return { handled: false, error: "Variant " + variantNum + " not found" };
+  if (!variantContent) {
+    return { error: `Variant ${variantNum} not found`, handled: false };
+  }
   const originalContent = extractOriginal(lines, block);
 
   // Extract CSS block if present
@@ -619,14 +615,14 @@ function buildAcceptedWrappedSource(
 
   const restored = deindentContent(variantContent, indent);
   const replacement = buildCarbonizeReplacement({
-    indent,
     commentSyntax,
-    isJsx,
-    id,
-    variantNum,
     cssContent,
+    id,
+    indent,
+    isJsx,
     paramValues,
     restored,
+    variantNum,
   });
 
   const newLines = [
@@ -635,22 +631,25 @@ function buildAcceptedWrappedSource(
     ...lines.slice(replaceRange.end + 1),
   ];
   return {
-    content: newLines.join("\n"),
-    carbonize: needsCarbonize,
     acceptedOriginalText: originalContent.join("\n"),
+    carbonize: needsCarbonize,
+    content: newLines.join("\n"),
   };
 }
 
 function readSourceShadowPreviewMeta(content, id) {
   const escaped = escapeRegExp(id);
   const wrapperRe = new RegExp(
-    "<[^>]+data-impeccable-variants=([\"'])" + escaped + "\\1[^>]*>"
+    `<[^>]+data-impeccable-variants=(["'])${escaped}\\1[^>]*>`
   );
   const match = String(content || "").match(wrapperRe);
-  if (!match) return null;
-  const tag = match[0];
-  if (readHtmlAttr(tag, "data-impeccable-preview") !== "source-shadow")
+  if (!match) {
     return null;
+  }
+  const tag = match[0];
+  if (readHtmlAttr(tag, "data-impeccable-preview") !== "source-shadow") {
+    return null;
+  }
   const sourceFile = readHtmlAttr(tag, "data-impeccable-source-file");
   const sourceStartLine = Number(
     readHtmlAttr(tag, "data-impeccable-source-start")
@@ -660,25 +659,28 @@ function readSourceShadowPreviewMeta(content, id) {
     !sourceFile ||
     !Number.isFinite(sourceStartLine) ||
     !Number.isFinite(sourceEndLine)
-  )
+  ) {
     return null;
-  return { sourceFile, sourceStartLine, sourceEndLine };
+  }
+  return { sourceEndLine, sourceFile, sourceStartLine };
 }
 
 function readHtmlAttr(tag, name) {
   const match = String(tag || "").match(
-    new RegExp("\\s" + escapeRegExp(name) + "\\s*=\\s*([\"'])(.*?)\\1")
+    new RegExp(`\\s${escapeRegExp(name)}\\s*=\\s*(["'])(.*?)\\1`)
   );
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   return decodeHtmlAttr(match[2]);
 }
 
 function decodeHtmlAttr(value) {
   return String(value || "")
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
+    .replaceAll("&quot;", '"')
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
 }
 
 // ---------------------------------------------------------------------------
@@ -692,18 +694,20 @@ function decodeHtmlAttr(value) {
 function findMarkerBlock(id, lines) {
   let start = -1;
   let end = -1;
-  const startPattern = "impeccable-variants-start " + id;
-  const endPattern = "impeccable-variants-end " + id;
+  const startPattern = `impeccable-variants-start ${id}`;
+  const endPattern = `impeccable-variants-end ${id}`;
 
   for (let i = 0; i < lines.length; i++) {
-    if (start === -1 && lines[i].includes(startPattern)) start = i;
+    if (start === -1 && lines[i].includes(startPattern)) {
+      start = i;
+    }
     if (lines[i].includes(endPattern)) {
       end = i;
       break;
     }
   }
 
-  return start !== -1 && end !== -1 ? { start, end, id } : null;
+  return start !== -1 && end !== -1 ? { end, id, start } : null;
 }
 
 /**
@@ -723,7 +727,9 @@ function findMarkerBlock(id, lines) {
  * extractVariant / extractCss continue to walk the same range.
  */
 function expandReplaceRange(block, lines, isJsx) {
-  if (!isJsx) return { start: block.start, end: block.end };
+  if (!isJsx) {
+    return { end: block.end, start: block.start };
+  }
 
   let { start, end } = block;
 
@@ -731,7 +737,9 @@ function expandReplaceRange(block, lines, isJsx) {
   // The attr may sit on a continuation line of a multi-line opening tag, so
   // also walk to the line that actually contains `<div`.
   for (let i = start - 1; i >= 0; i--) {
-    if (isVariantEndMarkerLine(lines[i], block.id)) break;
+    if (isVariantEndMarkerLine(lines[i], block.id)) {
+      break;
+    }
     if (hasVariantWrapperAttr(lines[i], block.id)) {
       let opener = i;
       while (
@@ -741,7 +749,9 @@ function expandReplaceRange(block, lines, isJsx) {
       ) {
         opener--;
       }
-      if (/<div\b/.test(lines[opener])) start = opener;
+      if (/<div\b/.test(lines[opener])) {
+        start = opener;
+      }
       break;
     }
   }
@@ -763,8 +773,11 @@ function expandReplaceRange(block, lines, isJsx) {
   while ((m = tagRe.exec(joined)) !== null) {
     const isClose = m[0].startsWith("</");
     const isSelfClose = !isClose && m[1] === "/";
-    if (isClose) depth--;
-    else if (!isSelfClose) depth++;
+    if (isClose) {
+      depth--;
+    } else if (!isSelfClose) {
+      depth++;
+    }
     if (depth <= 0) {
       // m.index is offset within `joined`; convert back to a file line.
       const linesBefore =
@@ -777,16 +790,16 @@ function expandReplaceRange(block, lines, isJsx) {
     }
   }
 
-  return { start, end };
+  return { end, start };
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isVariantEndMarkerLine(line, id) {
   return new RegExp(
-    "impeccable-variants-end\\s+" + escapeRegExp(id) + "(?:\\s|--|\\*/|$)"
+    `impeccable-variants-end\\s+${escapeRegExp(id)}(?:\\s|--|\\*/|$)`
   ).test(line);
 }
 
@@ -812,12 +825,20 @@ function stripStyleAndJoin(lines, block) {
   for (let i = block.start; i <= block.end; i++) {
     let line = lines[i];
 
-    if (!inStyle) {
+    if (inStyle) {
+      // In multi-line style body; drop everything until we see </style>.
+      const closeIdx = line.search(/<\/style\s*>/);
+      if (closeIdx !== -1) {
+        inStyle = false;
+        out.push(line.slice(closeIdx).replace(/<\/style\s*>/, ""));
+      }
+      // else: skip line entirely
+    } else {
       // Strip any complete <style> elements on this line (self-closed or
       // same-line-closed), including their body content.
       line = line
-        .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/g, "")
-        .replace(/<style\b[^>]*\/\s*>/g, "");
+        .replaceAll(/<style\b[^>]*>[\s\S]*?<\/style\s*>/g, "")
+        .replaceAll(/<style\b[^>]*\/\s*>/g, "");
 
       // If a <style> opener remains (multi-line body starts here), strip from
       // the opener to end-of-line and flip into skip mode.
@@ -827,14 +848,6 @@ function stripStyleAndJoin(lines, block) {
         inStyle = true;
       }
       out.push(line);
-    } else {
-      // In multi-line style body; drop everything until we see </style>.
-      const closeIdx = line.search(/<\/style\s*>/);
-      if (closeIdx !== -1) {
-        inStyle = false;
-        out.push(line.slice(closeIdx).replace(/<\/style\s*>/, ""));
-      }
-      // else: skip line entirely
     }
   }
   return out.join("\n");
@@ -848,17 +861,19 @@ function stripStyleAndJoin(lines, block) {
  */
 function extractInnerByAttr(text, attrMatch) {
   const openerRe = new RegExp(
-    "<([A-Za-z][A-Za-z0-9]*)\\b[^>]*" + attrMatch + "[^>]*>"
+    `<([A-Za-z][A-Za-z0-9]*)\\b[^>]*${attrMatch}[^>]*>`
   );
   const openMatch = text.match(openerRe);
-  if (!openMatch) return null;
+  if (!openMatch) {
+    return null;
+  }
 
   const tagName = openMatch[1];
   const innerStart = openMatch.index + openMatch[0].length;
 
   // Match any opener or closer of this tag name after innerStart.
   // (Does not match self-closing <TAG … />, which doesn't contribute to depth.)
-  const tagRe = new RegExp("<(?:/)?" + tagName + "\\b[^>]*>", "g");
+  const tagRe = new RegExp(`<(?:/)?${tagName}\\b[^>]*>`, "g");
   tagRe.lastIndex = innerStart;
 
   let depth = 1;
@@ -868,7 +883,9 @@ function extractInnerByAttr(text, attrMatch) {
     const isSelfClose = !isClose && /\/\s*>$/.test(m[0]);
     if (isClose) {
       depth--;
-      if (depth === 0) return text.slice(innerStart, m.index);
+      if (depth === 0) {
+        return text.slice(innerStart, m.index);
+      }
     } else if (!isSelfClose) {
       depth++;
     }
@@ -883,7 +900,9 @@ function extractInnerByAttr(text, attrMatch) {
 function extractOriginal(lines, block) {
   const text = stripStyleAndJoin(lines, block);
   const inner = extractInnerByAttr(text, 'data-impeccable-variant="original"');
-  if (inner === null) return [];
+  if (inner === null) {
+    return [];
+  }
   return inner.split("\n");
 }
 
@@ -895,14 +914,19 @@ function extractVariant(lines, block, variantNum) {
   const text = stripStyleAndJoin(lines, block);
   const inner = extractInnerByAttr(
     text,
-    'data-impeccable-variant="' + variantNum + '"'
+    `data-impeccable-variant="${variantNum}"`
   );
-  if (inner === null) return null;
+  if (inner === null) {
+    return null;
+  }
   const result = inner.split("\n");
   // Collapse a lone empty leading/trailing line (common after string splice).
-  while (result.length > 1 && result[0].trim() === "") result.shift();
-  while (result.length > 1 && result[result.length - 1].trim() === "")
+  while (result.length > 1 && result[0].trim() === "") {
+    result.shift();
+  }
+  while (result.length > 1 && result.at(-1).trim() === "") {
     result.pop();
+  }
   return result.length > 0 ? result : null;
 }
 
@@ -917,7 +941,7 @@ function extractVariant(lines, block, variantNum) {
  *      the lines between them.
  */
 function extractCss(lines, block, id) {
-  const styleAttr = 'data-impeccable-css="' + id + '"';
+  const styleAttr = `data-impeccable-css="${id}"`;
   let inStyle = false;
   const content = [];
 
@@ -926,7 +950,9 @@ function extractCss(lines, block, id) {
 
     if (!inStyle && line.includes(styleAttr)) {
       // Self-closing: nothing to carbonize.
-      if (/<style\b[^>]*\/\s*>/.test(line)) return null;
+      if (/<style\b[^>]*\/\s*>/.test(line)) {
+        return null;
+      }
       // Same-line open + close: extract inner text.
       const sameLine = line.match(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/);
       if (sameLine) {
@@ -942,12 +968,16 @@ function extractCss(lines, block, id) {
       // (`}</style>`) put the close mid-line, and we don't want to absorb the
       // template-literal punctuation as CSS content.
       const closeIdx = line.indexOf("</style>");
-      if (closeIdx !== -1) break;
+      if (closeIdx !== -1) {
+        break;
+      }
       content.push(line);
     }
   }
 
-  if (content.length === 0) return null;
+  if (content.length === 0) {
+    return null;
+  }
   return stripJsxTemplateLines(content);
 }
 
@@ -963,13 +993,19 @@ function extractCss(lines, block, id) {
  * `{` `{` … `}` `}`, which oxc rejects with "Expected `}` but found `@`".
  */
 function stripJsxTemplateLines(content) {
-  const out = content.slice();
+  const out = [...content];
 
   // Drop any leading blank lines so we don't miss a `{` line buried below
   // them; same for trailing.
-  while (out.length > 0 && out[0].trim() === "") out.shift();
-  while (out.length > 0 && out[out.length - 1].trim() === "") out.pop();
-  if (out.length === 0) return null;
+  while (out.length > 0 && out[0].trim() === "") {
+    out.shift();
+  }
+  while (out.length > 0 && out.at(-1).trim() === "") {
+    out.pop();
+  }
+  if (out.length === 0) {
+    return null;
+  }
 
   // Leading `{`: own line, or attached to the first CSS line.
   const firstTrim = out[0].trimStart();
@@ -978,9 +1014,13 @@ function stripJsxTemplateLines(content) {
   } else if (firstTrim.startsWith("{`")) {
     const idx = out[0].indexOf("{`");
     out[0] = out[0].slice(0, idx) + out[0].slice(idx + 2);
-    if (out[0].trim() === "") out.shift();
+    if (out[0].trim() === "") {
+      out.shift();
+    }
   }
-  if (out.length === 0) return null;
+  if (out.length === 0) {
+    return null;
+  }
 
   // Trailing `` ` `` `}`: own line, or attached to the last CSS line.
   const lastIdx = out.length - 1;
@@ -991,7 +1031,9 @@ function stripJsxTemplateLines(content) {
     const text = out[lastIdx];
     const idx = text.lastIndexOf("`}");
     out[lastIdx] = text.slice(0, idx) + text.slice(idx + 2);
-    if (out[lastIdx].trim() === "") out.pop();
+    if (out[lastIdx].trim() === "") {
+      out.pop();
+    }
   }
 
   return out.length > 0 ? out : null;
@@ -1012,15 +1054,21 @@ function deindentContent(contentLines, baseIndent) {
   // Find the minimum indentation in the content to determine how much was added
   let minIndent = Infinity;
   for (const line of contentLines) {
-    if (line.trim() === "") continue;
+    if (line.trim() === "") {
+      continue;
+    }
     const leadingSpaces = line.match(/^(\s*)/)[1].length;
     minIndent = Math.min(minIndent, leadingSpaces);
   }
-  if (minIndent === Infinity) minIndent = 0;
+  if (minIndent === Infinity) {
+    minIndent = 0;
+  }
 
   // Strip the extra indentation and re-add base indent
   return contentLines.map((line) => {
-    if (line.trim() === "") return "";
+    if (line.trim() === "") {
+      return "";
+    }
     return baseIndent + line.slice(minIndent);
   });
 }
@@ -1028,9 +1076,9 @@ function deindentContent(contentLines, baseIndent) {
 function detectCommentSyntax(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".jsx" || ext === ".tsx") {
-    return { open: "{/*", close: "*/}" };
+    return { close: "*/}", open: "{/*" };
   }
-  return { open: "<!--", close: "-->" };
+  return { close: "-->", open: "<!--" };
 }
 
 // ---------------------------------------------------------------------------
@@ -1047,14 +1095,16 @@ const SEARCH_SKIP_DIRS = [...NEVER_SOURCE_DIRS, "dist", "build"];
 
 function findSessionFile(id, cwd) {
   const result = findSourceFile({
-    query: "impeccable-variants-start " + id,
     cwd,
     extensions: resolveLiveTemplateExtensions(cwd),
+    query: `impeccable-variants-start ${id}`,
     skipDirs: SEARCH_SKIP_DIRS,
   });
-  if (!result) return null;
+  if (!result) {
+    return null;
+  }
   const content = fs.readFileSync(result, "utf-8");
-  return { file: result, content, lines: content.split("\n") };
+  return { content, file: result, lines: content.split("\n") };
 }
 
 // ---------------------------------------------------------------------------
@@ -1086,7 +1136,7 @@ function writeAcceptReceipt(cwd, id, receipt) {
     completedAt: new Date().toISOString(),
   };
   const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2) + "\n", "utf-8");
+  fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
   fs.renameSync(temporary, file);
   return value;
 }

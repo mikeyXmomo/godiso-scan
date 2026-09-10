@@ -81,7 +81,7 @@ const items = [
       </SelectItem>
     ))}
   </SelectPopup>
-</Select>
+</Select>;
 ```
 
 ### Toggle Group: `type` -> `multiple`
@@ -146,7 +146,12 @@ coss wraps [Base UI OTP Field](https://base-ui.com/react/components/otp-field) (
 
 ```tsx
 // coss
-<OTPField aria-label="Verification code" length={6} value={value} onValueChange={setValue}>
+<OTPField
+  aria-label="Verification code"
+  length={6}
+  value={value}
+  onValueChange={setValue}
+>
   <OTPFieldInput />
   <OTPFieldInput aria-label="Character 2 of 6" />
 </OTPField>

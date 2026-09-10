@@ -9,17 +9,21 @@ function normalizeGoogleFontFamilyParam(value) {
 
 function extractGoogleFontFamilies(text) {
   const families = [];
-  if (!text) return families;
+  if (!text) {
+    return families;
+  }
 
   GOOGLE_FONTS_URL_RE.lastIndex = 0;
   let urlMatch;
   while ((urlMatch = GOOGLE_FONTS_URL_RE.exec(text)) !== null) {
     const url = urlMatch[0];
     const queryStart = url.indexOf("?");
-    if (queryStart === -1) continue;
+    if (queryStart === -1) {
+      continue;
+    }
 
     const params = new URLSearchParams(
-      url.slice(queryStart + 1).replace(/&amp;/g, "&")
+      url.slice(queryStart + 1).replaceAll("&amp;", "&")
     );
     for (const value of params.getAll("family")) {
       families.push(...normalizeGoogleFontFamilyParam(value));

@@ -7,16 +7,18 @@ import {
 } from "./ui-surfaces.mjs";
 
 export const LIVE_BROWSER_SCRIPT_PARTS = Object.freeze([
-  Object.freeze({ name: "session-state", file: "live-browser-session.js" }),
-  Object.freeze({ name: "dom-helpers", file: "live-browser-dom.js" }),
-  Object.freeze({ name: "browser-ui", file: "live-browser.js" }),
+  Object.freeze({ file: "live-browser-session.js", name: "session-state" }),
+  Object.freeze({ file: "live-browser-dom.js", name: "dom-helpers" }),
+  Object.freeze({ file: "live-browser.js", name: "browser-ui" }),
 ]);
 
 export function resolveLiveBrowserScriptParts(
   scriptsDir,
   parts = LIVE_BROWSER_SCRIPT_PARTS
 ) {
-  if (!scriptsDir) throw new Error("scriptsDir is required");
+  if (!scriptsDir) {
+    throw new Error("scriptsDir is required");
+  }
   return parts.map((part, index) => ({
     ...part,
     index,

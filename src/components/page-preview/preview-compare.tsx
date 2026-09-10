@@ -1,11 +1,13 @@
 import { CircleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useScannerStore } from "@/lib/scanner-store";
 import { PDF } from "@/utils/pdf-renderer/pdf";
 import type { PDFPageInfo } from "@/utils/pdf-renderer/types";
 import { CanvasScanner } from "@/utils/scan-renderer/canvas-scan/scanner";
 import { ScanCacher } from "@/utils/scan-renderer/scan-cacher";
+
 import { ImagePreview } from "./image-preview";
 import { PagePagination } from "./page-pagination";
 import { SideBySidePreview } from "./side-by-side-preview";

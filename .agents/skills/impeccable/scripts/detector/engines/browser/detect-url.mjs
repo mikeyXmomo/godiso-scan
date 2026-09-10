@@ -8,8 +8,8 @@ import {
   profileStep,
   profileStepAsync,
 } from "../../profile/profiler.mjs";
-import { captureVisualContrastCandidate } from "../visual/screenshot-contrast.mjs";
 import { checkContentHiddenAtRest } from "../../rules/checks.mjs";
+import { captureVisualContrastCandidate } from "../visual/screenshot-contrast.mjs";
 
 // On Windows, puppeteer's bundled Chrome lives in a user-writable cache
 // directory. Its GPU process can be denied (STATUS_ACCESS_DENIED) by security
@@ -29,22 +29,23 @@ async function launchBrowser(puppeteer, { headless = true, args = [] } = {}) {
   if (process.platform === "win32") {
     try {
       return await puppeteer.default.launch({
+        args,
         channel: "chrome",
         headless,
-        args,
       });
-    } catch (err) {
+    } catch (error) {
       // System Chrome unavailable or unlaunchable; fall through to the bundled
       // browser, but keep the error in case the fallback fails too.
-      channelError = err;
+      channelError = error;
     }
   }
   try {
-    return await puppeteer.default.launch({ headless, args });
-  } catch (err) {
-    if (channelError && err && err.cause === undefined)
-      err.cause = channelError;
-    throw err;
+    return await puppeteer.default.launch({ args, headless });
+  } catch (error) {
+    if (channelError && error && error.cause === undefined) {
+      error.cause = channelError;
+    }
+    throw error;
   }
 }
 
@@ -63,28 +64,28 @@ async function measureContentHiddenAfterReveal(page) {
       document.body?.scrollHeight || 0
     );
     for (let y = 0; y <= max; y += step) {
-      window.scrollTo({ top: y, left: 0, behavior: "instant" });
+      window.scrollTo({ behavior: "instant", left: 0, top: y });
       await new Promise((resolve) =>
         requestAnimationFrame(() => setTimeout(resolve, 40))
       );
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    window.scrollTo({ behavior: "instant", left: 0, top: 0 });
     await new Promise((resolve) => setTimeout(resolve, 700));
   });
   return page.evaluate(() => {
-    if (typeof window.impeccableMeasureHiddenText !== "function") return null;
+    if (typeof window.impeccableMeasureHiddenText !== "function") {
+      return null;
+    }
     return window.impeccableMeasureHiddenText();
   });
 }
 
 function serializeDesignSystemForBrowser(designSystem) {
-  if (!designSystem?.present) return null;
+  if (!designSystem?.present) {
+    return null;
+  }
   return {
-    present: true,
-    hasFonts: designSystem.hasFonts === true,
-    allowedFonts: Array.from(designSystem.allowedFonts || []),
-    hasColors: designSystem.hasColors === true,
-    allowedColors: Array.from(designSystem.allowedColorKeys?.values?.() || [])
+    allowedColors: [...(designSystem.allowedColorKeys?.values?.() || [])]
       .map((entry) => entry?.color)
       .filter(
         (color) =>
@@ -93,12 +94,16 @@ function serializeDesignSystemForBrowser(designSystem) {
           Number.isFinite(color.g) &&
           Number.isFinite(color.b)
       )
-      .map((color) => ({ r: color.r, g: color.g, b: color.b })),
-    hasRadii: designSystem.hasRadii === true,
+      .map((color) => ({ b: color.b, g: color.g, r: color.r })),
+    allowedFonts: [...(designSystem.allowedFonts || [])],
     allowedRadii: (designSystem.allowedRadii || [])
       .map((entry) => Number(entry?.px))
       .filter((px) => Number.isFinite(px)),
+    hasColors: designSystem.hasColors === true,
+    hasFonts: designSystem.hasFonts === true,
     hasPillRadius: designSystem.hasPillRadius === true,
+    hasRadii: designSystem.hasRadii === true,
+    present: true,
   };
 }
 
@@ -109,7 +114,9 @@ async function runVisualContrastFallback(
   profile,
   target
 ) {
-  if (options?.visualContrast === false) return [];
+  if (options?.visualContrast === false) {
+    return [];
+  }
   const maxCandidates = Number.isFinite(options?.visualContrastMaxCandidates)
     ? options.visualContrastMaxCandidates
     : 12;
@@ -135,8 +142,9 @@ async function runVisualContrastFallback(
       async () => {
         browserAnalyses = await page.evaluate(
           async ({ maxCandidates, scrollOffscreen }) => {
-            if (typeof window.impeccableAnalyzeVisualContrast !== "function")
+            if (typeof window.impeccableAnalyzeVisualContrast !== "function") {
               return [];
+            }
             return window.impeccableAnalyzeVisualContrast({
               maxCandidates,
               scrollOffscreen,
@@ -172,8 +180,9 @@ async function runVisualContrastFallback(
             if (
               typeof window.impeccableCollectVisualContrastCandidates !==
               "function"
-            )
+            ) {
               return [];
+            }
             return window.impeccableCollectVisualContrastCandidates({
               maxCandidates,
             });
@@ -183,7 +192,7 @@ async function runVisualContrastFallback(
     );
   }
 
-  const viewport = options?.viewport || { width: 1280, height: 800 };
+  const viewport = options?.viewport || { height: 800, width: 1280 };
   const browserResolvedSelectors = new Set(
     browserAnalyses
       .filter((result) => result.status === "fail" || result.status === "pass")
@@ -195,7 +204,9 @@ async function runVisualContrastFallback(
       !existingLowContrastSelectors.has(candidate.selector) &&
       !browserResolvedSelectors.has(candidate.selector)
   );
-  if (options?.visualContrastPixel === false) return findings;
+  if (options?.visualContrastPixel === false) {
+    return findings;
+  }
   for (const candidate of filtered) {
     const result = await profileFindingsAsync(
       profile,
@@ -227,7 +238,7 @@ async function detectUrl(url, options = {}) {
   const profile = options?.profile;
   const waitUntil = options?.waitUntil || "networkidle0";
   const settleMs = Number.isFinite(options?.settleMs) ? options.settleMs : 0;
-  const viewport = options?.viewport || { width: 1280, height: 800 };
+  const viewport = options?.viewport || { height: 800, width: 1280 };
   const externalBrowser = options?.browser || null;
   let puppeteer;
   if (!externalBrowser) {
@@ -251,7 +262,7 @@ async function detectUrl(url, options = {}) {
 
   // Read the browser detection script — reuse it instead of reimplementing
   const browserScriptPath = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
+    import.meta.dirname,
     "..",
     "..",
     "detect-antipatterns-browser.js"
@@ -290,8 +301,8 @@ async function detectUrl(url, options = {}) {
       },
       () =>
         launchBrowser(puppeteer, {
-          headless: options?.headless ?? true,
           args: launchArgs,
+          headless: options?.headless ?? true,
         })
     ));
   const page = await profileStepAsync(
@@ -316,7 +327,9 @@ async function detectUrl(url, options = {}) {
         .split("\n")[0]
         .trim()
         .slice(0, 160);
-      if (message && !pageErrors.includes(message)) pageErrors.push(message);
+      if (message && !pageErrors.includes(message)) {
+        pageErrors.push(message);
+      }
     });
   }
 
@@ -340,7 +353,7 @@ async function detectUrl(url, options = {}) {
         ruleId: `goto:${waitUntil}`,
         target: url,
       },
-      () => page.goto(url, { waitUntil, timeout: 30000 })
+      () => page.goto(url, { timeout: 30_000, waitUntil })
     );
     if (settleMs > 0) {
       await profileStepAsync(
@@ -370,7 +383,7 @@ async function detectUrl(url, options = {}) {
       () =>
         page.evaluate((designSystem) => {
           window.__IMPECCABLE_CONFIG__ = {
-            ...(window.__IMPECCABLE_CONFIG__ || {}),
+            ...window.__IMPECCABLE_CONFIG__,
             autoScan: false,
             ...(designSystem ? { designSystem } : {}),
           };
@@ -397,15 +410,17 @@ async function detectUrl(url, options = {}) {
       },
       async () => {
         serializedGroups = await page.evaluate(() => {
-          if (!window.impeccableDetect) return [];
+          if (!window.impeccableDetect) {
+            return [];
+          }
           return window.impeccableDetect({ decorate: false, serialize: true });
         });
         return serializedGroups.flatMap(({ findings }) =>
           findings.map((f) => ({
             id: f.type,
-            snippet: f.detail,
             ignoreValue: f.ignoreValue || "",
             severity: f.severity || "",
+            snippet: f.detail,
           }))
         );
       }
@@ -468,10 +483,14 @@ async function detectUrl(url, options = {}) {
   }
   return results.map((f) => {
     const item = finding(f.id, url, f.snippet);
-    if (f.ignoreValue) item.ignoreValue = f.ignoreValue;
+    if (f.ignoreValue) {
+      item.ignoreValue = f.ignoreValue;
+    }
     // Per-finding severity promotion (e.g. hero-region pulsing dot)
     // overrides the registry default carried by finding().
-    if (f.severity && f.severity !== item.severity) item.severity = f.severity;
+    if (f.severity && f.severity !== item.severity) {
+      item.severity = f.severity;
+    }
     return item;
   });
 }
@@ -491,26 +510,28 @@ async function createBrowserDetector(options = {}) {
   const browser =
     options.browser ||
     (await launchBrowser(puppeteer, {
-      headless: options.headless ?? true,
       args: launchArgs,
+      headless: options.headless ?? true,
     }));
   const ownsBrowser = !options.browser;
   const defaults = {
-    waitUntil: options.waitUntil || "load",
     settleMs: Number.isFinite(options.settleMs) ? options.settleMs : 100,
-    viewport: options.viewport || { width: 1280, height: 800 },
+    viewport: options.viewport || { height: 800, width: 1280 },
+    waitUntil: options.waitUntil || "load",
   };
   return {
     browser,
+    async close() {
+      if (ownsBrowser) {
+        await browser.close().catch(() => {});
+      }
+    },
     async detectUrl(url, scanOptions = {}) {
       return detectUrl(url, {
         ...defaults,
         ...scanOptions,
         browser,
       });
-    },
-    async close() {
-      if (ownsBrowser) await browser.close().catch(() => {});
     },
   };
 }

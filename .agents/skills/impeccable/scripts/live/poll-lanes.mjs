@@ -3,15 +3,19 @@ export function eventPriority(event = {}) {
     event.type === "accept" ||
     event.type === "discard" ||
     event.type === "exit"
-  )
+  ) {
     return 0;
+  }
   if (
     event.type === "manual_edit_apply" ||
     event.type === "steer" ||
     event.type === "carbonize_cleanup"
-  )
+  ) {
     return 1;
-  if (event.type === "generate") return 2;
+  }
+  if (event.type === "generate") {
+    return 2;
+  }
   return 3;
 }
 

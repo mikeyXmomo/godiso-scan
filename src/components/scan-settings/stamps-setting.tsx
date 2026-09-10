@@ -1,6 +1,7 @@
 import { fileOpen } from "browser-fs-access";
 import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -8,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useScannerStore } from "@/lib/scanner-store";
-import { defaultStamp, type Stamp } from "@/utils/scan-renderer/config.types";
+import { defaultStamp } from "@/utils/scan-renderer/config.types";
+import type { Stamp } from "@/utils/scan-renderer/config.types";
 
 export function StampsSettingsCard() {
   const stamps = useScannerStore((s) => s.config.stamps);
@@ -99,7 +101,7 @@ function StampEditor({ index, stamp }: StampEditorProps) {
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.currentTarget.files?.[0];
       if (file) {
-        readAsDataUrl(file).then(handleImage, () => undefined);
+        readAsDataUrl(file).then(handleImage, () => {});
       }
       event.currentTarget.value = "";
     },
@@ -112,7 +114,7 @@ function StampEditor({ index, stamp }: StampEditorProps) {
   );
 
   const handlePickClick = useCallback(() => {
-    pickImage().catch(() => undefined);
+    pickImage().catch(() => {});
   }, [pickImage]);
 
   const handleAllPagesChange = useCallback(
@@ -155,9 +157,9 @@ function StampEditor({ index, stamp }: StampEditorProps) {
   );
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border/60 p-4">
+    <div className="border-border/60 flex flex-col gap-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-sm">
+        <span className="text-sm font-medium">
           Tanda tangan atau cap #{index + 1}
         </span>
         <Button
@@ -207,7 +209,7 @@ function StampEditor({ index, stamp }: StampEditorProps) {
             <div className="flex items-center gap-2">
               <img
                 alt={`Pratinjau tanda tangan ${index + 1}`}
-                className="h-10 w-auto max-w-24 rounded border border-border/60 bg-card object-contain"
+                className="border-border/60 bg-card h-10 w-auto max-w-24 rounded border object-contain"
                 height={40}
                 src={stamp.image}
                 width={96}

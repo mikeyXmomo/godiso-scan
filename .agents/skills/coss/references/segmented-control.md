@@ -36,7 +36,7 @@ npx shadcn@latest add @coss/segmented-control
 import {
   segmentedControlItemVariants,
   segmentedControlRootClassName,
-} from "@/lib/segmented-control"
+} from "@/lib/segmented-control";
 ```
 
 Apply `segmentedControlRootClassName` to the group surface. Generate one item class with the matching state selector:
@@ -45,7 +45,7 @@ Apply `segmentedControlRootClassName` to the group surface. Generate one item cl
 const itemClassName = segmentedControlItemVariants({
   size: "default",
   state: "checked",
-})
+});
 ```
 
 - `state: "checked"` for Radio Group

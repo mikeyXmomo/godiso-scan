@@ -38,16 +38,18 @@ const SVELTE_ROOT_IMPORT_LINE_RE =
  * which no cache survives.
  */
 export function svelteRootImportLine(rev) {
-  if (!rev) return SVELTE_ROOT_IMPORT;
-  return (
-    "import ImpeccableLiveRoot from '$lib/impeccable/ImpeccableLiveRoot.svelte?impeccable-live=" +
-    rev +
-    "';"
-  );
+  if (!rev) {
+    return SVELTE_ROOT_IMPORT;
+  }
+  return `import ImpeccableLiveRoot from '$lib/impeccable/ImpeccableLiveRoot.svelte?impeccable-live=${
+    rev
+  }';`;
 }
 
 export function svelteAdapterRev(token) {
-  if (!token) return null;
+  if (!token) {
+    return null;
+  }
   return crypto
     .createHash("sha256")
     .update(String(token))
@@ -57,11 +59,15 @@ export function svelteAdapterRev(token) {
 
 export function detectSvelteKitProject(cwd = process.cwd(), config = null) {
   const appHtml = findSvelteKitAppHtml(cwd, config);
-  if (!appHtml) return null;
+  if (!appHtml) {
+    return null;
+  }
   const hasTemplateMarkers =
     fileIncludes(path.join(cwd, appHtml), "%sveltekit.body%") &&
     fileIncludes(path.join(cwd, appHtml), "%sveltekit.head%");
-  if (!hasTemplateMarkers) return null;
+  if (!hasTemplateMarkers) {
+    return null;
+  }
 
   const hasSvelteConfig = Boolean(
     firstExistingFile(cwd, [
@@ -76,7 +82,9 @@ export function detectSvelteKitProject(cwd = process.cwd(), config = null) {
     "@sveltejs/vite-plugin-svelte",
     "svelte",
   ]);
-  if (!hasSvelteConfig && !hasKitPackage) return null;
+  if (!hasSvelteConfig && !hasKitPackage) {
+    return null;
+  }
 
   return {
     appHtml,
@@ -92,10 +100,12 @@ export function applySvelteKitLiveAdapter({
   config = null,
 } = {}) {
   if (!Number.isFinite(Number(port))) {
-    throw new Error("SvelteKit live adapter requires a numeric port");
+    throw new TypeError("SvelteKit live adapter requires a numeric port");
   }
   const detected = detectSvelteKitProject(cwd, config);
-  if (!detected) return null;
+  if (!detected) {
+    return null;
+  }
 
   ensureSvelteLiveRootComponent(cwd, Number(port), token);
 
@@ -110,10 +120,10 @@ export function applySvelteKitLiveAdapter({
   fs.writeFileSync(layoutAbs, after, "utf-8");
 
   return {
-    file: layoutRel,
     adapter: "sveltekit",
-    inserted: after !== before || !layoutExisted,
     appHtmlUntouched: true,
+    file: layoutRel,
+    inserted: after !== before || !layoutExisted,
     rootComponent: SVELTE_LIVE_ROOT_COMPONENT,
   };
 }
@@ -123,7 +133,9 @@ export function removeSvelteKitLiveAdapter({
   config = null,
 } = {}) {
   const detected = detectSvelteKitProject(cwd, config);
-  if (!detected) return null;
+  if (!detected) {
+    return null;
+  }
 
   const layoutAbs = path.join(cwd, detected.layoutFile);
   let removed = false;
@@ -145,10 +157,10 @@ export function removeSvelteKitLiveAdapter({
   pruneEmptyDir(path.dirname(rootAbs), path.join(cwd, "src"));
 
   return {
-    file: detected.layoutFile,
     adapter: "sveltekit",
-    removed,
     appHtmlUntouched: true,
+    file: detected.layoutFile,
+    removed,
     rootComponent: SVELTE_LIVE_ROOT_COMPONENT,
   };
 }
@@ -161,19 +173,20 @@ export function patchSvelteLayout(content, { rev = null } = {}) {
     // indentation; only a layout with no impeccable import gets an insert.
     let replaced = false;
     out = out.replace(SVELTE_ROOT_IMPORT_LINE_RE, (line) => {
-      if (replaced) return "";
+      if (replaced) {
+        return "";
+      }
       replaced = true;
       const indent = (line.match(/^[ \t]*/) || [""])[0];
-      return indent + importLine + "\n";
+      return `${indent + importLine}\n`;
     });
     if (!replaced) {
       const scriptMatch = out.match(/<script(?:\s[^>]*)?>/i);
       if (scriptMatch) {
         const insertAt = scriptMatch.index + scriptMatch[0].length;
-        out =
-          out.slice(0, insertAt) + "\n  " + importLine + out.slice(insertAt);
+        out = `${out.slice(0, insertAt)}\n  ${importLine}${out.slice(insertAt)}`;
       } else {
-        out = `<script>\n  ${importLine}\n</script>\n\n` + out;
+        out = `<script>\n  ${importLine}\n</script>\n\n${out}`;
       }
     }
   }
@@ -186,7 +199,7 @@ export function patchSvelteLayout(content, { rev = null } = {}) {
     if (match) {
       out = out.slice(0, match.index) + block + out.slice(match.index);
     } else {
-      out = out.replace(/\s*$/, "\n\n" + block);
+      out = out.replace(/\s*$/, `\n\n${block}`);
     }
   }
 
@@ -196,17 +209,17 @@ export function patchSvelteLayout(content, { rev = null } = {}) {
 export function unpatchSvelteLayout(content) {
   let out = String(content || "");
   const blockRe = new RegExp(
-    "([ \\t]*)" +
-      escapeRegExp(SVELTE_LAYOUT_MARKER_OPEN) +
-      "\\n<ImpeccableLiveRoot\\s*/>\\n" +
-      escapeRegExp(SVELTE_LAYOUT_MARKER_CLOSE) +
-      "\\n?",
+    `([ \\t]*)${escapeRegExp(
+      SVELTE_LAYOUT_MARKER_OPEN
+    )}\\n<ImpeccableLiveRoot\\s*/>\\n${escapeRegExp(
+      SVELTE_LAYOUT_MARKER_CLOSE
+    )}\\n?`,
     "g"
   );
   out = out.replace(blockRe, "$1");
   out = out.replace(SVELTE_ROOT_IMPORT_LINE_RE, "");
-  out = out.replace(/<script>\s*<\/script>[ \t]*\r?\n?/g, "");
-  return out.replace(/\n{3,}/g, "\n\n");
+  out = out.replaceAll(/<script>\s*<\/script>[ \t]*\r?\n?/g, "");
+  return out.replaceAll(/\n{3,}/g, "\n\n");
 }
 
 export function ensureSvelteLiveRootComponent(cwd, port, token) {
@@ -217,11 +230,9 @@ export function ensureSvelteLiveRootComponent(cwd, port, token) {
 }
 
 export function buildSvelteLiveRootComponent(port, token) {
-  const liveUrl =
-    "http://localhost:" +
-    Number(port) +
-    "/live.js" +
-    (token ? "?token=" + encodeURIComponent(token) : "");
+  const liveUrl = `http://localhost:${Number(port)}/live.js${
+    token ? `?token=${encodeURIComponent(token)}` : ""
+  }`;
   return `<script>
   import { onMount } from 'svelte';
 
@@ -290,11 +301,17 @@ export function buildSvelteLiveRootComponent(port, token) {
 function findSvelteKitAppHtml(cwd, config) {
   const files = Array.isArray(config?.files) ? config.files : ["src/app.html"];
   for (const rel of files) {
-    if (rel.includes("*")) continue;
+    if (rel.includes("*")) {
+      continue;
+    }
     const normalized = rel.split(path.sep).join("/");
-    if (!normalized.endsWith("app.html")) continue;
+    if (!normalized.endsWith("app.html")) {
+      continue;
+    }
     const abs = path.join(cwd, normalized);
-    if (fs.existsSync(abs)) return normalized;
+    if (fs.existsSync(abs)) {
+      return normalized;
+    }
   }
   const fallback = "src/app.html";
   return fs.existsSync(path.join(cwd, fallback)) ? fallback : null;
@@ -325,7 +342,9 @@ function pruneEmptyDir(dir, stopDir) {
   let current = dir;
   while (current.startsWith(stopDir) && current !== stopDir) {
     try {
-      if (fs.readdirSync(current).length > 0) return;
+      if (fs.readdirSync(current).length > 0) {
+        return;
+      }
       fs.rmdirSync(current);
       current = path.dirname(current);
     } catch {
@@ -335,5 +354,5 @@ function pruneEmptyDir(dir, stopDir) {
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

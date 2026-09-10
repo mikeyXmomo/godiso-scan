@@ -38,13 +38,13 @@ const FORBIDDEN = [
     why: "live-mode plumbing attribute left on markup",
   },
   {
-    marker: /\bdata-p-[A-Za-z0-9_-]+\s*(?:=|\])/,
     label: "data-p-*",
+    marker: /\bdata-p-[A-Za-z0-9_-]+\s*(?:=|\])/,
     why: "preview parameter attribute left on markup",
   },
   {
-    marker: /var\(\s*--p-[A-Za-z0-9_-]+\s*[,)]/,
     label: "var(--p-*)",
+    marker: /var\(\s*--p-[A-Za-z0-9_-]+\s*[,)]/,
     why: "preview parameter variable not baked to a literal",
   },
   {
@@ -67,9 +67,9 @@ export function verifyAcceptedSource(text) {
         marker instanceof RegExp ? marker.test(line) : line.includes(marker);
       if (hit) {
         findings.push({
-          marker: label || String(marker),
-          line: i + 1,
           excerpt: line.trim().slice(0, 120),
+          line: i + 1,
+          marker: label || String(marker),
           why,
         });
       }

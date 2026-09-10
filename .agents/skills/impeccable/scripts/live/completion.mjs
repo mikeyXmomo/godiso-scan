@@ -6,17 +6,24 @@
 const PREVIEW_MODES_WITHOUT_SOURCE_MARKERS = new Set(["svelte-component"]);
 
 export function completionTypeForAcceptResult(eventType, acceptResult) {
-  if (eventType === "discard")
+  if (eventType === "discard") {
     return acceptResult?.handled === true ? "discarded" : "error";
-  if (acceptResult?.handled === true && acceptResult?.carbonize === true)
+  }
+  if (acceptResult?.handled === true && acceptResult?.carbonize === true) {
     return "agent_done";
-  if (acceptResult?.handled === true) return "complete";
-  if (acceptResult?.mode === "error") return "error";
+  }
+  if (acceptResult?.handled === true) {
+    return "complete";
+  }
+  if (acceptResult?.mode === "error") {
+    return "error";
+  }
   if (
     eventType === "accept" &&
     PREVIEW_MODES_WITHOUT_SOURCE_MARKERS.has(acceptResult?.previewMode)
-  )
+  ) {
     return "error";
+  }
   return "agent_done";
 }
 

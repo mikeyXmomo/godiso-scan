@@ -15,8 +15,6 @@ import {
 } from "../tanstack-adapter.mjs";
 
 export const tanstackStart = {
-  name: "tanstack-start",
-
   detect(cwd) {
     return detectTanStackStartProject(cwd);
   },
@@ -25,7 +23,7 @@ export const tanstackStart = {
     kind: "adapter",
 
     apply({ cwd, port, token, project }) {
-      return applyTanStackLiveAdapter({ cwd, port, token, project });
+      return applyTanStackLiveAdapter({ cwd, port, project, token });
     },
 
     remove({ cwd, project }) {
@@ -39,19 +37,21 @@ export const tanstackStart = {
     },
 
     artifacts({ project }) {
-      if (!project) return [];
+      if (!project) {
+        return [];
+      }
       return [
         {
           kind: "created",
-          path: project.componentFile,
           marker: "impeccable-live-tanstack",
+          path: project.componentFile,
           pruneTo: "src",
         },
         {
           kind: "patched",
-          path: project.rootRoute,
-          patch: "tanstack-root",
           markers: [TANSTACK_MARKER_OPEN],
+          patch: "tanstack-root",
+          path: project.rootRoute,
         },
       ];
     },
@@ -61,10 +61,12 @@ export const tanstackStart = {
     },
   },
 
+  name: "tanstack-start",
+
   source: {
+    commentSyntax: "jsx",
     extensions: [".tsx", ".jsx"],
     preview: "source",
     styleMode: "scoped",
-    commentSyntax: "jsx",
   },
 };

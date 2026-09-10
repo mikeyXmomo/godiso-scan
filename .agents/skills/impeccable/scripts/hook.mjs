@@ -29,9 +29,13 @@ import {
 } from "./hook-lib.mjs";
 
 async function readStdin() {
-  if (process.stdin.isTTY) return "";
+  if (process.stdin.isTTY) {
+    return "";
+  }
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks).toString("utf-8");
 }
 
@@ -60,31 +64,33 @@ async function main() {
 
   const run = stdinIsStop(stdinJson) ? runStopHook : runHook;
   const result = await run({
-    stdinJson,
-    env: inheritedEnv,
     cwd: process.cwd(),
+    env: inheritedEnv,
+    stdinJson,
   });
 
   writeAuditLog(process.env, result.audit, process.cwd());
 
-  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stdout) {
+    process.stdout.write(result.stdout);
+  }
   process.exit(result.exitCode || 0);
 }
 
-main().catch((err) => {
+main().catch((error) => {
   // Last-ditch: never break the agent's turn even if something we did not
   // anticipate goes wrong. Audit-log the failure if logging is enabled.
   try {
     writeAuditLog(process.env, {
-      ts: new Date().toISOString(),
+      error: String(error && error.message ? error.message : error),
       event: "hook-error",
-      error: String(err && err.message ? err.message : err),
+      ts: new Date().toISOString(),
     });
   } catch {
     /* swallow */
   }
   if (process.env.IMPECCABLE_HOOK_DEBUG) {
-    process.stderr.write(`[impeccable-hook] ${err}\n`);
+    process.stderr.write(`[impeccable-hook] ${error}\n`);
   }
   process.exit(0);
 });

@@ -13,33 +13,16 @@
  *   node <scripts_path>/live-server.mjs --help
  */
 
-import http from "node:http";
-import { randomUUID } from "node:crypto";
 import { spawn, execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
+import http from "node:http";
 import net from "node:net";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseDesignMd } from "./lib/design-parser.mjs";
+
 import { loadContext } from "./context.mjs";
-import {
-  assembleLiveBrowserScript,
-  assertLiveBrowserScriptParts,
-  readLiveBrowserScriptParts,
-  resolveLiveBrowserScriptParts,
-} from "./live/browser-script-parts.mjs";
-import {
-  createLiveSessionStore,
-  GENERATION_FENCED_PHASES,
-} from "./live/session-store.mjs";
-import { runGenerationPreflight } from "./live/generation-preflight.mjs";
-import { validateEvent } from "./live/event-validation.mjs";
-import { selectAvailablePendingEvent } from "./live/poll-lanes.mjs";
-import { createManualEditRoutes } from "./live/manual-edit-routes.mjs";
-import {
-  LIVE_COMMANDS,
-  VARIANT_PROGRESS_CHECKPOINT_REASONS as VARIANT_PROGRESS_CHECKPOINT_REASON_LIST,
-} from "./live/vocabulary.mjs";
+import { parseDesignMd } from "./lib/design-parser.mjs";
 import {
   getDesignSidecarPath,
   getLiveDir,
@@ -50,11 +33,26 @@ import {
   resolveDesignSidecarPath,
   writeLiveServerInfo,
 } from "./lib/impeccable-paths.mjs";
-import { countByPage as countPendingByPage } from "./live/manual-edits-buffer.mjs";
+import {
+  assembleLiveBrowserScript,
+  assertLiveBrowserScriptParts,
+  readLiveBrowserScriptParts,
+  resolveLiveBrowserScriptParts,
+} from "./live/browser-script-parts.mjs";
+import { validateEvent } from "./live/event-validation.mjs";
+import { runGenerationPreflight } from "./live/generation-preflight.mjs";
 import {
   createManualApplyController,
   summarizeManualApplyFailures,
 } from "./live/manual-apply.mjs";
+import { createManualEditRoutes } from "./live/manual-edit-routes.mjs";
+import { countByPage as countPendingByPage } from "./live/manual-edits-buffer.mjs";
+import { selectAvailablePendingEvent } from "./live/poll-lanes.mjs";
+import { enterLiveRoot } from "./live/roots.mjs";
+import {
+  createLiveSessionStore,
+  GENERATION_FENCED_PHASES,
+} from "./live/session-store.mjs";
 import {
   applyDeferredSvelteComponentAccepts,
   bumpSvelteComponentPreviewRevision,
@@ -62,9 +60,12 @@ import {
   removeAllSvelteComponentSessions,
   sweepInactiveSvelteComponentSessions,
 } from "./live/svelte-component.mjs";
-import { enterLiveRoot } from "./live/roots.mjs";
+import {
+  LIVE_COMMANDS,
+  VARIANT_PROGRESS_CHECKPOINT_REASONS as VARIANT_PROGRESS_CHECKPOINT_REASON_LIST,
+} from "./live/vocabulary.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 // Anchor the whole process on the live roots manifest before anything derives
 // a path from cwd. A server started from the wrong directory re-roots itself
 // onto the appRoot the boot decided on instead of minting a second project.
@@ -87,12 +88,12 @@ function resolveProjectContext() {
     !!(LIVE_ROOTS?.productPath && fs.existsSync(LIVE_ROOTS.productPath));
   return {
     ...ctx,
-    hasProduct,
-    hasDesign: !!designPath,
-    resolvedDesignPath: designPath,
     contextDir: ctx.contextDir || LIVE_ROOTS?.contextRoot || process.cwd(),
     designContextDir:
       ctx.designContextDir || (designPath ? path.dirname(designPath) : null),
+    hasDesign: !!designPath,
+    hasProduct,
+    resolvedDesignPath: designPath,
   };
 }
 const DEFAULT_POLL_TIMEOUT = 600_000; // 10 min — agent re-polls on timeout anyway
@@ -118,7 +119,7 @@ async function findOpenPort(start = 8400) {
   return new Promise((resolve) => {
     const srv = net.createServer();
     srv.listen(start, "127.0.0.1", () => {
-      const port = srv.address().port;
+      const { port } = srv.address();
       srv.close(() => resolve(port));
     });
     srv.on("error", () => resolve(findOpenPort(start + 1)));
@@ -161,29 +162,33 @@ const DEBUG_MANUAL_EDIT_EVENTS = /^(1|true|yes)$/i.test(
 );
 
 const manualApply = createManualApplyController({
-  pendingEvents: state.pendingEvents,
-  pendingApplyDeferreds: state.pendingApplyDeferreds,
-  timedOutApplyIds: state.timedOutApplyIds,
-  enqueueEvent,
   acknowledgePendingEvent,
-  flushPendingPolls,
-  recordManualEditActivity,
   cwd: () => process.cwd(),
+  enqueueEvent,
+  flushPendingPolls,
+  pendingApplyDeferreds: state.pendingApplyDeferreds,
+  pendingEvents: state.pendingEvents,
+  recordManualEditActivity,
+  timedOutApplyIds: state.timedOutApplyIds,
 });
 
 const manualEditRoutes = createManualEditRoutes({
-  getToken: () => state.token,
-  manualApply,
-  recordManualEditActivity,
-  getManualEditStatus,
   chatAgentLikelyActive,
   cwd: () => process.cwd(),
   env: () => process.env,
+  getManualEditStatus,
+  getToken: () => state.token,
+  manualApply,
+  recordManualEditActivity,
 });
 
 function chatAgentLikelyActive() {
-  if (state.pendingPolls.length > 0) return true;
-  if (!state.lastPollAt) return false;
+  if (state.pendingPolls.length > 0) {
+    return true;
+  }
+  if (!state.lastPollAt) {
+    return false;
+  }
   return Date.now() - state.lastPollAt < CHAT_POLL_FRESHNESS_MS;
 }
 
@@ -198,12 +203,18 @@ const POLLER_OWNED_EVENT_FIELDS = [
 ];
 
 function stripPollerOwnedEventFields(event) {
-  if (!event || typeof event !== "object") return;
-  for (const key of POLLER_OWNED_EVENT_FIELDS) delete event[key];
+  if (!event || typeof event !== "object") {
+    return;
+  }
+  for (const key of POLLER_OWNED_EVENT_FIELDS) {
+    delete event[key];
+  }
 }
 
 function enqueueEvent(event) {
-  if (!event) return;
+  if (!event) {
+    return;
+  }
   stripPollerOwnedEventFields(event);
   // Dedupe by (session, type), except mount failures, which are per-variant:
   // variant 2 failing must not be swallowed because variant 1's failure is
@@ -217,15 +228,21 @@ function enqueueEvent(event) {
         (event.type !== "variant_mount_failed" ||
           entry.event?.variant === event.variant)
     );
-  if (duplicate) return;
+  if (duplicate) {
+    return;
+  }
   state.pendingEvents.push({ event, leaseUntil: 0, seq: state.nextEventSeq++ });
   flushPendingPolls();
 }
 
 function restorePendingEventsFromStore() {
-  if (!state.sessionStore) return;
+  if (!state.sessionStore) {
+    return;
+  }
   for (const snapshot of state.sessionStore.listActiveSessions()) {
-    if (snapshot.pendingEvent) enqueueEvent(snapshot.pendingEvent);
+    if (snapshot.pendingEvent) {
+      enqueueEvent(snapshot.pendingEvent);
+    }
   }
 }
 
@@ -242,7 +259,9 @@ async function leaseEvent(entry, leaseMs) {
   await prepareGenerateEventForLease(entry);
   if (!entry.event?.id) {
     const idx = state.pendingEvents.indexOf(entry);
-    if (idx !== -1) state.pendingEvents.splice(idx, 1);
+    if (idx !== -1) {
+      state.pendingEvents.splice(idx, 1);
+    }
     return entry.event;
   }
   // Re-stamp so the lease window starts when the agent actually receives the
@@ -256,7 +275,9 @@ async function leaseEvent(entry, leaseMs) {
 
 function recordGenerateDelivery(entry) {
   const event = entry?.event;
-  if (!event || event.type !== "generate" || event.generationReadyAt) return;
+  if (!event || event.type !== "generate" || event.generationReadyAt) {
+    return;
+  }
   const at = Date.now();
   entry.event = { ...event, generationReadyAt: at };
   state.sessionStore?.appendEvent(entry.event);
@@ -265,7 +286,9 @@ function recordGenerateDelivery(entry) {
 
 async function prepareGenerateEventForLease(entry) {
   const event = entry?.event;
-  if (!event || event.type !== "generate" || event.scaffoldAttempted) return;
+  if (!event || event.type !== "generate" || event.scaffoldAttempted) {
+    return;
+  }
 
   recordAgentPhase(event.id, "picked_up");
   recordAgentPhase(event.id, "scaffolding");
@@ -289,12 +312,14 @@ async function prepareGenerateEventForLease(entry) {
 }
 
 function recordAgentPhase(id, phase, details = {}) {
-  if (!id) return;
+  if (!id) {
+    return;
+  }
   const event = {
-    type: "agent_phase",
+    at: Date.now(),
     id,
     phase,
-    at: Date.now(),
+    type: "agent_phase",
     ...details,
   };
   state.sessionStore?.appendEvent(event);
@@ -322,11 +347,18 @@ function recordAgentPhase(id, phase, details = {}) {
  * redelivery from its next checkpoint.
  */
 function detectMissedGenerationCompletion(event) {
-  if (!event?.id || event.type !== "checkpoint") return null;
-  if (event.phase !== "generating") return null;
-  if (!variantCountLooksBehind(event.arrivedVariants, event.expectedVariants))
+  if (!event?.id || event.type !== "checkpoint") {
     return null;
-  if (!state.sessionStore) return null;
+  }
+  if (event.phase !== "generating") {
+    return null;
+  }
+  if (!variantCountLooksBehind(event.arrivedVariants, event.expectedVariants)) {
+    return null;
+  }
+  if (!state.sessionStore) {
+    return null;
+  }
   let snapshot = null;
   try {
     snapshot = state.sessionStore.getSnapshot(event.id);
@@ -343,27 +375,39 @@ function variantCountLooksBehind(arrivedValue, expectedValue) {
 }
 
 function missedCompletionFromSnapshot(snapshot) {
-  if (!snapshot?.id || !snapshot.generationCompletedAt) return null;
-  if (snapshot.generationCanceled) return null;
+  if (!snapshot?.id || !snapshot.generationCompletedAt) {
+    return null;
+  }
+  if (snapshot.generationCanceled) {
+    return null;
+  }
   // Accept/discard already underway: the browser is no longer waiting on
   // generation, and a late `done` there would collide with teardown.
-  if (GENERATION_FENCED_PHASES.has(snapshot.phase)) return null;
+  if (GENERATION_FENCED_PHASES.has(snapshot.phase)) {
+    return null;
+  }
   const file = snapshot.sourceFile || snapshot.previewFile;
-  if (!file) return null;
+  if (!file) {
+    return null;
+  }
   return {
-    type: "done",
-    id: snapshot.id,
     file,
-    sourceFile: snapshot.sourceFile || undefined,
+    id: snapshot.id,
     previewFile: snapshot.previewFile || undefined,
     previewMode: snapshot.previewMode || undefined,
     redelivered: true,
+    sourceFile: snapshot.sourceFile || undefined,
+    type: "done",
   };
 }
 
 function recordGenerationCheckpoint(event) {
-  if (!event?.id || event.type !== "checkpoint") return;
-  if (generationIsFenced(event.id)) return;
+  if (!event?.id || event.type !== "checkpoint") {
+    return;
+  }
+  if (generationIsFenced(event.id)) {
+    return;
+  }
   // Only checkpoints that report a change in variant availability are
   // generation progress. The browser also checkpoints for durability on Tune
   // slider drags, resumes, and anchor recovery; treating those as progress
@@ -371,31 +415,35 @@ function recordGenerationCheckpoint(event) {
   // remounts the component preview mid-drag (reverting the user's live param
   // edit and detaching the popover's element), and permanently latched the
   // *_reviewable phases from the wrong trigger, corrupting generation timings.
-  if (!VARIANT_PROGRESS_CHECKPOINT_REASONS.has(event.reason)) return;
+  if (!VARIANT_PROGRESS_CHECKPOINT_REASONS.has(event.reason)) {
+    return;
+  }
   const arrived = Number(event.arrivedVariants) || 0;
   const expected = Number(event.expectedVariants) || 0;
-  if (arrived <= 0 || expected <= 0) return;
+  if (arrived <= 0 || expected <= 0) {
+    return;
+  }
   const previewMode = event.previewMode || "source";
   const previewFile = event.previewFile || event.file;
   if (previewFile) {
     broadcast({
-      type: "variant_progress",
-      id: event.id,
+      arrivedVariants: arrived,
+      expectedVariants: expected,
       file: previewFile,
+      id: event.id,
+      previewFile,
+      previewMode,
+      publicationKind: event.publicationKind || "variants",
       sourceFile:
         event.sourceFile ||
         (previewMode === "source" ? previewFile : undefined),
-      previewFile,
-      previewMode,
-      arrivedVariants: arrived,
-      expectedVariants: expected,
-      publicationKind: event.publicationKind || "variants",
+      type: "variant_progress",
     });
   }
   const details = {
     arrivedVariants: arrived,
-    expectedVariants: expected,
     checkpointReason: event.reason || null,
+    expectedVariants: expected,
   };
   const at = Date.now();
   if (!generationPhaseAlreadyRecorded(event.id, "first_reviewable")) {
@@ -417,7 +465,9 @@ function recordGenerationCheckpoint(event) {
 }
 
 function generationIsFenced(id) {
-  if (!state.sessionStore || !id) return false;
+  if (!state.sessionStore || !id) {
+    return false;
+  }
   try {
     const snapshot = state.sessionStore.getSnapshot(id, {
       includeCompleted: true,
@@ -429,7 +479,9 @@ function generationIsFenced(id) {
 }
 
 function generationPhaseAlreadyRecorded(id, phase) {
-  if (!state.sessionStore) return false;
+  if (!state.sessionStore) {
+    return false;
+  }
   try {
     const snapshot = state.sessionStore.getSnapshot(id, {
       includeCompleted: true,
@@ -441,13 +493,17 @@ function generationPhaseAlreadyRecorded(id, phase) {
 }
 
 function acknowledgePendingEvent(id, sourceEventType) {
-  if (!id) return false;
+  if (!id) {
+    return false;
+  }
   const idx = state.pendingEvents.findIndex(
     (entry) =>
       entry.event?.id === id &&
       (!sourceEventType || entry.event?.type === sourceEventType)
   );
-  if (idx === -1) return false;
+  if (idx === -1) {
+    return false;
+  }
   const acknowledged = state.pendingEvents[idx].event;
   state.pendingEvents.splice(idx, 1);
   scheduleLeaseFlush();
@@ -461,18 +517,24 @@ function releasePendingEvent(id, sourceEventType) {
       item.event?.id === id &&
       (!sourceEventType || item.event?.type === sourceEventType)
   );
-  if (!entry) return null;
+  if (!entry) {
+    return null;
+  }
   entry.leaseUntil = 0;
   scheduleLeaseFlush();
   return entry.event;
 }
 
 function retirePendingGeneration(id) {
-  if (!id) return 0;
+  if (!id) {
+    return 0;
+  }
   let retired = 0;
   for (let index = state.pendingEvents.length - 1; index >= 0; index -= 1) {
     const event = state.pendingEvents[index]?.event;
-    if (event?.id !== id || event.type !== "generate") continue;
+    if (event?.id !== id || event.type !== "generate") {
+      continue;
+    }
     state.pendingEvents.splice(index, 1);
     retired += 1;
   }
@@ -484,7 +546,9 @@ function retirePendingGeneration(id) {
 }
 
 function findPendingEventById(id, sourceEventType) {
-  if (!id) return null;
+  if (!id) {
+    return null;
+  }
   const entry = state.pendingEvents.find(
     (item) =>
       item.event?.id === id &&
@@ -497,9 +561,9 @@ function summarizePendingEventForStatus(entry) {
   const event = entry.event || {};
   const summary = {
     id: event.id,
-    type: event.type,
-    leased: isLeased(entry),
     leaseUntil: entry.leaseUntil || null,
+    leased: isLeased(entry),
+    type: event.type,
   };
   if (event.type === "manual_edit_apply") {
     summary.pageUrl = event.pageUrl || null;
@@ -549,7 +613,9 @@ function summarizeActiveSessionForClient(snapshot = {}) {
 }
 
 function activeSessionSummaries() {
-  if (!state.sessionStore) return [];
+  if (!state.sessionStore) {
+    return [];
+  }
   return state.sessionStore
     .listActiveSessions()
     .map((snapshot) => summarizeActiveSessionForClient(snapshot));
@@ -559,7 +625,9 @@ function cancelQueuedAnonymousExitEvents() {
   let removed = 0;
   for (let i = state.pendingEvents.length - 1; i >= 0; i -= 1) {
     const event = state.pendingEvents[i]?.event;
-    if (event?.type !== "exit" || event.id) continue;
+    if (event?.type !== "exit" || event.id) {
+      continue;
+    }
     state.pendingEvents.splice(i, 1);
     removed += 1;
   }
@@ -580,7 +648,9 @@ function scheduleLeaseFlush() {
     .map((entry) => entry.leaseUntil || 0)
     .filter((leaseUntil) => leaseUntil > now)
     .sort((a, b) => a - b)[0];
-  if (!nextLeaseUntil) return;
+  if (!nextLeaseUntil) {
+    return;
+  }
   state.leaseTimer = setTimeout(
     () => {
       state.leaseTimer = null;
@@ -601,7 +671,9 @@ function flushPendingPolls() {
         Date.now(),
         state.pendingPolls[index].types
       );
-      if (!candidate) continue;
+      if (!candidate) {
+        continue;
+      }
       pollIndex = index;
       entry = candidate;
       break;
@@ -620,17 +692,18 @@ function flushPendingPolls() {
     // lease expires, which keeps a deterministic failure from hot-looping.
     leaseEvent(entry, poll.leaseMs).then(poll.resolve, (error) => {
       console.error(
-        "[live] lease failed for " +
-          (entry.event?.id || "unknown") +
-          ": " +
-          (error?.message || error)
+        `[live] lease failed for ${entry.event?.id || "unknown"}: ${
+          error?.message || error
+        }`
       );
       poll.resolve({ type: "timeout" });
     });
     changed = true;
   }
   scheduleLeaseFlush();
-  if (changed) broadcastAgentPollingIfChanged();
+  if (changed) {
+    broadcastAgentPollingIfChanged();
+  }
 }
 
 function isLeased(entry) {
@@ -646,14 +719,16 @@ function agentPollingConnected() {
 
 function broadcastAgentPollingIfChanged() {
   const connected = agentPollingConnected();
-  if (state.lastAgentPollingBroadcast === connected) return;
+  if (state.lastAgentPollingBroadcast === connected) {
+    return;
+  }
   state.lastAgentPollingBroadcast = connected;
-  broadcast({ type: "agent_polling", connected });
+  broadcast({ connected, type: "agent_polling" });
 }
 
 /** Push a message to all connected SSE clients. */
 function broadcast(msg) {
-  const data = "data: " + JSON.stringify(msg) + "\n\n";
+  const data = `data: ${JSON.stringify(msg)}\n\n`;
   for (const res of state.sseClients) {
     try {
       res.write(data);
@@ -666,8 +741,8 @@ function broadcast(msg) {
 function recordManualEditActivity(type, details = {}) {
   const entry = {
     seq: state.nextManualEditSeq++,
-    type,
     ts: new Date().toISOString(),
+    type,
     ...details,
   };
   state.manualEditActivity = entry;
@@ -678,7 +753,7 @@ function recordManualEditActivity(type, details = {}) {
         "manual-edit-events.jsonl"
       );
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
+      fs.appendFileSync(filePath, `${JSON.stringify(entry)}\n`);
     } catch {
       /* diagnostics are best-effort; never block live mode on observability */
     }
@@ -690,13 +765,13 @@ function recordManualEditActivity(type, details = {}) {
 function getManualEditStatus() {
   try {
     const { totalCount, perPage } = countPendingByPage(process.cwd());
-    return { totalCount, perPage, lastActivity: state.manualEditActivity };
-  } catch (err) {
+    return { lastActivity: state.manualEditActivity, perPage, totalCount };
+  } catch (error) {
     return {
-      totalCount: null,
-      perPage: {},
+      error: error.message,
       lastActivity: state.manualEditActivity,
-      error: err.message,
+      perPage: {},
+      totalCount: null,
     };
   }
 }
@@ -754,8 +829,8 @@ function loadBrowserScripts() {
   const liveScriptParts = resolveLiveBrowserScriptParts(__dirname);
   try {
     assertLiveBrowserScriptParts(liveScriptParts);
-  } catch (err) {
-    process.stderr.write("Error: " + err.message + "\n");
+  } catch (error) {
+    process.stderr.write(`Error: ${error.message}\n`);
     process.exit(1);
   }
 
@@ -781,14 +856,18 @@ function statOrNull(filePath) {
 // substring match, so `http://localhost.evil.com` and `http://127.0.0.1.evil.com`
 // fail) and accepts only http/https on localhost, 127.0.0.1, or the IPv6 loopback.
 function isLoopbackOrigin(origin) {
-  if (typeof origin !== "string" || origin.length === 0) return false;
+  if (typeof origin !== "string" || origin.length === 0) {
+    return false;
+  }
   let parsed;
   try {
     parsed = new URL(origin);
   } catch {
     return false;
   }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
   const host = parsed.hostname.toLowerCase();
   return (
     host === "localhost" ||
@@ -820,7 +899,7 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
     // origin. Requests with no Origin header (script tags, curl, the agent's
     // own fetches) are not subject to CORS and keep working; no ACAO header
     // is needed for them.
-    const origin = req.headers.origin;
+    const { origin } = req.headers;
     if (
       origin &&
       (isLoopbackOrigin(origin) ||
@@ -857,22 +936,22 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       let parts;
       try {
         parts = readLiveBrowserScriptParts(liveScriptParts);
-      } catch (err) {
+      } catch (error) {
         res.writeHead(500, { "Content-Type": "text/plain" });
-        res.end("Error reading live browser scripts: " + err.message);
+        res.end(`Error reading live browser scripts: ${error.message}`);
         return;
       }
       const body = assembleLiveBrowserScript({
-        token: state.token,
-        port: state.port,
-        vocabulary: LIVE_COMMANDS,
-        commandPrefix: IMPECCABLE_COMMAND_PREFIX,
         appRoot: process.cwd(),
+        commandPrefix: IMPECCABLE_COMMAND_PREFIX,
         parts,
+        port: state.port,
+        token: state.token,
+        vocabulary: LIVE_COMMANDS,
       });
       res.writeHead(200, {
-        "Content-Type": "application/javascript",
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Content-Type": "application/javascript",
         Pragma: "no-cache",
       });
       res.end(body);
@@ -896,8 +975,8 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       const vendorPath = path.join(__dirname, "modern-screenshot.umd.js");
       try {
         res.writeHead(200, {
-          "Content-Type": "application/javascript",
           "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "application/javascript",
         });
         res.end(fs.readFileSync(vendorPath));
       } catch {
@@ -938,7 +1017,9 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       let total = 0;
       let aborted = false;
       req.on("data", (c) => {
-        if (aborted) return;
+        if (aborted) {
+          return;
+        }
         total += c.length;
         if (total > MAX_ANNOTATION_BYTES) {
           aborted = true;
@@ -950,13 +1031,15 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
         chunks.push(c);
       });
       req.on("end", () => {
-        if (aborted) return;
-        const absPath = path.join(state.sessionDir, eventId + ".png");
+        if (aborted) {
+          return;
+        }
+        const absPath = path.join(state.sessionDir, `${eventId}.png`);
         try {
           fs.writeFileSync(absPath, Buffer.concat(chunks));
-        } catch (err) {
+        } catch (error) {
           res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Write failed: " + err.message }));
+          res.end(JSON.stringify({ error: `Write failed: ${error.message}` }));
           return;
         }
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -983,15 +1066,15 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          status: "ok",
-          port: state.port,
+          activeSessions: sessions,
+          agentPolling: agentPollingConnected(),
           connectedClients: state.sseClients.size,
+          manualEdits: getManualEditStatus(),
           pendingEvents: state.pendingEvents.map((entry) =>
             summarizePendingEventForStatus(entry)
           ),
-          agentPolling: agentPollingConnected(),
-          activeSessions: sessions,
-          manualEdits: getManualEditStatus(),
+          port: state.port,
+          status: "ok",
         })
       );
       return;
@@ -1001,11 +1084,11 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          status: "ok",
-          port: state.port,
-          mode: "variant",
-          hasProjectContext: hasProjectContext(),
           connectedClients: state.sseClients.size,
+          hasProjectContext: hasProjectContext(),
+          mode: "variant",
+          port: state.port,
+          status: "ok",
         })
       );
       return;
@@ -1058,7 +1141,6 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       }
 
       const response = {
-        present: true,
         hasMd: !!mdStat,
         hasSidecar: !!jsonStat,
         mdNewerThanJson: !!(
@@ -1066,22 +1148,22 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
           jsonStat &&
           mdStat.mtimeMs > jsonStat.mtimeMs + 1000
         ),
+        present: true,
       };
 
       if (mdStat) {
         try {
           response.parsed = parseDesignMd(fs.readFileSync(mdPath, "utf-8"));
-        } catch (err) {
-          response.parseError = err.message;
+        } catch (error) {
+          response.parseError = error.message;
         }
       }
 
       if (jsonStat) {
         try {
           response.sidecar = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
-        } catch (err) {
-          response.sidecarError =
-            "Failed to parse .impeccable/design.json: " + err.message;
+        } catch (error) {
+          response.sidecarError = `Failed to parse .impeccable/design.json: ${error.message}`;
         }
       }
 
@@ -1105,7 +1187,8 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
         return;
       }
       const absPath = path.resolve(process.cwd(), filePath);
-      let realRoot, realTarget;
+      let realRoot;
+      let realTarget;
       try {
         realRoot = fs.realpathSync(process.cwd());
         realTarget = fs.realpathSync(absPath);
@@ -1151,19 +1234,17 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
       state.exitTimer = null;
       cancelQueuedAnonymousExitEvents();
       res.writeHead(200, {
-        "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "Content-Type": "text/event-stream",
       });
       res.write(
-        "data: " +
-          JSON.stringify({
-            type: "connected",
-            hasProjectContext: hasProjectContext(),
-            agentPolling: agentPollingConnected(),
-            activeSessions: activeSessionSummaries(),
-          }) +
-          "\n\n"
+        `data: ${JSON.stringify({
+          activeSessions: activeSessionSummaries(),
+          agentPolling: agentPollingConnected(),
+          hasProjectContext: hasProjectContext(),
+          type: "connected",
+        })}\n\n`
       );
 
       state.sseClients.add(res);
@@ -1183,14 +1264,18 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
         if (state.sseClients.size === 0) {
           clearTimeout(state.exitTimer);
           state.exitTimer = setTimeout(() => {
-            if (state.sseClients.size === 0) enqueueEvent({ type: "exit" });
+            if (state.sseClients.size === 0) {
+              enqueueEvent({ type: "exit" });
+            }
           }, 8000);
         }
       });
       return;
     }
 
-    if (manualEditRoutes(req, res, url)) return;
+    if (manualEditRoutes(req, res, url)) {
+      return;
+    }
 
     // --- Browser→server events (replaces WebSocket messages) ---
     if (p === "/events" && req.method === "POST") {
@@ -1273,12 +1358,12 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
         if (state.sessionStore && msg.id) {
           try {
             state.sessionStore.appendEvent(msg);
-          } catch (err) {
+          } catch (error) {
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(
               JSON.stringify({
                 error: "session_store_append_failed",
-                message: err.message,
+                message: error.message,
               })
             );
             return;
@@ -1288,7 +1373,9 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
           retirePendingGeneration(msg.id);
         }
         recordGenerationCheckpoint(msg);
-        if (missedCompletion) broadcast(missedCompletion);
+        if (missedCompletion) {
+          broadcast(missedCompletion);
+        }
         if (msg.type === "exit") {
           cleanupSvelteComponentSessionsBeforeExit();
         }
@@ -1302,9 +1389,9 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
         if (orphanedDiscard && state.sessionStore && msg.id) {
           try {
             state.sessionStore.appendEvent({
-              type: "discarded",
               id: msg.id,
               orphaned: true,
+              type: "discarded",
             });
           } catch {
             /* the discard_requested phase already left the resumable set */
@@ -1363,7 +1450,9 @@ function createRequestHandler({ detectScript, liveScriptParts }) {
 // ---------------------------------------------------------------------------
 
 function parsePollTypes(value) {
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
   const types = String(value)
     .split(",")
     .map((type) => type.trim())
@@ -1379,11 +1468,14 @@ function handlePollGet(req, res, url) {
     return;
   }
   state.lastPollAt = Date.now();
-  const timeout = parseInt(
+  const timeout = Number.parseInt(
     url.searchParams.get("timeout") || DEFAULT_POLL_TIMEOUT,
     10
   );
-  const leaseMs = parseInt(url.searchParams.get("leaseMs") || "30000", 10);
+  const leaseMs = Number.parseInt(
+    url.searchParams.get("leaseMs") || "30000",
+    10
+  );
   const types = parsePollTypes(url.searchParams.get("types"));
   const available = findAvailablePendingEvent(Date.now(), types);
   if (available) {
@@ -1392,28 +1484,33 @@ function handlePollGet(req, res, url) {
     // so check the socket before replying.
     leaseEvent(available, leaseMs).then(
       (event) => {
-        if (res.writableEnded || res.destroyed) return;
+        if (res.writableEnded || res.destroyed) {
+          return;
+        }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(event));
       },
       (error) => {
         console.error(
-          "[live] lease failed for " +
-            (available.event?.id || "unknown") +
-            ": " +
-            (error?.message || error)
+          `[live] lease failed for ${available.event?.id || "unknown"}: ${
+            error?.message || error
+          }`
         );
-        if (res.writableEnded || res.destroyed) return;
+        if (res.writableEnded || res.destroyed) {
+          return;
+        }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ type: "timeout" }));
       }
     );
     return;
   }
-  const poll = { resolve, leaseMs, types };
+  const poll = { leaseMs, resolve, types };
   const timer = setTimeout(() => {
     const idx = state.pendingPolls.indexOf(poll);
-    if (idx !== -1) state.pendingPolls.splice(idx, 1);
+    if (idx !== -1) {
+      state.pendingPolls.splice(idx, 1);
+    }
     broadcastAgentPollingIfChanged();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ type: "timeout" }));
@@ -1430,47 +1527,56 @@ function handlePollGet(req, res, url) {
   req.on("close", () => {
     clearTimeout(timer);
     const idx = state.pendingPolls.indexOf(poll);
-    if (idx !== -1) state.pendingPolls.splice(idx, 1);
+    if (idx !== -1) {
+      state.pendingPolls.splice(idx, 1);
+    }
     broadcastAgentPollingIfChanged();
   });
 }
 
 function sessionFileMetadataFromPollReply(file) {
-  if (!file || typeof file !== "string") return { file };
+  if (!file || typeof file !== "string") {
+    return { file };
+  }
   const normalized = file.split(path.sep).join("/");
   const base = { file: normalized };
   const metadataFile = normalized;
   if (
     !metadataFile.endsWith("/manifest.json") &&
     metadataFile !== "manifest.json"
-  )
+  ) {
     return base;
+  }
   if (
     !metadataFile.includes(".impeccable/live/previews/") &&
     !metadataFile.includes("node_modules/.impeccable-live/") &&
     !metadataFile.includes("src/lib/impeccable/") &&
     !metadataFile.includes("/.impeccable-live/")
-  )
+  ) {
     return base;
+  }
 
   let full;
   try {
     full = path.resolve(process.cwd(), metadataFile);
     const rel = path.relative(process.cwd(), full);
-    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return base;
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+      return base;
+    }
   } catch {
     return base;
   }
 
   try {
     const manifest = JSON.parse(fs.readFileSync(full, "utf-8"));
-    if (manifest?.previewMode !== "svelte-component" || !manifest.sourceFile)
+    if (manifest?.previewMode !== "svelte-component" || !manifest.sourceFile) {
       return base;
+    }
     return {
       file: String(manifest.sourceFile).split(path.sep).join("/"),
-      sourceFile: String(manifest.sourceFile).split(path.sep).join("/"),
       previewFile: normalized,
       previewMode: manifest.previewMode,
+      sourceFile: String(manifest.sourceFile).split(path.sep).join("/"),
     };
   } catch {
     return base;
@@ -1482,16 +1588,22 @@ function inferSourceEventType(msg = {}, pendingEvents = state.pendingEvents) {
     (entry) => entry.event?.id === msg.id
   );
   const pendingTypes = new Set(entriesForId.map((entry) => entry.event?.type));
-  if (msg.type === "discarded" || msg.type === "discard") return "discard";
+  if (msg.type === "discarded" || msg.type === "discard") {
+    return "discard";
+  }
   if (msg.type === "complete") {
-    if (pendingTypes.has("carbonize_cleanup")) return "carbonize_cleanup";
+    if (pendingTypes.has("carbonize_cleanup")) {
+      return "carbonize_cleanup";
+    }
     return pendingTypes.has("accept")
       ? "accept"
       : pendingTypes.has("generate")
         ? "generate"
         : undefined;
   }
-  if (msg.type === "steer_done") return "steer";
+  if (msg.type === "steer_done") {
+    return "steer";
+  }
   // `agent_done` can be the automatic acknowledgement for a carbonize Accept.
   // New pollers send sourceEventType explicitly; default to generate only for
   // older callers so a late worker cannot acknowledge a queued Accept.
@@ -1503,8 +1615,9 @@ function inferSourceEventType(msg = {}, pendingEvents = state.pendingEvents) {
     if (
       !pendingTypes.has("generate") &&
       pendingTypes.has("variant_mount_failed")
-    )
+    ) {
       return "variant_mount_failed";
+    }
     return "generate";
   }
   // `error` is reference/live.md's documented failure reply, and parseReplyArgs
@@ -1519,7 +1632,7 @@ function inferSourceEventType(msg = {}, pendingEvents = state.pendingEvents) {
   if (msg.type === "error") {
     return entriesForId.find(isLeased)?.event?.type || "generate";
   }
-  return undefined;
+  return;
 }
 
 function handlePollPost(req, res) {
@@ -1549,14 +1662,14 @@ function handlePollPost(req, res) {
       );
       if (!validation.ok) {
         recordManualEditActivity("manual_edit_apply_reply_invalid", {
+          chunk: pendingApplyDeferred.event?.chunk || null,
           id: msg.id,
           pageUrl: pendingApplyDeferred.pageUrl,
-          chunk: pendingApplyDeferred.event?.chunk || null,
-          repair: pendingApplyDeferred.event?.repair || null,
           reason:
             validation.body?.reason ||
             validation.body?.error ||
             "invalid_manual_apply_result",
+          repair: pendingApplyDeferred.event?.repair || null,
           status: msg.data?.status || null,
         });
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -1564,15 +1677,15 @@ function handlePollPost(req, res) {
         return;
       }
       recordManualEditActivity("manual_edit_apply_reply_received", {
-        id: msg.id,
-        pageUrl: pendingApplyDeferred.pageUrl,
-        chunk: pendingApplyDeferred.event?.chunk || null,
-        repair: pendingApplyDeferred.event?.repair || null,
-        status: validation.result.status,
         appliedCount: validation.result.appliedEntryIds.length,
+        chunk: pendingApplyDeferred.event?.chunk || null,
         failed: summarizeManualApplyFailures(validation.result.failed),
         fileCount: validation.result.files.length,
+        id: msg.id,
         noteCount: validation.result.notes.length,
+        pageUrl: pendingApplyDeferred.pageUrl,
+        repair: pendingApplyDeferred.event?.repair || null,
+        status: validation.result.status,
       });
       manualApply.resolveDeferred(msg.id, validation.result);
       acknowledgePendingEvent(msg.id);
@@ -1585,8 +1698,8 @@ function handlePollPost(req, res) {
       const rollback = manualApply.rollbackTimedOutReply(msg);
       recordManualEditActivity("manual_edit_apply_stale_reply_rejected", {
         id: msg.id,
-        rolledBackFileCount: rollback.rolledBackFiles?.length || 0,
         rollbackFailureCount: rollback.rollbackFailures?.length || 0,
+        rolledBackFileCount: rollback.rolledBackFiles?.length || 0,
       });
       res.writeHead(409, { "Content-Type": "application/json" });
       res.end(
@@ -1638,7 +1751,9 @@ function handlePollPost(req, res) {
         existingSession = state.sessionStore.getSnapshot(msg.id, {
           includeCompleted: true,
         });
-        if (!existingSession?.updatedAt) existingSession = null;
+        if (!existingSession?.updatedAt) {
+          existingSession = null;
+        }
         skipJournalReply =
           existingSession?.phase === "completed" ||
           existingSession?.phase === "discarded";
@@ -1673,7 +1788,7 @@ function handlePollPost(req, res) {
       msg.id &&
       (msg.type === "done" || !msg.type)
     ) {
-      let compileCheck = { ok: true, failures: [] };
+      let compileCheck = { failures: [], ok: true };
       try {
         compileCheck = compileCheckVariants(msg.id, process.cwd());
       } catch {
@@ -1683,11 +1798,11 @@ function handlePollPost(req, res) {
         res.writeHead(422, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
-            error: "variant_compile_failed",
-            id: msg.id,
-            failures: compileCheck.failures,
             _instructions:
               "The publish was NOT delivered: the listed variant file(s) do not compile, so the browser never saw them. Fix each failure at the given file and line (the most common cause is a second top-level <style> element; Svelte allows exactly one, so merge all rules into the existing block), then send the same --reply done again.",
+            error: "variant_compile_failed",
+            failures: compileCheck.failures,
+            id: msg.id,
           })
         );
         return;
@@ -1711,15 +1826,15 @@ function handlePollPost(req, res) {
                   ? "agent_error"
                   : "agent_done";
         state.sessionStore.appendEvent({
-          type: eventType,
-          id: msg.id,
+          carbonize: msg.data?.carbonize === true,
           file: replyFileMeta.file,
-          sourceFile: replyFileMeta.sourceFile,
+          id: msg.id,
+          message: msg.message,
           previewFile: replyFileMeta.previewFile,
           previewMode: replyFileMeta.previewMode,
-          message: msg.message,
           sourceEventType: acknowledgedEvent?.type,
-          carbonize: msg.data?.carbonize === true,
+          sourceFile: replyFileMeta.sourceFile,
+          type: eventType,
         });
       } catch {
         /* keep reply path best-effort; browser still needs SSE */
@@ -1728,14 +1843,14 @@ function handlePollPost(req, res) {
     flushPendingPolls();
     // Forward the reply to the browser via SSE
     broadcast({
-      type: msg.type || "done",
+      data: msg.data,
+      file: msg.file,
       id: msg.id,
       message: msg.message,
-      file: msg.file,
-      sourceFile: replyFileMeta.sourceFile,
       previewFile: replyFileMeta.previewFile,
       previewMode: replyFileMeta.previewMode,
-      data: msg.data,
+      sourceFile: replyFileMeta.sourceFile,
+      type: msg.type || "done",
     });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
@@ -1751,11 +1866,13 @@ let httpServer = null;
 function shutdown() {
   cleanupSvelteComponentSessionsBeforeExit();
   removeLiveServerInfo(process.cwd());
-  if (state.leaseTimer) clearTimeout(state.leaseTimer);
+  if (state.leaseTimer) {
+    clearTimeout(state.leaseTimer);
+  }
   state.leaseTimer = null;
   if (state.sessionDir) {
     try {
-      fs.rmSync(state.sessionDir, { recursive: true, force: true });
+      fs.rmSync(state.sessionDir, { force: true, recursive: true });
     } catch {}
   }
   for (const res of state.sseClients) {
@@ -1764,19 +1881,23 @@ function shutdown() {
     } catch {}
   }
   state.sseClients.clear();
-  for (const poll of state.pendingPolls) poll.resolve({ type: "exit" });
+  for (const poll of state.pendingPolls) {
+    poll.resolve({ type: "exit" });
+  }
   state.pendingPolls.length = 0;
-  if (httpServer) httpServer.close();
+  if (httpServer) {
+    httpServer.close();
+  }
   process.exit(0);
 }
 
 function cleanupSvelteComponentSessionsBeforeExit() {
   try {
     removeAllSvelteComponentSessions(process.cwd());
-  } catch (err) {
+  } catch (error) {
     console.warn(
       "[impeccable] Svelte component session cleanup failed:",
-      err.message
+      error.message
     );
   }
 }
@@ -1801,10 +1922,10 @@ function sweepOrphanSvelteComponentSessionsOnStartup() {
         JSON.stringify(result)
       );
     }
-  } catch (err) {
+  } catch (error) {
     console.warn(
       "[impeccable] Svelte component session sweep failed:",
-      err.message
+      error.message
     );
   }
 }
@@ -1817,28 +1938,35 @@ const ACCEPT_RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 function sweepStaleAcceptReceiptsOnStartup() {
   try {
     const dir = path.join(getLiveDir(process.cwd()), "accept-receipts");
-    if (!fs.existsSync(dir)) return;
+    if (!fs.existsSync(dir)) {
+      return;
+    }
     const cutoff = Date.now() - ACCEPT_RECEIPT_MAX_AGE_MS;
     let removed = 0;
     for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith(".json") && !name.endsWith(".tmp")) continue;
+      if (!name.endsWith(".json") && !name.endsWith(".tmp")) {
+        continue;
+      }
       const file = path.join(dir, name);
       try {
-        if (fs.statSync(file).mtimeMs >= cutoff) continue;
+        if (fs.statSync(file).mtimeMs >= cutoff) {
+          continue;
+        }
         fs.rmSync(file, { force: true });
         removed++;
       } catch {
         /* non-fatal */
       }
     }
-    if (removed > 0)
+    if (removed > 0) {
       console.log(
         `[impeccable] removed ${removed} accept receipt(s) older than 14 days`
       );
-  } catch (err) {
+    }
+  } catch (error) {
     console.warn(
       "[impeccable] accept receipt retention sweep failed:",
-      err.message
+      error.message
     );
   }
 }
@@ -1852,10 +1980,10 @@ function applyLegacyDeferredAcceptsOnStartup() {
         JSON.stringify(result)
       );
     }
-  } catch (err) {
+  } catch (error) {
     console.warn(
       "[impeccable] legacy deferred Svelte component accept apply failed:",
-      err.message
+      error.message
     );
   }
 }
@@ -1905,7 +2033,9 @@ if (args.includes("stop")) {
     const res = await fetch(
       `http://localhost:${info.port}/stop?token=${info.token}`
     );
-    if (res.ok) console.log(`Stopped live server on port ${info.port}.`);
+    if (res.ok) {
+      console.log(`Stopped live server on port ${info.port}.`);
+    }
   } catch {
     console.log("No running live server found.");
   }
@@ -1913,8 +2043,8 @@ if (args.includes("stop")) {
     const injectPath = path.join(__dirname, "live-inject.mjs");
     try {
       const out = execFileSync(process.execPath, [injectPath, "--remove"], {
-        encoding: "utf-8",
         cwd: process.cwd(),
+        encoding: "utf-8",
       });
       const line = out.trim().split("\n").filter(Boolean).pop();
       if (line) {
@@ -1927,12 +2057,12 @@ if (args.includes("stop")) {
           /* ignore non-JSON lines */
         }
       }
-    } catch (err) {
+    } catch (error) {
       const detail =
-        err.stderr?.toString?.().trim?.() ||
-        err.stdout?.toString?.().trim?.() ||
-        err.message ||
-        String(err);
+        error.stderr?.toString?.().trim?.() ||
+        error.stdout?.toString?.().trim?.() ||
+        error.message ||
+        String(error);
       console.warn(
         `Note: could not remove live script tag (${detail.split("\n")[0]})`
       );
@@ -1946,15 +2076,11 @@ if (args.includes("stop")) {
 // simple (no shell backgrounding or chained commands).
 if (args.includes("--background")) {
   const childArgs = args.filter((a) => a !== "--background");
-  const child = spawn(
-    process.execPath,
-    [fileURLToPath(import.meta.url), ...childArgs],
-    {
-      detached: true,
-      stdio: "ignore",
-      cwd: process.cwd(),
-    }
-  );
+  const child = spawn(process.execPath, [import.meta.filename, ...childArgs], {
+    cwd: process.cwd(),
+    detached: true,
+    stdio: "ignore",
+  });
   child.unref();
 
   // Poll for the PID file (the child writes it once the HTTP server is listening).
@@ -1989,9 +2115,7 @@ if (existingRecord?.info) {
       `Live server already running on port ${existing.port} (pid ${existing.pid}).`
     );
     console.error(
-      "Stop it first with: node " +
-        path.basename(fileURLToPath(import.meta.url)) +
-        " stop"
+      `Stop it first with: node ${path.basename(import.meta.filename)} stop`
     );
     process.exit(1);
   } catch {
@@ -2013,7 +2137,7 @@ restorePendingEventsFromStore();
 manualApply.pruneStaleEvidence();
 const portArg = args.find((a) => a.startsWith("--port="));
 state.port = portArg
-  ? parseInt(portArg.split("=")[1], 10)
+  ? Number.parseInt(portArg.split("=")[1], 10)
   : await findOpenPort();
 // Annotation screenshots live in the project root so the agent's Read tool
 // doesn't trip a per-file permission prompt. Sessioned by token so concurrent
@@ -2040,9 +2164,7 @@ httpServer.listen(state.port, "127.0.0.1", () => {
   console.log(
     "Inject: managed by live-inject.mjs; Astro source tags use is:inline automatically."
   );
-  console.log(
-    `Stop:   node ${path.basename(fileURLToPath(import.meta.url))} stop`
-  );
+  console.log(`Stop:   node ${path.basename(import.meta.filename)} stop`);
 });
 
 process.on("SIGINT", shutdown);

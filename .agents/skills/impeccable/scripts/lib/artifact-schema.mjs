@@ -61,7 +61,9 @@ export function productStampLine(version = PRODUCT_SCHEMA_VERSION) {
  */
 export function readProductSchemaVersion(markdown) {
   const match = String(markdown || "").match(PRODUCT_STAMP_RE);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const version = Number.parseInt(match[1], 10);
   return Number.isInteger(version) ? version : null;
 }
@@ -75,11 +77,15 @@ export function readProductSchemaVersion(markdown) {
 export function stampProductSchema(markdown, version = PRODUCT_SCHEMA_VERSION) {
   const body = String(markdown || "");
   const line = productStampLine(version);
-  if (PRODUCT_STAMP_RE.test(body)) return body.replace(PRODUCT_STAMP_RE, line);
+  if (PRODUCT_STAMP_RE.test(body)) {
+    return body.replace(PRODUCT_STAMP_RE, line);
+  }
 
   const lines = body.split("\n");
   const headingIndex = lines.findIndex((entry) => /^#\s+\S/.test(entry));
-  if (headingIndex === -1) return `${line}\n\n${body.replace(/^\n+/, "")}`;
+  if (headingIndex === -1) {
+    return `${line}\n\n${body.replace(/^\n+/, "")}`;
+  }
   lines.splice(headingIndex + 1, 0, "", line);
   return lines.join("\n");
 }

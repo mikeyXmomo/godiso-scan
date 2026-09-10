@@ -230,7 +230,7 @@ function ScanView() {
           </SettingsSection>
           <div
             aria-live="polite"
-            className="static -mx-4 border-border/70 border-t bg-background/95 px-4 pt-3 pb-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:sticky md:bottom-0 md:z-20 md:mx-0 md:border-t-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
+            className="border-border/70 bg-background/95 supports-[backdrop-filter]:bg-background/80 static -mx-4 border-t px-4 pt-3 pb-4 backdrop-blur md:sticky md:bottom-0 md:z-20 md:mx-0 md:border-t-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
           >
             {generateError ? (
               <Alert aria-live="assertive" className="mb-3" variant="error">
@@ -273,7 +273,7 @@ function UploadCard({ exampleError }: { exampleError?: string }) {
         </Alert>
       ) : null}
       <p className="text-muted-foreground text-xs">
-        <span className="font-medium text-foreground">
+        <span className="text-foreground font-medium">
           Diproses secara lokal
         </span>
         {" — "}file tidak pernah diunggah ke server.
@@ -298,7 +298,7 @@ function SettingsSection({
   title,
 }: SettingsSectionProps) {
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card not-dark:bg-clip-padding text-card-foreground shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]">
+    <div className="bg-card text-card-foreground overflow-hidden rounded-2xl border shadow-xs/5 not-dark:bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]">
       <Accordion>
         <AccordionItem
           className="border-b-0"
@@ -310,12 +310,12 @@ function SettingsSection({
               <span aria-hidden="true" className="text-muted-foreground">
                 {icon}
               </span>
-              <span className="truncate font-medium text-sm">{title}</span>
+              <span className="truncate text-sm font-medium">{title}</span>
             </span>
           </AccordionTrigger>
           <AccordionPanel className="px-5 pb-5">
             {description ? (
-              <p className="mb-3 text-muted-foreground text-xs leading-relaxed">
+              <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
                 {description}
               </p>
             ) : null}
@@ -332,7 +332,7 @@ function ScanPageGuide() {
     <div className="mx-auto mt-16 w-full max-w-[1088px] space-y-12 pb-12 lg:space-y-16 lg:pb-16">
       <section aria-labelledby="scan-steps-title">
         <h2
-          className="mb-5 font-semibold text-xl tracking-tight lg:mb-6 lg:text-2xl"
+          className="mb-5 text-xl font-semibold tracking-tight lg:mb-6 lg:text-2xl"
           id="scan-steps-title"
         >
           Tiga langkah menuju PDF hasil scan
@@ -340,19 +340,19 @@ function ScanPageGuide() {
         <ol className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           {SCAN_STEPS.map((step, index) => (
             <li
-              className="flex flex-col gap-1.5 border-border/70 border-t pt-3"
+              className="border-border/70 flex flex-col gap-1.5 border-t pt-3"
               key={step.title}
             >
               <span
                 aria-hidden="true"
-                className="font-mono text-muted-foreground text-xs"
+                className="text-muted-foreground font-mono text-xs"
               >
                 0{index + 1}
               </span>
-              <span className="text-pretty text-muted-foreground text-sm leading-6">
+              <span className="text-muted-foreground text-sm leading-6 text-pretty">
                 {step.description}
               </span>
-              <span className="font-medium text-sm">{step.title}</span>
+              <span className="text-sm font-medium">{step.title}</span>
             </li>
           ))}
         </ol>
@@ -360,23 +360,23 @@ function ScanPageGuide() {
 
       <section aria-labelledby="scan-formats-title">
         <h2
-          className="mb-2 font-semibold text-xl tracking-tight lg:mb-3 lg:text-2xl"
+          className="mb-2 text-xl font-semibold tracking-tight lg:mb-3 lg:text-2xl"
           id="scan-formats-title"
         >
           Format yang didukung
         </h2>
-        <p className="mb-5 text-muted-foreground text-sm leading-relaxed">
+        <p className="text-muted-foreground mb-5 text-sm leading-relaxed">
           Saat ini hanya format PDF yang didukung.
         </p>
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {SCAN_FORMATS.map((format) => (
             <li
-              className="flex h-11 items-center gap-2.5 rounded-lg border border-border/70 bg-card/60 px-3"
+              className="border-border/70 bg-card/60 flex h-11 items-center gap-2.5 rounded-lg border px-3"
               key={format.title}
             >
               <span className="flex min-w-0 flex-col leading-tight">
-                <span className="font-medium text-[13px]">{format.title}</span>
-                <span className="truncate text-muted-foreground text-xs">
+                <span className="text-[13px] font-medium">{format.title}</span>
+                <span className="text-muted-foreground truncate text-xs">
                   {format.description}
                 </span>
               </span>
@@ -387,12 +387,12 @@ function ScanPageGuide() {
 
       <section aria-labelledby="scan-faq-title">
         <h2
-          className="mb-5 font-semibold text-xl tracking-tight lg:mb-6 lg:text-2xl"
+          className="mb-5 text-xl font-semibold tracking-tight lg:mb-6 lg:text-2xl"
           id="scan-faq-title"
         >
           Pertanyaan yang sering diajukan
         </h2>
-        <Accordion className="h-fit rounded-2xl border bg-card">
+        <Accordion className="bg-card h-fit rounded-2xl border">
           {SCAN_FAQS.map((item, index) => (
             <AccordionItem key={item.question} value={`faq-${index + 1}`}>
               <AccordionTrigger>{item.question}</AccordionTrigger>

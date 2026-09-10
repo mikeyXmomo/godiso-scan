@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 /**
  * Context loader: prints PRODUCT.md, DESIGN.md when present, the matching
  * persisted surface brief when one can be resolved, and native-platform
@@ -27,27 +28,27 @@
  * shape rather than the markdown block.
  */
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTargetOptions } from "./lib/target-args.mjs";
+
 import { IMPECCABLE_COMMAND, IMPECCABLE_PROVIDER_ID } from "./lib/provider.mjs";
-import { resolveSurfaceBrief } from "./lib/surface-briefs.mjs";
-import {
-  collectBootFindings,
-  designSidecarCandidatesFor,
-} from "./lib/staleness.mjs";
 import {
   buildStalenessDirective,
   filterFreshFindings,
   stalenessCheckDisabled,
 } from "./lib/staleness-notice.mjs";
+import {
+  collectBootFindings,
+  designSidecarCandidatesFor,
+} from "./lib/staleness.mjs";
+import { resolveSurfaceBrief } from "./lib/surface-briefs.mjs";
+import { parseTargetOptions } from "./lib/target-args.mjs";
 
 const PRODUCT_NAMES = ["PRODUCT.md", "Product.md", "product.md"];
 const DESIGN_NAMES = ["DESIGN.md", "Design.md", "design.md"];
 const SKILL_REFERENCE_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
+  import.meta.dirname,
   "..",
   "reference"
 );
@@ -119,8 +120,8 @@ export function resolveContextDir(cwd = process.cwd(), options = {}) {
 export function loadContext(cwd = process.cwd(), options = {}) {
   const resolved = resolveContext(cwd, options);
   const absCwd = path.resolve(cwd);
-  const productPath = resolved.productPath;
-  const designPath = resolved.designPath;
+  const { productPath } = resolved;
+  const { designPath } = resolved;
   const product = productPath ? safeRead(productPath) : null;
   const design = designPath ? safeRead(designPath) : null;
   const platform = extractPlatform(product);
@@ -130,32 +131,32 @@ export function loadContext(cwd = process.cwd(), options = {}) {
   );
   const surfaceBrief = surfaceResolution.brief;
   return {
-    hasProduct: !!product,
-    product,
-    productPath: productPath ? path.relative(absCwd, productPath) : null,
-    hasDesign: !!design,
-    design,
-    designPath: designPath ? path.relative(absCwd, designPath) : null,
     contextDir: resolved.contextDir,
-    productContextDir: productPath ? path.dirname(productPath) : null,
+    design,
     designContextDir: designPath ? path.dirname(designPath) : null,
+    designPath: designPath ? path.relative(absCwd, designPath) : null,
+    hasDesign: !!design,
+    hasProduct: !!product,
     hasSurfaceBrief: !!surfaceBrief,
+    hasVisualImplementation: hasVisualImplementation(resolved.projectRoot),
+    isMonorepo: resolved.isMonorepo,
+    platform,
+    product,
+    productContextDir: productPath ? path.dirname(productPath) : null,
+    productPath: productPath ? path.relative(absCwd, productPath) : null,
+    projectRoot: resolved.projectRoot,
+    repoRoot: resolved.repoRoot,
     surfaceBrief: surfaceBrief?.text ?? null,
+    surfaceBriefCandidates: surfaceResolution.candidates.map((brief) => ({
+      path: path.relative(absCwd, brief.path),
+      primaryTarget: brief.primaryTarget,
+      relatedTargets: brief.relatedTargets,
+      slug: brief.slug,
+    })),
     surfaceBriefPath: surfaceBrief?.path
       ? path.relative(absCwd, surfaceBrief.path)
       : null,
     surfaceBriefReason: surfaceResolution.reason,
-    surfaceBriefCandidates: surfaceResolution.candidates.map((brief) => ({
-      slug: brief.slug,
-      path: path.relative(absCwd, brief.path),
-      primaryTarget: brief.primaryTarget,
-      relatedTargets: brief.relatedTargets,
-    })),
-    hasVisualImplementation: hasVisualImplementation(resolved.projectRoot),
-    platform,
-    projectRoot: resolved.projectRoot,
-    repoRoot: resolved.repoRoot,
-    isMonorepo: resolved.isMonorepo,
   };
 }
 
@@ -167,9 +168,9 @@ function resolveContext(cwd = process.cwd(), options = {}) {
   // nested below it: monorepo workspace children and explicit-target nested
   // products in ordinary repos behave the same way.
   const rootContextDir =
-    project.repoRoot !== project.projectRoot
-      ? resolveLocalContextDir(project.repoRoot)
-      : null;
+    project.repoRoot === project.projectRoot
+      ? null
+      : resolveLocalContextDir(project.repoRoot);
 
   let productPath =
     (projectContextDir
@@ -197,11 +198,11 @@ function resolveContext(cwd = process.cwd(), options = {}) {
       : designPath
         ? path.dirname(designPath)
         : envContextDir || project.projectRoot,
-    productPath,
     designPath,
+    isMonorepo: project.isMonorepo,
+    productPath,
     projectRoot: project.projectRoot,
     repoRoot: project.repoRoot,
-    isMonorepo: project.isMonorepo,
     targetDir: project.targetDir,
   };
 }
@@ -211,7 +212,9 @@ export function resolveProjectRoot(cwd = process.cwd(), options = {}) {
 }
 
 export function resolveTargetSelection(cwd = process.cwd(), options = {}) {
-  if (hasTargetOption(options)) return null;
+  if (hasTargetOption(options)) {
+    return null;
+  }
   const project = resolveProject(cwd);
   if (
     !project.isMonorepo ||
@@ -226,12 +229,14 @@ export function resolveTargetSelection(cwd = process.cwd(), options = {}) {
   // or a marker file with no apps/packages children): there is nothing to choose,
   // so treat the repo root as the active project rather than blocking on an empty
   // selection prompt that the user cannot answer.
-  if (targetCandidates.length === 0) return null;
+  if (targetCandidates.length === 0) {
+    return null;
+  }
   return {
-    targetPath: null,
     projectRoot: project.projectRoot,
     repoRoot: project.repoRoot,
     targetCandidates,
+    targetPath: null,
   };
 }
 
@@ -247,17 +252,17 @@ function resolveProject(cwd = process.cwd(), options = {}) {
   }
   if (!repoRoot) {
     return {
-      targetDir,
+      isMonorepo: false,
       projectRoot: nearestTargetContextRoot(absCwd, targetDir) || absCwd,
       repoRoot: absCwd,
-      isMonorepo: false,
+      targetDir,
     };
   }
   return {
-    targetDir,
+    isMonorepo: true,
     projectRoot: resolveWorkspaceProjectRoot(repoRoot, targetDir) || repoRoot,
     repoRoot,
-    isMonorepo: true,
+    targetDir,
   };
 }
 
@@ -281,7 +286,9 @@ function resolveLocalContextDir(root) {
 
 function resolveEnvContextDir(cwd) {
   const envDir = process.env.IMPECCABLE_CONTEXT_DIR;
-  if (!envDir || !envDir.trim()) return null;
+  if (!envDir || !envDir.trim()) {
+    return null;
+  }
   const trimmed = envDir.trim();
   return path.isAbsolute(trimmed) ? trimmed : path.resolve(cwd, trimmed);
 }
@@ -289,7 +296,9 @@ function resolveEnvContextDir(cwd) {
 function resolveTargetDir(cwd, options = {}) {
   const targetPath =
     options && typeof options === "object" ? options.targetPath : null;
-  if (!targetPath || !String(targetPath).trim()) return cwd;
+  if (!targetPath || !String(targetPath).trim()) {
+    return cwd;
+  }
   const abs = path.isAbsolute(targetPath)
     ? targetPath
     : path.resolve(cwd, targetPath);
@@ -305,17 +314,25 @@ function findMonorepoRoot(startDir) {
   let dir = path.resolve(startDir);
   const homeDir = path.resolve(os.homedir());
   while (true) {
-    if (dir === homeDir) return null;
+    if (dir === homeDir) {
+      return null;
+    }
     // isMonorepoRoot is checked before hasGitBoundary on purpose: a workspace
     // root that also carries its own .git is still recognized. The trade-off is
     // deliberate — a directory with a monorepo *marker* but no workspace patterns
     // and no apps/packages children is not a monorepo root, so its .git stops
     // traversal and a further-up root is not searched. The nested .git is treated
     // as an independent project boundary, which is the intended isolation.
-    if (isMonorepoRoot(dir)) return dir;
-    if (hasGitBoundary(dir)) return null;
+    if (isMonorepoRoot(dir)) {
+      return dir;
+    }
+    if (hasGitBoundary(dir)) {
+      return null;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) return null;
+    if (parent === dir) {
+      return null;
+    }
     dir = parent;
   }
 }
@@ -325,12 +342,14 @@ function isMonorepoRoot(dir) {
     readProjectPatterns(dir).some(
       (pattern) => !normalizeWorkspacePattern(pattern).startsWith("!")
     )
-  )
+  ) {
     return true;
+  }
   if (
     !MONOREPO_MARKER_FILES.some((file) => fs.existsSync(path.join(dir, file)))
-  )
+  ) {
     return false;
+  }
   return hasFallbackWorkspaceChildren(dir);
 }
 
@@ -352,8 +371,9 @@ function hasFallbackWorkspaceChildren(dir) {
         (entry) =>
           entry.isDirectory() && !isIgnoredWorkspaceDiscoveryDir(entry.name)
       )
-    )
+    ) {
       return true;
+    }
   }
   return false;
 }
@@ -385,8 +405,12 @@ function discoverTargetCandidates(repoRoot) {
         continue;
       }
       for (const entry of entries) {
-        if (!entry.isDirectory() || isIgnoredWorkspaceDiscoveryDir(entry.name))
+        if (
+          !entry.isDirectory() ||
+          isIgnoredWorkspaceDiscoveryDir(entry.name)
+        ) {
           continue;
+        }
         const root = path.join(base, entry.name);
         roots.set(
           path.relative(repoRoot, root).split(path.sep).join("/"),
@@ -413,10 +437,10 @@ function discoverTargetCandidates(repoRoot) {
 function resolveCandidateContextSummary(repoRoot, projectRoot, targetPath) {
   const ctx = resolveContext(repoRoot, { targetPath });
   return {
-    productStatus: contextSourceStatus(ctx.productPath, repoRoot, projectRoot),
-    productPath: contextSourcePath(ctx.productPath, repoRoot),
-    designStatus: contextSourceStatus(ctx.designPath, repoRoot, projectRoot),
     designPath: contextSourcePath(ctx.designPath, repoRoot),
+    designStatus: contextSourceStatus(ctx.designPath, repoRoot, projectRoot),
+    productPath: contextSourcePath(ctx.productPath, repoRoot),
+    productStatus: contextSourceStatus(ctx.productPath, repoRoot, projectRoot),
   };
 }
 
@@ -427,7 +451,9 @@ function resolveCandidateContextSummary(repoRoot, projectRoot, targetPath) {
 // root but in a subdirectory (FALLBACK_DIRS, e.g. `.agents/context/`), and a file
 // outside both the project and repo roots (IMPECCABLE_CONTEXT_DIR override).
 function contextSourceStatus(filePath, repoRoot, projectRoot) {
-  if (!filePath) return "missing";
+  if (!filePath) {
+    return "missing";
+  }
   const absPath = path.resolve(filePath);
   const absProjectRoot = path.resolve(projectRoot);
   const absRepoRoot = path.resolve(repoRoot);
@@ -444,7 +470,9 @@ function contextSourceStatus(filePath, repoRoot, projectRoot) {
 }
 
 function contextSourcePath(filePath, repoRoot) {
-  if (!filePath) return null;
+  if (!filePath) {
+    return null;
+  }
   const rel = path.relative(repoRoot, filePath);
   if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
     return rel.split(path.sep).join("/");
@@ -454,20 +482,30 @@ function contextSourcePath(filePath, repoRoot) {
 
 function discoverRootsForPattern(repoRoot, rawPattern) {
   const pattern = normalizeWorkspacePattern(rawPattern);
-  if (!pattern || pattern.startsWith("!")) return [];
+  if (!pattern || pattern.startsWith("!")) {
+    return [];
+  }
   const segments = pattern.split("/").filter(Boolean);
-  if (!segments.length) return [];
+  if (!segments.length) {
+    return [];
+  }
   const firstGlobIndex = segments.findIndex((segment) => segment.includes("*"));
   const literalPrefix =
     firstGlobIndex === -1 ? segments : segments.slice(0, firstGlobIndex);
   const base = path.join(repoRoot, ...literalPrefix);
-  if (!fs.existsSync(base)) return [];
+  if (!fs.existsSync(base)) {
+    return [];
+  }
   if (segments.includes("**")) {
     const packageRoots = [];
     walkDirs(base, (dir) => {
-      if (dir !== base && isCandidateProjectRoot(dir)) packageRoots.push(dir);
+      if (dir !== base && isCandidateProjectRoot(dir)) {
+        packageRoots.push(dir);
+      }
     });
-    if (packageRoots.length) return packageRoots;
+    if (packageRoots.length) {
+      return packageRoots;
+    }
     return directChildDirs(base);
   }
   return expandSimplePattern(repoRoot, segments);
@@ -479,8 +517,9 @@ function expandSimplePattern(
   index = 0,
   current = repoRoot
 ) {
-  if (index >= patternSegments.length)
+  if (index >= patternSegments.length) {
     return fs.existsSync(current) ? [current] : [];
+  }
   const segment = patternSegments[index];
   if (!segment.includes("*")) {
     return expandSimplePattern(
@@ -498,9 +537,12 @@ function expandSimplePattern(
   }
   const roots = [];
   for (const entry of entries) {
-    if (!entry.isDirectory() || isIgnoredWorkspaceDiscoveryDir(entry.name))
+    if (!entry.isDirectory() || isIgnoredWorkspaceDiscoveryDir(entry.name)) {
       continue;
-    if (!segmentMatches(segment, entry.name)) continue;
+    }
+    if (!segmentMatches(segment, entry.name)) {
+      continue;
+    }
     roots.push(
       ...expandSimplePattern(
         repoRoot,
@@ -535,8 +577,9 @@ function walkDirs(root, visit) {
     return;
   }
   for (const entry of entries) {
-    if (!entry.isDirectory() || isIgnoredWorkspaceDiscoveryDir(entry.name))
+    if (!entry.isDirectory() || isIgnoredWorkspaceDiscoveryDir(entry.name)) {
       continue;
+    }
     const dir = path.join(root, entry.name);
     visit(dir);
     walkDirs(dir, visit);
@@ -572,25 +615,32 @@ function findTargetExample(repoRoot, projectRoot) {
   ];
   for (const rel of examples) {
     const abs = path.join(projectRoot, rel);
-    if (fs.existsSync(abs))
+    if (fs.existsSync(abs)) {
       return path.relative(repoRoot, abs).split(path.sep).join("/");
+    }
   }
   return path.relative(repoRoot, projectRoot).split(path.sep).join("/");
 }
 
 function resolveWorkspaceProjectRoot(repoRoot, targetDir) {
   const rel = path.relative(repoRoot, targetDir);
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return repoRoot;
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return repoRoot;
+  }
   const relSegments = rel.split(path.sep).filter(Boolean);
   for (const patterns of readProjectPatternGroups(repoRoot)) {
-    if (isExcludedByWorkspacePattern(relSegments, patterns)) return repoRoot;
+    if (isExcludedByWorkspacePattern(relSegments, patterns)) {
+      return repoRoot;
+    }
     for (const pattern of patterns) {
       const projectRoot = projectRootFromWorkspacePattern(
         repoRoot,
         relSegments,
         pattern
       );
-      if (projectRoot) return projectRoot;
+      if (projectRoot) {
+        return projectRoot;
+      }
     }
   }
   if (
@@ -600,7 +650,9 @@ function resolveWorkspaceProjectRoot(repoRoot, targetDir) {
     return path.join(repoRoot, relSegments[0], relSegments[1]);
   }
   const nearest = nearestProjectLikeRoot(repoRoot, targetDir);
-  if (nearest) return nearest;
+  if (nearest) {
+    return nearest;
+  }
   return repoRoot;
 }
 
@@ -615,19 +667,21 @@ function resolveWorkspaceProjectRoot(repoRoot, targetDir) {
 function isSelectableCandidate(repoRoot, rel, patternGroups) {
   const relSegments = rel.split("/").filter(Boolean);
   const [impeccablePatterns, packagePatterns] = patternGroups;
-  if (isExcludedByWorkspacePattern(relSegments, impeccablePatterns))
+  if (isExcludedByWorkspacePattern(relSegments, impeccablePatterns)) {
     return false;
+  }
   for (const pattern of impeccablePatterns) {
     const boundary = projectRootFromWorkspacePattern(
       repoRoot,
       relSegments,
       pattern
     );
-    if (boundary)
+    if (boundary) {
       return (
         path.resolve(boundary) ===
         path.resolve(path.join(repoRoot, ...relSegments))
       );
+    }
   }
   return !isExcludedByWorkspacePattern(relSegments, packagePatterns);
 }
@@ -635,7 +689,9 @@ function isSelectableCandidate(repoRoot, rel, patternGroups) {
 function isExcludedByWorkspacePattern(relSegments, patterns) {
   return patterns.some((rawPattern) => {
     const pattern = normalizeWorkspacePattern(rawPattern);
-    if (!pattern.startsWith("!")) return false;
+    if (!pattern.startsWith("!")) {
+      return false;
+    }
     return workspacePatternMatchesRel(pattern.slice(1), relSegments);
   });
 }
@@ -651,17 +707,21 @@ function isExcludedByWorkspacePattern(relSegments, patterns) {
 // project's context, not a nested product, so they never count.
 // Returns null when nothing nested is found, keeping the cwd default.
 function nearestTargetContextRoot(absCwd, targetDir) {
-  if (!isPathInside(targetDir, absCwd)) return null;
-  const rootFallbackDirs = FALLBACK_DIRS.map((rel) =>
-    path.resolve(absCwd, rel)
+  if (!isPathInside(targetDir, absCwd)) {
+    return null;
+  }
+  const rootFallbackDirs = new Set(
+    FALLBACK_DIRS.map((rel) => path.resolve(absCwd, rel))
   );
   let dir = path.resolve(targetDir);
   while (dir && dir !== absCwd) {
-    if (!rootFallbackDirs.includes(dir) && resolveLocalContextDir(dir)) {
+    if (!rootFallbackDirs.has(dir) && resolveLocalContextDir(dir)) {
       return dir;
     }
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     dir = parent;
   }
   return null;
@@ -678,7 +738,9 @@ function nearestProjectLikeRoot(repoRoot, targetDir) {
       return dir;
     }
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     dir = parent;
   }
   return null;
@@ -689,9 +751,13 @@ function nearestPackageRootBetween(repoRoot, targetDir, stopDir) {
   const stop = path.resolve(stopDir || repoRoot);
   const root = path.resolve(repoRoot);
   while (dir && dir !== stop && isPathInsideOrEqual(dir, root)) {
-    if (fs.existsSync(path.join(dir, "package.json"))) return dir;
+    if (fs.existsSync(path.join(dir, "package.json"))) {
+      return dir;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     dir = parent;
   }
   return null;
@@ -708,7 +774,9 @@ function workspacePatternMatchesRel(pattern, relSegments) {
   const patternSegments = normalizeWorkspacePattern(pattern)
     .split("/")
     .filter(Boolean);
-  if (!patternSegments.length) return false;
+  if (!patternSegments.length) {
+    return false;
+  }
   if (patternSegments.includes("**")) {
     const firstGlobIndex = patternSegments.findIndex((segment) =>
       segment.includes("*")
@@ -717,15 +785,23 @@ function workspacePatternMatchesRel(pattern, relSegments) {
       firstGlobIndex === -1
         ? patternSegments
         : patternSegments.slice(0, firstGlobIndex);
-    if (relSegments.length < literalPrefix.length + 1) return false;
+    if (relSegments.length < literalPrefix.length + 1) {
+      return false;
+    }
     for (let i = 0; i < literalPrefix.length; i++) {
-      if (!segmentMatches(literalPrefix[i], relSegments[i])) return false;
+      if (!segmentMatches(literalPrefix[i], relSegments[i])) {
+        return false;
+      }
     }
     return true;
   }
-  if (relSegments.length < patternSegments.length) return false;
+  if (relSegments.length < patternSegments.length) {
+    return false;
+  }
   for (let i = 0; i < patternSegments.length; i++) {
-    if (!segmentMatches(patternSegments[i], relSegments[i])) return false;
+    if (!segmentMatches(patternSegments[i], relSegments[i])) {
+      return false;
+    }
   }
   return true;
 }
@@ -755,10 +831,13 @@ function readImpeccableProjectRoots(repoRoot) {
   const patterns = [];
   for (const name of ["config.json", "config.local.json"]) {
     const cfg = readJson(path.join(repoRoot, ".impeccable", name));
-    if (!Array.isArray(cfg?.projectRoots)) continue;
+    if (!Array.isArray(cfg?.projectRoots)) {
+      continue;
+    }
     for (const entry of cfg.projectRoots) {
-      if (typeof entry === "string" && entry.trim())
+      if (typeof entry === "string" && entry.trim()) {
         patterns.push(entry.trim());
+      }
     }
   }
   return patterns;
@@ -767,8 +846,12 @@ function readImpeccableProjectRoots(repoRoot) {
 function readPackageWorkspaces(repoRoot) {
   const pkg = readJson(path.join(repoRoot, "package.json"));
   const workspaces = pkg?.workspaces;
-  if (Array.isArray(workspaces)) return workspaces;
-  if (Array.isArray(workspaces?.packages)) return workspaces.packages;
+  if (Array.isArray(workspaces)) {
+    return workspaces;
+  }
+  if (Array.isArray(workspaces?.packages)) {
+    return workspaces.packages;
+  }
   return [];
 }
 
@@ -787,7 +870,9 @@ function readPnpmWorkspaces(repoRoot) {
     let inPackages = false;
     for (const line of body.split(/\r?\n/)) {
       const trimmed = stripYamlInlineComment(line).trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
       const flowMatch = trimmed.match(/^packages:\s*\[(.*)\]\s*$/);
       if (flowMatch) {
         patterns.push(...parseYamlFlowList(flowMatch[1]));
@@ -798,10 +883,14 @@ function readPnpmWorkspaces(repoRoot) {
         inPackages = true;
         continue;
       }
-      if (inPackages && /^[A-Za-z0-9_-]+:\s*/.test(trimmed)) break;
+      if (inPackages && /^[A-Za-z0-9_-]+:\s*/.test(trimmed)) {
+        break;
+      }
       if (inPackages) {
         const match = trimmed.match(/^-\s*(.+)$/);
-        if (match) patterns.push(unquoteYamlValue(match[1]));
+        if (match) {
+          patterns.push(unquoteYamlValue(match[1]));
+        }
       }
     }
     return patterns;
@@ -818,7 +907,9 @@ function stripYamlInlineComment(line) {
       quote = quote === ch ? null : quote || ch;
       continue;
     }
-    if (ch === "#" && !quote) return line.slice(0, i);
+    if (ch === "#" && !quote) {
+      return line.slice(0, i);
+    }
   }
   return line;
 }
@@ -836,21 +927,25 @@ function parseYamlFlowList(body) {
     }
     if (ch === "," && !quote) {
       const value = unquoteYamlValue(current);
-      if (value) items.push(value);
+      if (value) {
+        items.push(value);
+      }
       current = "";
       continue;
     }
     current += ch;
   }
   const value = unquoteYamlValue(current);
-  if (value) items.push(value);
+  if (value) {
+    items.push(value);
+  }
   return items;
 }
 
 function unquoteYamlValue(value) {
   return String(value || "")
     .trim()
-    .replace(/^['"]|['"]$/g, "");
+    .replaceAll(/^['"]|['"]$/g, "");
 }
 
 function readJson(filePath) {
@@ -863,9 +958,13 @@ function readJson(filePath) {
 
 function projectRootFromWorkspacePattern(repoRoot, relSegments, rawPattern) {
   const pattern = normalizeWorkspacePattern(rawPattern);
-  if (!pattern || pattern.startsWith("!")) return null;
+  if (!pattern || pattern.startsWith("!")) {
+    return null;
+  }
   const patternSegments = pattern.split("/").filter(Boolean);
-  if (!patternSegments.length) return null;
+  if (!patternSegments.length) {
+    return null;
+  }
   if (patternSegments.includes("**")) {
     return projectRootFromDoubleStarPattern(
       repoRoot,
@@ -873,9 +972,13 @@ function projectRootFromWorkspacePattern(repoRoot, relSegments, rawPattern) {
       patternSegments
     );
   }
-  if (relSegments.length < patternSegments.length) return null;
+  if (relSegments.length < patternSegments.length) {
+    return null;
+  }
   for (let i = 0; i < patternSegments.length; i++) {
-    if (!segmentMatches(patternSegments[i], relSegments[i])) return null;
+    if (!segmentMatches(patternSegments[i], relSegments[i])) {
+      return null;
+    }
   }
   return path.join(repoRoot, ...relSegments.slice(0, patternSegments.length));
 }
@@ -892,30 +995,40 @@ function projectRootFromDoubleStarPattern(
     firstGlobIndex === -1
       ? patternSegments
       : patternSegments.slice(0, firstGlobIndex);
-  if (relSegments.length < literalPrefix.length + 1) return null;
+  if (relSegments.length < literalPrefix.length + 1) {
+    return null;
+  }
   for (let i = 0; i < literalPrefix.length; i++) {
-    if (!segmentMatches(literalPrefix[i], relSegments[i])) return null;
+    if (!segmentMatches(literalPrefix[i], relSegments[i])) {
+      return null;
+    }
   }
   const prefixDir = path.join(repoRoot, ...literalPrefix);
   const targetDir = path.join(repoRoot, ...relSegments);
   const packageRoot = nearestPackageRootBetween(repoRoot, targetDir, prefixDir);
-  if (packageRoot) return packageRoot;
+  if (packageRoot) {
+    return packageRoot;
+  }
   return path.join(repoRoot, ...relSegments.slice(0, literalPrefix.length + 1));
 }
 
 function normalizeWorkspacePattern(pattern) {
   return String(pattern || "")
     .trim()
-    .replace(/^['"]|['"]$/g, "")
+    .replaceAll(/^['"]|['"]$/g, "")
     .replace(/^\.\//, "")
     .replace(/\/+$/, "");
 }
 
 function segmentMatches(patternSegment, relSegment) {
-  if (patternSegment === "*") return true;
-  if (!patternSegment.includes("*")) return patternSegment === relSegment;
+  if (patternSegment === "*") {
+    return true;
+  }
+  if (!patternSegment.includes("*")) {
+    return patternSegment === relSegment;
+  }
   const re = new RegExp(
-    `^${escapeRegExp(patternSegment).replace(/\\\*/g, "[^/]*")}$`
+    `^${escapeRegExp(patternSegment).replaceAll("\\*", "[^/]*")}$`
   );
   return re.test(relSegment);
 }
@@ -923,7 +1036,9 @@ function segmentMatches(patternSegment, relSegment) {
 function firstExisting(dir, names) {
   for (const name of names) {
     const abs = path.join(dir, name);
-    if (fs.existsSync(abs)) return abs;
+    if (fs.existsSync(abs)) {
+      return abs;
+    }
   }
   return null;
 }
@@ -946,7 +1061,7 @@ function loadNativePlatformReferences(platform) {
   return names.flatMap((name) => {
     const filePath = path.join(SKILL_REFERENCE_DIR, `${name}.md`);
     const content = safeRead(filePath);
-    return content ? [{ name, filePath, content }] : [];
+    return content ? [{ content, filePath, name }] : [];
   });
 }
 
@@ -961,12 +1076,16 @@ function loadNativePlatformReferences(platform) {
  * HTML surface, or several styled UI components is.
  */
 export function hasVisualImplementation(projectRoot) {
-  if (!projectRoot) return false;
+  if (!projectRoot) {
+    return false;
+  }
   const root = path.resolve(projectRoot);
   const queue = [];
   for (const rel of VISUAL_SOURCE_DIRS) {
     const dir = path.join(root, rel);
-    if (fs.existsSync(dir)) queue.push({ dir, depth: 0 });
+    if (fs.existsSync(dir)) {
+      queue.push({ depth: 0, dir });
+    }
   }
 
   let scannedFiles = 0;
@@ -974,10 +1093,16 @@ export function hasVisualImplementation(projectRoot) {
 
   const inspectFile = (filePath) => {
     const ext = path.extname(filePath).toLowerCase();
-    if (!STYLE_EXTENSIONS.has(ext) && !UI_EXTENSIONS.has(ext)) return false;
+    if (!STYLE_EXTENSIONS.has(ext) && !UI_EXTENSIONS.has(ext)) {
+      return false;
+    }
     const base = path.basename(filePath).toLowerCase();
-    if (/\.min\.[a-z]+$/.test(base)) return false;
-    if (scannedFiles++ >= VISUAL_SCAN_FILE_LIMIT) return false;
+    if (/\.min\.[a-z]+$/.test(base)) {
+      return false;
+    }
+    if (scannedFiles++ >= VISUAL_SCAN_FILE_LIMIT) {
+      return false;
+    }
     let body;
     try {
       body = fs.readFileSync(filePath, "utf-8").slice(0, 64 * 1024);
@@ -986,9 +1111,9 @@ export function hasVisualImplementation(projectRoot) {
     }
 
     const evidence = body
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/<!--[\s\S]*?-->/g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+      .replaceAll(/\/\*[\s\S]*?\*\//g, "")
+      .replaceAll(/<!--[\s\S]*?-->/g, "")
+      .replaceAll(/^\s*\/\/.*$/gm, "");
     if (STYLE_EXTENSIONS.has(ext)) {
       const customProperties =
         evidence.match(/--[a-z0-9_-]+\s*:/gi)?.length ?? 0;
@@ -999,9 +1124,12 @@ export function hasVisualImplementation(projectRoot) {
       if (
         /\b(?:tokens?|theme|design-system)\b/.test(base) &&
         evidence.trim().length > 80
-      )
+      ) {
         return true;
-      if (customProperties >= 3 || visualDeclarations >= 5) return true;
+      }
+      if (customProperties >= 3 || visualDeclarations >= 5) {
+        return true;
+      }
     }
 
     if (
@@ -1028,8 +1156,9 @@ export function hasVisualImplementation(projectRoot) {
         (embeddedCustomProperties >= 3 && embeddedVisualDeclarations >= 3) ||
         embeddedVisualDeclarations >= 5 ||
         classTokens >= 12
-      )
+      ) {
         return true;
+      }
     }
     if (
       ![".html", ".htm"].includes(ext) &&
@@ -1037,7 +1166,9 @@ export function hasVisualImplementation(projectRoot) {
       /class(?:Name)?\s*=|style\s*=|styled\(|css`/i.test(evidence)
     ) {
       styledComponents += 1;
-      if (styledComponents >= 3) return true;
+      if (styledComponents >= 3) {
+        return true;
+      }
     }
     return false;
   };
@@ -1045,8 +1176,9 @@ export function hasVisualImplementation(projectRoot) {
   // Root-level authored surfaces and styles are common in small projects.
   try {
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-      if (entry.isFile() && inspectFile(path.join(root, entry.name)))
+      if (entry.isFile() && inspectFile(path.join(root, entry.name))) {
         return true;
+      }
     }
   } catch {
     /* unreadable root: no evidence */
@@ -1066,20 +1198,23 @@ export function hasVisualImplementation(projectRoot) {
           depth >= VISUAL_SCAN_DEPTH_LIMIT ||
           entry.name.startsWith(".") ||
           WORKSPACE_DISCOVERY_IGNORED_DIRS.has(entry.name)
-        )
+        ) {
           continue;
-        queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
+        }
+        queue.push({ depth: depth + 1, dir: path.join(dir, entry.name) });
       } else if (entry.isFile() && inspectFile(path.join(dir, entry.name))) {
         return true;
       }
-      if (scannedFiles >= VISUAL_SCAN_FILE_LIMIT) break;
+      if (scannedFiles >= VISUAL_SCAN_FILE_LIMIT) {
+        break;
+      }
     }
   }
   return styledComponents >= 3;
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -1089,7 +1224,9 @@ function escapeRegExp(value) {
  * near-miss headings don't shadow the real field.
  */
 export function extractSectionValue(product, heading) {
-  if (!product) return null;
+  if (!product) {
+    return null;
+  }
   const headingRe = new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$`, "i");
   const lines = product.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -1097,8 +1234,12 @@ export function extractSectionValue(product, heading) {
       for (let j = i + 1; j < lines.length; j++) {
         const next = lines[j].trim();
         // A new heading before any value means the section is empty.
-        if (/^#{1,6}\s/.test(next)) return null;
-        if (next) return next;
+        if (/^#{1,6}\s/.test(next)) {
+          return null;
+        }
+        if (next) {
+          return next;
+        }
       }
     }
   }
@@ -1116,14 +1257,17 @@ export function extractSectionValue(product, heading) {
  */
 export function extractPlatform(product) {
   const value = (extractSectionValue(product, "Platform") || "").toLowerCase();
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
   if (
     value === "web" ||
     value === "ios" ||
     value === "android" ||
     value === "adaptive"
-  )
+  ) {
     return value;
+  }
   // A short list naming both native targets (`ios, android`, `ios and
   // android`) = adaptive. Only list separators and the two platform words may
   // appear; anything else (prose, negations) is unrecognized and falls
@@ -1147,11 +1291,11 @@ export function extractPlatform(product) {
  */
 function readLocalSkillVersion() {
   try {
-    const here = path.dirname(fileURLToPath(import.meta.url));
+    const here = import.meta.dirname;
     const skillMd = path.join(here, "..", "SKILL.md");
     const content = fs.readFileSync(skillMd, "utf-8");
     const match = content.match(/^version:\s*(.+)$/m);
-    return match ? match[1].trim().replace(/^["']|["']$/g, "") : null;
+    return match ? match[1].trim().replaceAll(/^["']|["']$/g, "") : null;
   } catch {
     return null;
   }
@@ -1178,13 +1322,15 @@ function writeUpdateCache(cache) {
 function compareSemver(a, b) {
   const pa = String(a)
     .split(".")
-    .map((n) => parseInt(n, 10) || 0);
+    .map((n) => Number.parseInt(n, 10) || 0);
   const pb = String(b)
     .split(".")
-    .map((n) => parseInt(n, 10) || 0);
+    .map((n) => Number.parseInt(n, 10) || 0);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff;
+    if (diff !== 0) {
+      return diff;
+    }
   }
   return 0;
 }
@@ -1194,7 +1340,9 @@ async function fetchLatestSkillVersion() {
     const res = await fetch(`${UPDATE_HOST}/api/version`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return null;
+    }
     const data = await res.json();
     return typeof data?.skills === "string" ? data.skills : null;
   } catch {
@@ -1265,8 +1413,9 @@ function updateCheckDisabledByConfig(cwd = process.cwd()) {
         raw &&
         typeof raw === "object" &&
         typeof raw.updateCheck === "boolean"
-      )
+      ) {
         value = raw.updateCheck;
+      }
     } catch {
       /* missing or malformed: ignore */
     }
@@ -1276,10 +1425,16 @@ function updateCheckDisabledByConfig(cwd = process.cwd()) {
 
 async function computeUpdateDirective(now = Date.now()) {
   try {
-    if (process.env.IMPECCABLE_NO_UPDATE_CHECK) return null;
-    if (updateCheckDisabledByConfig()) return null;
+    if (process.env.IMPECCABLE_NO_UPDATE_CHECK) {
+      return null;
+    }
+    if (updateCheckDisabledByConfig()) {
+      return null;
+    }
     const localVersion = readLocalSkillVersion();
-    if (!localVersion) return null;
+    if (!localVersion) {
+      return null;
+    }
 
     const cache = readUpdateCache();
 
@@ -1288,12 +1443,16 @@ async function computeUpdateDirective(now = Date.now()) {
     if (!cache.lastCheck || now - cache.lastCheck > CHECK_INTERVAL_MS) {
       const latest = await fetchLatestSkillVersion();
       cache.lastCheck = now;
-      if (latest) cache.latestVersion = latest;
+      if (latest) {
+        cache.latestVersion = latest;
+      }
       writeUpdateCache(cache);
     }
 
     const latest = cache.latestVersion;
-    if (!latest || compareSemver(latest, localVersion) <= 0) return null;
+    if (!latest || compareSemver(latest, localVersion) <= 0) {
+      return null;
+    }
 
     // Anti-nag: surface a given version at most once per RENOTIFY window.
     if (
@@ -1317,12 +1476,12 @@ async function cli() {
   let cliOptions;
   try {
     cliOptions = parseCliOptions(process.argv.slice(2));
-  } catch (err) {
-    if (err?.name === "TargetArgError") {
-      process.stderr.write(`${err.message}\n`);
+  } catch (error) {
+    if (error?.name === "TargetArgError") {
+      process.stderr.write(`${error.message}\n`);
       process.exit(1);
     }
-    throw err;
+    throw error;
   }
   const targetProvided = hasTargetOption(cliOptions);
   const targetExists = targetProvided
@@ -1330,7 +1489,7 @@ async function cli() {
     : null;
   const selection = resolveTargetSelection(process.cwd(), cliOptions);
   if (selection) {
-    process.stdout.write(buildTargetSelectionDirective(selection) + "\n");
+    process.stdout.write(`${buildTargetSelectionDirective(selection)}\n`);
     process.exit(0);
   }
   const ctx = loadContext(process.cwd(), cliOptions);
@@ -1389,8 +1548,10 @@ async function cli() {
     }
     appendImageToolsDirective(parts);
     appendStalenessDirective(parts, ctx, cliOptions);
-    if (updateDirective) parts.push(updateDirective);
-    await finishCli(parts.join("\n\n---\n\n") + "\n");
+    if (updateDirective) {
+      parts.push(updateDirective);
+    }
+    await finishCli(`${parts.join("\n\n---\n\n")}\n`);
   }
   const parts = [`# PRODUCT.md\n\n${ctx.product.trim()}`];
   if (ctx.hasDesign) {
@@ -1437,8 +1598,10 @@ async function cli() {
       );
     }
   }
-  if (updateDirective) parts.push(updateDirective);
-  await finishCli(parts.join("\n\n---\n\n") + "\n");
+  if (updateDirective) {
+    parts.push(updateDirective);
+  }
+  await finishCli(`${parts.join("\n\n---\n\n")}\n`);
 }
 
 function parseCliOptions(args) {
@@ -1461,9 +1624,9 @@ function pathExistsForTarget(cwd, targetPath) {
 }
 
 const HOOK_MANIFESTS_BY_PROVIDER = Object.freeze({
+  agents: [".codex/hooks.json"],
   "claude-code": [".claude/settings.local.json", ".claude/settings.json"],
   codex: [".codex/hooks.json"],
-  agents: [".codex/hooks.json"],
   cursor: [".cursor/hooks.json"],
   github: [".github/hooks/impeccable.json"],
   grok: [".grok/hooks/impeccable.json"],
@@ -1480,24 +1643,26 @@ function valueHasHookMarker(value) {
       value.includes("skills/impeccable/scripts/hook-before-edit.mjs")
     );
   }
-  if (Array.isArray(value)) return value.some(valueHasHookMarker);
-  if (value && typeof value === "object")
+  if (Array.isArray(value)) {
+    return value.some(valueHasHookMarker);
+  }
+  if (value && typeof value === "object") {
     return Object.values(value).some(valueHasHookMarker);
+  }
   return false;
 }
 
 function hookEnabledAt(root) {
-  if (truthyEnv(process.env.IMPECCABLE_HOOK_DISABLED)) return false;
+  if (truthyEnv(process.env.IMPECCABLE_HOOK_DISABLED)) {
+    return false;
+  }
   let enabled = true;
   for (const name of [
     ".impeccable/config.json",
     ".impeccable/config.local.json",
   ]) {
     const raw = readJson(path.join(root, name));
-    if (
-      raw?.hook &&
-      Object.prototype.hasOwnProperty.call(raw.hook, "enabled")
-    ) {
+    if (raw?.hook && Object.hasOwn(raw.hook, "enabled")) {
       enabled = raw.hook.enabled !== false;
     }
   }
@@ -1520,7 +1685,9 @@ function automaticHookMode(ctx) {
     return "none";
   }
   const activeRoot = path.resolve(ctx.projectRoot || process.cwd());
-  if (!hookEnabledAt(activeRoot)) return "none";
+  if (!hookEnabledAt(activeRoot)) {
+    return "none";
+  }
   const manifests = HOOK_MANIFESTS_BY_PROVIDER[IMPECCABLE_PROVIDER_ID] || [];
   const roots = [
     ...new Set(
@@ -1559,7 +1726,7 @@ function readBuildPathAt(root) {
       source = `.impeccable/${name}`;
     }
   }
-  return value ? { value, source } : null;
+  return value ? { source, value } : null;
 }
 
 // Roots in precedence order, nearest first: the resolved project decides, and
@@ -1582,7 +1749,9 @@ function appendBuildPathDirective(parts, ctx) {
   ];
   for (const root of roots) {
     const found = readBuildPathAt(root);
-    if (!found) continue;
+    if (!found) {
+      continue;
+    }
     // "Never written back" is scoped by the fact that this directive exists at
     // all: it is emitted only where a value is already recorded, which is the
     // case where a flip really is session-only. Saying so inline because the
@@ -1601,8 +1770,10 @@ function appendBuildPathDirective(parts, ctx) {
 // "none" line reads as "no visualization anywhere" and suppresses the
 // harness's own image tools.
 function appendImageGenDirective(parts) {
-  if (!process.env.OPENAI_API_KEY) return;
-  const scriptsPath = path.dirname(fileURLToPath(import.meta.url));
+  if (!process.env.OPENAI_API_KEY) {
+    return;
+  }
+  const scriptsPath = import.meta.dirname;
   parts.push(
     [
       "IMAGE_GEN_AVAILABLE: your harness-native image tool is always the first choice for generation; use it whenever one exists.",
@@ -1653,14 +1824,17 @@ function appendSubagentAuthorizationDirective(parts) {
 // or Stop; a session without one has to run the detector by hand. The detector
 // reads HTML and CSS, so native projects get nothing.
 function appendDetectorFallback(parts, ctx) {
-  if (automaticHookMode(ctx) !== "none") return;
+  if (automaticHookMode(ctx) !== "none") {
+    return;
+  }
   if (
     ctx.platform === "ios" ||
     ctx.platform === "android" ||
     ctx.platform === "adaptive"
-  )
+  ) {
     return;
-  const scriptsPath = path.dirname(fileURLToPath(import.meta.url));
+  }
+  const scriptsPath = import.meta.dirname;
   parts.push(
     [
       "MANUAL_DETECTOR_REQUIRED: No automatic Impeccable design hook is active this session.",
@@ -1696,17 +1870,19 @@ function appendImageToolsDirective(parts) {
 
 function appendStalenessDirective(parts, ctx, options) {
   const projectRoot = ctx.projectRoot || process.cwd();
-  if (stalenessCheckDisabled([projectRoot, ctx.repoRoot])) return;
+  if (stalenessCheckDisabled([projectRoot, ctx.repoRoot])) {
+    return;
+  }
   const absCwd = path.resolve(process.cwd());
 
   let findings;
   try {
     findings = collectBootFindings(ctx, {
-      absProductPath: ctx.productPath
-        ? path.resolve(absCwd, ctx.productPath)
-        : null,
       absDesignPath: ctx.designPath
         ? path.resolve(absCwd, ctx.designPath)
+        : null,
+      absProductPath: ctx.productPath
+        ? path.resolve(absCwd, ctx.productPath)
         : null,
       sidecarCandidates: designSidecarCandidatesFor(
         projectRoot,
@@ -1721,7 +1897,9 @@ function appendStalenessDirective(parts, ctx, options) {
 
   const fresh = filterFreshFindings(findings, { projectRoot });
   const directive = buildStalenessDirective(fresh);
-  if (directive) parts.push(directive);
+  if (directive) {
+    parts.push(directive);
+  }
 }
 
 // `projectRoots` globs that match nothing leave the repo root standing in as
@@ -1731,12 +1909,19 @@ function appendStalenessDirective(parts, ctx, options) {
 // returned an empty candidate list, so the walk repeated here is the cheap
 // path (a pattern that matches nothing exits before reading any directory).
 function projectRootsDiagnostic(ctx, options) {
-  if (hasTargetOption(options)) return {};
-  if (!ctx.isMonorepo || !ctx.repoRoot) return {};
-  if (path.resolve(ctx.projectRoot || "") !== path.resolve(ctx.repoRoot))
+  if (hasTargetOption(options)) {
     return {};
+  }
+  if (!ctx.isMonorepo || !ctx.repoRoot) {
+    return {};
+  }
+  if (path.resolve(ctx.projectRoot || "") !== path.resolve(ctx.repoRoot)) {
+    return {};
+  }
   const patterns = readImpeccableProjectRoots(ctx.repoRoot);
-  if (!patterns.length) return {};
+  if (!patterns.length) {
+    return {};
+  }
   return {
     projectRootPatterns: patterns,
     targetCandidates: discoverTargetCandidates(ctx.repoRoot),
@@ -1775,21 +1960,25 @@ function appendSurfaceBriefContext(parts, ctx) {
     );
     return;
   }
-  if (!ctx.surfaceBriefCandidates?.length) return;
-  const helper = path.join(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "surface-brief.mjs"
-  );
+  if (!ctx.surfaceBriefCandidates?.length) {
+    return;
+  }
+  const helper = path.join(import.meta.dirname, "surface-brief.mjs");
   parts.push(
-    "SURFACE_CONTEXT_AVAILABLE: Persisted surface briefs exist, but none was selected unambiguously for this invocation. " +
-      "Resolve the requested surface to its concrete primary or related source path, then run " +
-      `\`node ${helper} read <path>\` once before changing that surface. Candidates:\n` +
-      JSON.stringify(ctx.surfaceBriefCandidates, null, 2)
+    `SURFACE_CONTEXT_AVAILABLE: Persisted surface briefs exist, but none was selected unambiguously for this invocation. ` +
+      `Resolve the requested surface to its concrete primary or related source path, then run ` +
+      `\`node ${helper} read <path>\` once before changing that surface. Candidates:\n${JSON.stringify(
+        ctx.surfaceBriefCandidates,
+        null,
+        2
+      )}`
   );
 }
 
 function shouldWarnMissingTarget(ctx, targetProvided, targetExists = null) {
-  if (ctx.isMonorepo && targetProvided && targetExists === false) return true;
+  if (ctx.isMonorepo && targetProvided && targetExists === false) {
+    return true;
+  }
   return !!(
     ctx.isMonorepo &&
     (!targetProvided || targetExists === false) &&
@@ -1823,11 +2012,11 @@ function buildTargetSelectionDirective(selection) {
 // invocation (the test harness symlinks the skill dir).
 function invokedAsScript() {
   const arg = process.argv[1];
-  if (!arg) return false;
+  if (!arg) {
+    return false;
+  }
   try {
-    return (
-      fs.realpathSync(arg) === fs.realpathSync(fileURLToPath(import.meta.url))
-    );
+    return fs.realpathSync(arg) === fs.realpathSync(import.meta.filename);
   } catch {
     return false;
   }

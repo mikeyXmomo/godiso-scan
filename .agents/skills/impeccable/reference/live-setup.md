@@ -21,7 +21,7 @@ Create the file at the `path` the boot reported (default `.impeccable/live/confi
 **Glob syntax:** `**` matches any number of segments (including zero), `*` matches within a segment, `?` matches one character. Paths are project-root-relative with forward slashes.
 
 | Framework | `files` | `insertBefore` | `commentSyntax` |
-|-----------|---------|----------------|-----------------|
+| --- | --- | --- | --- |
 | SPA with single shell (Vite / React / Plain HTML) | `["index.html"]` | `</body>` | `html` |
 | Next.js (App Router) | `["app/layout.tsx"]` | `</body>` | `jsx` |
 | Next.js (Pages) | `["pages/_document.tsx"]` | `</body>` | `jsx` |
@@ -48,7 +48,7 @@ If `config.cspChecked === true`, skip this whole section; the user was already a
 node .agents/skills/impeccable/scripts/detect-csp.mjs
 ```
 
-Output `{ shape, signals }`; the shape names the *patch mechanism*, so one template covers many frameworks:
+Output `{ shape, signals }`; the shape names the _patch mechanism_, so one template covers many frameworks:
 
 - **`null`**: no CSP; write the config with `cspChecked: true` and stop here.
 - **`append-arrays`**: CSP as structured directive arrays; auto-patchable (monorepo helpers with `additionalScriptSrc`/`additionalConnectSrc`, SvelteKit `kit.csp.directives`, Nuxt `nuxt-security`).
@@ -78,7 +78,7 @@ const __impeccableLiveDev =
   process.env.NODE_ENV === "development" ? ["http://localhost:8400"] : [];
 ```
 
-Per-framework: Next.js + monorepo helper: edit the *app's* `next.config.*` (not the shared helper), appending to `additionalScriptSrc` / `additionalConnectSrc`. SvelteKit: `svelte.config.js`, `kit.csp.directives['script-src']` and `['connect-src']`. Nuxt + nuxt-security: `nuxt.config.*`, `security.headers.contentSecurityPolicy['script-src']` and `['connect-src']`. Reference outputs: `tests/framework-fixtures/nextjs-turborepo/expected-after-patch.ts`, `tests/framework-fixtures/sveltekit-csp/expected-after-patch.js`. Idempotency: if `__impeccableLiveDev` already exists in the file, the patch is applied; just mark `cspChecked: true`.
+Per-framework: Next.js + monorepo helper: edit the _app's_ `next.config.*` (not the shared helper), appending to `additionalScriptSrc` / `additionalConnectSrc`. SvelteKit: `svelte.config.js`, `kit.csp.directives['script-src']` and `['connect-src']`. Nuxt + nuxt-security: `nuxt.config.*`, `security.headers.contentSecurityPolicy['script-src']` and `['connect-src']`. Reference outputs: `tests/framework-fixtures/nextjs-turborepo/expected-after-patch.ts`, `tests/framework-fixtures/sveltekit-csp/expected-after-patch.js`. Idempotency: if `__impeccableLiveDev` already exists in the file, the patch is applied; just mark `cspChecked: true`.
 
 ### append-string
 

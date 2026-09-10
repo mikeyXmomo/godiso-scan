@@ -1,6 +1,7 @@
 import { fileSave } from "browser-fs-access";
 import { CircleAlert, Download, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
@@ -134,7 +135,7 @@ export function SaveButtonCard({
         </Button>
         <p
           aria-live="polite"
-          className="text-center text-muted-foreground text-sm"
+          className="text-muted-foreground text-center text-sm"
           role="status"
         >
           {downloading

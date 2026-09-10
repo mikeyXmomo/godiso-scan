@@ -2,19 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadDesignSystemForTarget } from "../design-system.mjs";
-import { RULE_SCOPES, filterByScopes } from "../registry/antipatterns.mjs";
-import {
-  createBrowserDetector,
-  detectUrl,
-} from "../engines/browser/detect-url.mjs";
-import { detectHtml } from "../engines/static-html/detect-html.mjs";
-import { detectText } from "../engines/regex/detect-text.mjs";
 import {
   filterDetectionFindings,
   readDetectionConfig,
   shouldIgnoreDetectionFile,
 } from "../../lib/impeccable-config.mjs";
+import { loadDesignSystemForTarget } from "../design-system.mjs";
+import {
+  createBrowserDetector,
+  detectUrl,
+} from "../engines/browser/detect-url.mjs";
+import { detectText } from "../engines/regex/detect-text.mjs";
+import { detectHtml } from "../engines/static-html/detect-html.mjs";
 import {
   HTML_EXTENSIONS,
   buildImportGraph,
@@ -22,6 +21,7 @@ import {
   isPortListening,
   walkDir,
 } from "../node/file-system.mjs";
+import { RULE_SCOPES, filterByScopes } from "../registry/antipatterns.mjs";
 
 // ---------------------------------------------------------------------------
 // Output formatting
@@ -52,19 +52,23 @@ function isAdvisory(finding) {
 function partitionAdvisory(findings) {
   const primary = [];
   const advisory = [];
-  for (const f of findings) (isAdvisory(f) ? advisory : primary).push(f);
-  return { primary, advisory };
+  for (const f of findings) {
+    (isAdvisory(f) ? advisory : primary).push(f);
+  }
+  return { advisory, primary };
 }
 
 // ANSI dim, when stderr is a TTY. Advisory output is chrome, so keep it quiet.
 function dim(text) {
-  return process.stderr.isTTY ? `\x1b[2m${text}\x1b[0m` : text;
+  return process.stderr.isTTY ? `\u001B[2m${text}\u001B[0m` : text;
 }
 
 function formatFindingsBody(findings) {
   const grouped = {};
   for (const f of findings) {
-    if (!grouped[f.file]) grouped[f.file] = [];
+    if (!grouped[f.file]) {
+      grouped[f.file] = [];
+    }
     grouped[f.file].push(f);
   }
   const out = [];
@@ -75,18 +79,22 @@ function formatFindingsBody(findings) {
     out.push(`\n${file}${importNote}`);
     for (const item of items) {
       out.push(
-        `  ${item.line ? `line ${item.line}: ` : ""}[${item.antipattern}] ${item.snippet}`
+        `  ${item.line ? `line ${item.line}: ` : ""}[${item.antipattern}] ${item.snippet}`,
+        `    → ${item.description}`
       );
-      out.push(`    → ${item.description}`);
     }
   }
   return out;
 }
 
 function formatAdvisorySection(advisory) {
-  if (!advisory || advisory.length === 0) return "";
+  if (!advisory || advisory.length === 0) {
+    return "";
+  }
   const lines = [`\n${dim("── Advisory (not counted as failures) ──")}`];
-  for (const line of formatFindingsBody(advisory)) lines.push(dim(line));
+  for (const line of formatFindingsBody(advisory)) {
+    lines.push(dim(line));
+  }
   lines.push(
     dim(
       `\n${advisory.length} advisory note${advisory.length === 1 ? "" : "s"}. Suppress with --no-advisory.`
@@ -99,13 +107,17 @@ function formatAdvisorySection(advisory) {
 // out into their own section and excluded from the failure summary count. JSON
 // output keeps every finding (each advisory one flagged) in a single array.
 function formatFindings(findings, jsonMode) {
-  if (jsonMode) return JSON.stringify(findings, null, 2);
+  if (jsonMode) {
+    return JSON.stringify(findings, null, 2);
+  }
 
   const { primary, advisory } = partitionAdvisory(findings);
   const out = [...formatFindingsBody(primary)];
   out.push(`\n${formatFindingSummary(primary.length)}`);
   const advisorySection = formatAdvisorySection(advisory);
-  if (advisorySection) out.push(advisorySection);
+  if (advisorySection) {
+    out.push(advisorySection);
+  }
   return out.join("\n");
 }
 
@@ -127,7 +139,9 @@ async function handleStdin(optionsFor = () => ({})) {
   const resolve =
     typeof optionsFor === "function" ? optionsFor : () => optionsFor;
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
   const input = Buffer.concat(chunks).toString("utf-8");
   try {
     const parsed = JSON.parse(input);
@@ -211,11 +225,17 @@ Examples:
 
 async function detectCli() {
   let args = process.argv.slice(2).map((arg) => {
-    if (arg === "-json") return "--json";
-    if (arg === "-fast") return "--fast";
+    if (arg === "-json") {
+      return "--json";
+    }
+    if (arg === "-fast") {
+      return "--fast";
+    }
     return arg;
   });
-  if (args[0] === "detect") args = args.slice(1);
+  if (args[0] === "detect") {
+    args = args.slice(1);
+  }
   const jsonMode = args.includes("--json");
   const quietMode = args.includes("--quiet");
   const helpMode = args.includes("--help");
@@ -237,10 +257,12 @@ async function detectCli() {
   const configEnabled = !args.includes("--no-config");
   const detectionConfig = configEnabled
     ? readDetectionConfig(process.cwd())
-    : { ignoreRules: [], ignoreFiles: [], ignoreValues: [] };
+    : { ignoreFiles: [], ignoreRules: [], ignoreValues: [] };
   const scopes = [];
   for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--scope" && !args[i].startsWith("--scope=")) continue;
+    if (args[i] !== "--scope" && !args[i].startsWith("--scope=")) {
+      continue;
+    }
     const inline = args[i].startsWith("--scope=");
     const value = inline ? args[i].slice("--scope=".length) : args[i + 1];
     const parsed =
@@ -264,8 +286,9 @@ async function detectCli() {
   }
   let viewport = null;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--viewport" && !args[i].startsWith("--viewport="))
+    if (args[i] !== "--viewport" && !args[i].startsWith("--viewport=")) {
       continue;
+    }
     const inline = args[i].startsWith("--viewport=");
     const value = inline ? args[i].slice("--viewport=".length) : args[i + 1];
     const match = /^(\d{2,5})x(\d{2,5})$/i.exec(value || "");
@@ -275,7 +298,7 @@ async function detectCli() {
       );
       process.exit(1);
     }
-    viewport = { width: Number(match[1]), height: Number(match[2]) };
+    viewport = { height: Number(match[2]), width: Number(match[1]) };
     args.splice(i, inline ? 1 : 2);
     i -= 1;
   }
@@ -296,7 +319,9 @@ async function detectCli() {
   const inlineIgnoresEnabled =
     configEnabled && !args.includes("--no-inline-ignores");
   const baseScanOptions = { inlineIgnores: inlineIgnoresEnabled };
-  if (viewport) baseScanOptions.viewport = viewport;
+  if (viewport) {
+    baseScanOptions.viewport = viewport;
+  }
   // DESIGN.md must resolve from EACH scan target's own project root, not from
   // process.cwd(): scanning project B's files from inside project A applied A's
   // design rules (cross-project contamination). Resolve per target, memoized by
@@ -304,7 +329,9 @@ async function detectCli() {
   // A target with no project marker above it gets no design system (never cwd's).
   const designSystemCache = new Map();
   const scanOptionsFor = (localPath) => {
-    if (!designSystemEnabled || !localPath) return baseScanOptions;
+    if (!designSystemEnabled || !localPath) {
+      return baseScanOptions;
+    }
     const designSystem = loadDesignSystemForTarget(localPath, {
       cache: designSystemCache,
     });
@@ -349,8 +376,8 @@ async function detectCli() {
               ? (url) => browserDetector.detectUrl(url, urlOptions)
               : (url) => detectUrl(url, urlOptions);
             allFindings.push(...(await scanner(target)));
-          } catch (e) {
-            process.stderr.write(`Error: ${e.message}\n`);
+          } catch (error) {
+            process.stderr.write(`Error: ${error.message}\n`);
           }
           continue;
         }
@@ -427,8 +454,9 @@ async function detectCli() {
           const importedByMap = new Map();
           for (const [importer, imports] of graph) {
             for (const imported of imports) {
-              if (!importedByMap.has(imported))
+              if (!importedByMap.has(imported)) {
                 importedByMap.set(imported, new Set());
+              }
               importedByMap.get(imported).add(importer);
             }
           }
@@ -451,21 +479,26 @@ async function detectCli() {
         } else if (stat.isFile()) {
           if (
             shouldIgnoreDetectionFile(resolved, process.cwd(), detectionConfig)
-          )
+          ) {
             continue;
+          }
           const fileOptions = scanOptionsFor(resolved);
           allFindings.push(...(await detectLocalFile(resolved, fileOptions)));
         }
       }
     } finally {
-      if (browserDetector) await browserDetector.close();
+      if (browserDetector) {
+        await browserDetector.close();
+      }
     }
   }
 
   allFindings = filterDetectionFindings(allFindings, detectionConfig);
   allFindings = filterByScopes(allFindings, scopes);
   // --no-advisory drops advisory findings before any output or exit-code math.
-  if (noAdvisory) allFindings = allFindings.filter((f) => !isAdvisory(f));
+  if (noAdvisory) {
+    allFindings = allFindings.filter((f) => !isAdvisory(f));
+  }
 
   // The exit code and failure count reflect non-advisory findings only. An
   // advisory-only scan still prints its notes but exits 0 (a clean pass), so
@@ -473,21 +506,25 @@ async function detectCli() {
   const { primary, advisory } = partitionAdvisory(allFindings);
 
   if (allFindings.length > 0) {
-    if (jsonMode)
-      process.stdout.write(formatFindings(allFindings, true) + "\n");
-    else if (quietMode) {
-      process.stderr.write(formatFindingSummary(primary.length) + "\n");
+    if (jsonMode) {
+      process.stdout.write(`${formatFindings(allFindings, true)}\n`);
+    } else if (quietMode) {
+      process.stderr.write(`${formatFindingSummary(primary.length)}\n`);
       if (advisory.length > 0) {
         process.stderr.write(
-          dim(
+          `${dim(
             `${advisory.length} advisory note${advisory.length === 1 ? "" : "s"} (not counted).`
-          ) + "\n"
+          )}\n`
         );
       }
-    } else process.stderr.write(formatFindings(allFindings, false) + "\n");
+    } else {
+      process.stderr.write(`${formatFindings(allFindings, false)}\n`);
+    }
     process.exit(primary.length > 0 ? 2 : 0);
   }
-  if (jsonMode) process.stdout.write("[]\n");
+  if (jsonMode) {
+    process.stdout.write("[]\n");
+  }
   process.exit(0);
 }
 

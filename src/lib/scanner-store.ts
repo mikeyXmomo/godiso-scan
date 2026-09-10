@@ -1,8 +1,7 @@
 import { create } from "zustand";
-import {
-  defaultConfig,
-  type ScanConfig,
-} from "@/utils/scan-renderer/config.types";
+
+import { defaultConfig } from "@/utils/scan-renderer/config.types";
+import type { ScanConfig } from "@/utils/scan-renderer/config.types";
 
 interface ScannerState {
   config: ScanConfig;

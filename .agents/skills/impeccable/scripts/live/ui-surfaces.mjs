@@ -41,7 +41,6 @@ export const LIVE_CHROME_MOUNT_CONTRACT = Object.freeze([
 export const LIVE_UI_SURFACES = Object.freeze(
   [
     {
-      key: "global-bottom-bar",
       ids: [
         id("global-bar"),
         id("global-bar-brand"),
@@ -55,10 +54,10 @@ export const LIVE_UI_SURFACES = Object.freeze(
         id("page-chat-voice"),
         id("page-chat-send"),
       ],
+      key: "global-bottom-bar",
     },
-    { key: "pending-copy-edit-dock", ids: [id("pending-dock")] },
+    { ids: [id("pending-dock")], key: "pending-copy-edit-dock" },
     {
-      key: "element-selection-chrome",
       ids: [
         id("highlight"),
         id("tooltip"),
@@ -68,15 +67,15 @@ export const LIVE_UI_SURFACES = Object.freeze(
         id("configure-voice"),
         id("configure-bar-tooltip"),
       ],
+      key: "element-selection-chrome",
     },
-    { key: "action-picker", ids: [id("picker")] },
-    { key: "edit-chrome", ids: [id("edit-badge")] },
-    { key: "generating-row", ids: [id("bar"), id("shader")] },
-    { key: "variant-cycling-row", ids: [id("bar"), id("params-panel")] },
-    { key: "variant-params-panel", ids: [id("params-panel")] },
-    { key: "saving-confirmed-rows", ids: [id("bar")] },
+    { ids: [id("picker")], key: "action-picker" },
+    { ids: [id("edit-badge")], key: "edit-chrome" },
+    { ids: [id("bar"), id("shader")], key: "generating-row" },
+    { ids: [id("bar"), id("params-panel")], key: "variant-cycling-row" },
+    { ids: [id("params-panel")], key: "variant-params-panel" },
+    { ids: [id("bar")], key: "saving-confirmed-rows" },
     {
-      key: "insert-mode-chrome",
       ids: [
         id("insert-line"),
         id("insert-placeholder"),
@@ -86,14 +85,15 @@ export const LIVE_UI_SURFACES = Object.freeze(
         id("insert-create"),
         id("insert-create-tooltip"),
       ],
+      key: "insert-mode-chrome",
     },
     {
-      key: "annotation-chrome",
       ids: [id("annot"), id("annot-svg"), id("annot-pins"), id("annot-clear")],
+      key: "annotation-chrome",
     },
-    { key: "design-system-panel", ids: [id("design-host")] },
-    { key: "toasts-and-errors", ids: [id("toast"), id("mount-error")] },
-    { key: "css-isolation-boundary", ids: [id("root")] },
+    { ids: [id("design-host")], key: "design-system-panel" },
+    { ids: [id("toast"), id("mount-error")], key: "toasts-and-errors" },
+    { ids: [id("root")], key: "css-isolation-boundary" },
   ].map((surface) =>
     Object.freeze({ ...surface, ids: Object.freeze(surface.ids) })
   )

@@ -9,9 +9,9 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const BATCH_OP_TEXT_LIMIT = 240;
@@ -105,16 +105,17 @@ export async function runCopyEditBatchAgent(batch, opts = {}) {
   const env = opts.env || process.env;
   const provider =
     opts.provider ||
-    chooseCopyEditAgent({ env, chatAvailable: opts.chatAvailable });
+    chooseCopyEditAgent({ chatAvailable: opts.chatAvailable, env });
   if (provider === "mock") {
     const delayMs = Number(env.IMPECCABLE_LIVE_COPY_AGENT_MOCK_DELAY_MS || 0);
-    if (delayMs > 0)
+    if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     return mockBatchResult(batch, env, cwd);
   }
   if (provider === "chat") {
     if (typeof opts.applyBatchToSource !== "function") {
-      throw new Error("chat provider requires applyBatchToSource callback");
+      throw new TypeError("chat provider requires applyBatchToSource callback");
     }
     const raw = await opts.applyBatchToSource(batch, {
       repair: batch?.repair || null,
@@ -137,16 +138,16 @@ export async function runCopyEditBatchAgent(batch, opts = {}) {
     await runCodex(prompt, {
       cwd,
       env,
-      resultPath,
       logPath,
+      resultPath,
       timeoutMs: opts.timeoutMs,
     });
   } else if (provider === "claude") {
     await runClaude(prompt, {
       cwd,
       env,
-      resultPath,
       logPath,
+      resultPath,
       timeoutMs: opts.timeoutMs,
     });
   } else {
@@ -157,14 +158,15 @@ export async function runCopyEditBatchAgent(batch, opts = {}) {
     ? fs.readFileSync(resultPath, "utf-8")
     : "";
   const parsed = parseCopyEditBatchResult(output);
-  if (parsed) return parsed;
+  if (parsed) {
+    return parsed;
+  }
 
   const tail = fs.existsSync(logPath)
     ? fs.readFileSync(logPath, "utf-8").slice(-1200)
     : output.slice(-1200);
   throw new Error(
-    "AI copy-edit batch did not return a valid completion payload. " +
-      tail.trim()
+    `AI copy-edit batch did not return a valid completion payload. ${tail.trim()}`
   );
 }
 
@@ -191,35 +193,40 @@ export function runCopyEditPostApplyChecks({
     let content = "";
     try {
       content = fs.readFileSync(file, "utf-8");
-    } catch (err) {
+    } catch (error) {
       failures.push({
         file: relativeFile,
+        message: error.message,
         reason: "read_failed",
-        message: err.message,
       });
       continue;
     }
     const markerMatch = findLeftoverImpeccableMarker(content);
-    if (markerMatch)
+    if (markerMatch) {
       failures.push({
         file: relativeFile,
-        reason: "leftover_impeccable_marker",
         marker: markerMatch,
+        reason: "leftover_impeccable_marker",
       });
-    if (/\.json$/.test(relativeFile)) {
+    }
+    if (relativeFile.endsWith(".json")) {
       try {
         JSON.parse(content);
-      } catch (err) {
+      } catch (error) {
         failures.push({
           file: relativeFile,
+          message: error.message || String(error),
           reason: "invalid_json",
-          message: err.message || String(err),
         });
       }
     }
     const syntaxCheck = checkFrameworkSourceSyntax(relativeFile, content);
-    if (syntaxCheck?.failure) failures.push(syntaxCheck.failure);
-    if (syntaxCheck?.warning) warnings.push(syntaxCheck.warning);
+    if (syntaxCheck?.failure) {
+      failures.push(syntaxCheck.failure);
+    }
+    if (syntaxCheck?.warning) {
+      warnings.push(syntaxCheck.warning);
+    }
     if (/\.(mjs|cjs|js)$/.test(relativeFile)) {
       const check = spawnSync(process.execPath, ["--check", file], {
         cwd,
@@ -228,20 +235,26 @@ export function runCopyEditPostApplyChecks({
       if (check.status !== 0) {
         failures.push({
           file: relativeFile,
-          reason: "invalid_js",
           message: (check.stderr || check.stdout || "").trim(),
+          reason: "invalid_js",
         });
       }
     }
   }
   const validation = runManualEditValidationScript(cwd);
-  if (validation?.failure) failures.push(validation.failure);
-  if (validation?.warning) warnings.push(validation.warning);
-  return { ok: failures.length === 0, failures, warnings };
+  if (validation?.failure) {
+    failures.push(validation.failure);
+  }
+  if (validation?.warning) {
+    warnings.push(validation.warning);
+  }
+  return { failures, ok: failures.length === 0, warnings };
 }
 
 function checkFrameworkSourceSyntax(relativeFile, content) {
-  if (!/\.(jsx|tsx|ts)$/.test(relativeFile)) return null;
+  if (!/\.(jsx|tsx|ts)$/.test(relativeFile)) {
+    return null;
+  }
   let parser;
   try {
     parser = require("@babel/parser");
@@ -251,20 +264,22 @@ function checkFrameworkSourceSyntax(relativeFile, content) {
     };
   }
   const plugins = ["jsx"];
-  if (/\.(ts|tsx)$/.test(relativeFile)) plugins.push("typescript");
+  if (/\.(ts|tsx)$/.test(relativeFile)) {
+    plugins.push("typescript");
+  }
   try {
     parser.parse(content, {
-      sourceType: "module",
-      plugins,
       errorRecovery: false,
+      plugins,
+      sourceType: "module",
     });
     return null;
-  } catch (err) {
+  } catch (error) {
     return {
       failure: {
         file: relativeFile,
+        message: error.message || String(error),
         reason: "invalid_source_syntax",
-        message: err.message || String(err),
       },
     };
   }
@@ -274,7 +289,9 @@ function findLeftoverImpeccableMarker(content) {
   const commentMarker = content.match(
     /^\s*(?:<!--|\{\/\*)\s*impeccable-carbonize-(?:start|end)\b|^\s*(?:<!--|\{\/\*)\s*impeccable-variants-(?:start|end)\b/m
   );
-  if (commentMarker) return commentMarker[0];
+  if (commentMarker) {
+    return commentMarker[0];
+  }
 
   const attrPattern =
     /\bdata-impeccable-(?:variants?|original-text|editable|text-wrap)\s*=/g;
@@ -282,7 +299,9 @@ function findLeftoverImpeccableMarker(content) {
     attrPattern.lastIndex = 0;
     let match;
     while ((match = attrPattern.exec(line))) {
-      if (!isInsideQuotedLiteral(line, match.index)) return match[0];
+      if (!isInsideQuotedLiteral(line, match.index)) {
+        return match[0];
+      }
     }
   }
   return null;
@@ -302,17 +321,23 @@ function isInsideQuotedLiteral(line, index) {
       continue;
     }
     if (quote) {
-      if (ch === quote) quote = null;
+      if (ch === quote) {
+        quote = null;
+      }
       continue;
     }
-    if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+    }
   }
   return quote !== null;
 }
 
 function runManualEditValidationScript(cwd) {
   const script = readManualEditValidationScript(cwd);
-  if (!script) return null;
+  if (!script) {
+    return null;
+  }
   const validation = spawnSync(script, {
     cwd,
     encoding: "utf-8",
@@ -323,8 +348,8 @@ function runManualEditValidationScript(cwd) {
     return {
       failure: {
         file: "package.json",
-        reason: "manual_edit_validation_failed",
         message: validation.error.message || String(validation.error),
+        reason: "manual_edit_validation_failed",
       },
     };
   }
@@ -332,11 +357,11 @@ function runManualEditValidationScript(cwd) {
     return {
       failure: {
         file: "package.json",
-        reason: "manual_edit_validation_failed",
         message: [validation.stderr, validation.stdout]
           .filter(Boolean)
           .join("\n")
           .trim(),
+        reason: "manual_edit_validation_failed",
       },
     };
   }
@@ -345,7 +370,9 @@ function runManualEditValidationScript(cwd) {
 
 function readManualEditValidationScript(cwd) {
   const pkgPath = path.join(cwd, "package.json");
-  if (!fs.existsSync(pkgPath)) return null;
+  if (!fs.existsSync(pkgPath)) {
+    return null;
+  }
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
     const script = pkg?.scripts?.["impeccable:manual-edit-validate"];
@@ -357,54 +384,58 @@ function readManualEditValidationScript(cwd) {
 
 function compactBatchForPrompt(batch) {
   return {
-    pageUrl: batch?.pageUrl || null,
-    repair: compactBatchRepair(batch?.repair),
+    candidates: compactBatchCandidates(batch?.candidates),
     entries: (batch?.entries || []).map((entry) => ({
+      element: compactContextForBatch(entry.element),
       id: entry.id,
+      ops: (entry.ops || []).map(compactBatchOp),
       pageUrl: entry.pageUrl,
       stagedAt: entry.stagedAt || null,
-      element: compactContextForBatch(entry.element),
-      ops: (entry.ops || []).map(compactBatchOp),
     })),
-    candidates: compactBatchCandidates(batch?.candidates),
+    pageUrl: batch?.pageUrl || null,
+    repair: compactBatchRepair(batch?.repair),
   };
 }
 
 function compactBatchRepair(repair) {
-  if (!repair || typeof repair !== "object") return undefined;
+  if (!repair || typeof repair !== "object") {
+    return;
+  }
   return {
-    status: compactBatchString(repair.status),
     attempt: normalizeOptionalBatchNumber(repair.attempt),
     attempts: normalizeOptionalBatchNumber(repair.attempts),
-    maxAttempts: normalizeOptionalBatchNumber(repair.maxAttempts),
-    reason: compactBatchString(repair.reason),
-    transactionId: compactBatchString(repair.transactionId),
-    pageUrl: compactBatchString(repair.pageUrl),
     failures: compactBatchDiagnostics(repair.failures),
     files: compactBatchStringList(repair.files, 20),
+    maxAttempts: normalizeOptionalBatchNumber(repair.maxAttempts),
+    pageUrl: compactBatchString(repair.pageUrl),
+    reason: compactBatchString(repair.reason),
+    status: compactBatchString(repair.status),
+    transactionId: compactBatchString(repair.transactionId),
   };
 }
 
 function compactBatchDiagnostics(items, depth = 0) {
-  if (!Array.isArray(items)) return undefined;
+  if (!Array.isArray(items)) {
+    return;
+  }
   return items.slice(0, 12).map((item) => ({
-    entryId: compactBatchString(item?.entryId || item?.id),
-    reason: compactBatchString(item?.reason || item?.kind),
-    detail: compactBatchString(item?.detail),
-    message: compactBatchString(item?.message),
-    file: compactBatchString(item?.file || item?.relativeFile),
-    line: normalizeOptionalBatchNumber(item?.line),
-    ref: compactBatchString(item?.ref),
-    marker: compactBatchString(item?.marker),
-    files: compactBatchStringList(item?.files, 8),
     candidates:
       depth < 2 ? compactBatchSourceMatches(item?.candidates, 8) : undefined,
+    checks:
+      depth < 2 ? compactBatchDiagnostics(item?.checks, depth + 1) : undefined,
+    detail: compactBatchString(item?.detail),
+    entryId: compactBatchString(item?.entryId || item?.id),
     failures:
       depth < 2
         ? compactBatchDiagnostics(item?.failures, depth + 1)
         : undefined,
-    checks:
-      depth < 2 ? compactBatchDiagnostics(item?.checks, depth + 1) : undefined,
+    file: compactBatchString(item?.file || item?.relativeFile),
+    files: compactBatchStringList(item?.files, 8),
+    line: normalizeOptionalBatchNumber(item?.line),
+    marker: compactBatchString(item?.marker),
+    message: compactBatchString(item?.message),
+    reason: compactBatchString(item?.reason || item?.kind),
+    ref: compactBatchString(item?.ref),
   }));
 }
 
@@ -412,34 +443,38 @@ function compactBatchCandidates(candidates) {
   return (Array.isArray(candidates) ? candidates : [])
     .slice(0, 24)
     .map((candidate) => ({
-      entryId: compactBatchString(candidate?.entryId),
-      ref: compactBatchString(candidate?.ref),
-      sourceHint: compactBatchSourceMatch(candidate?.sourceHint),
-      textMatches: compactBatchSourceMatches(candidate?.textMatches, 8),
-      objectKeyMatches: compactBatchSourceMatches(
-        candidate?.objectKeyMatches,
-        8
-      ),
       contextTextMatches: compactBatchSourceMatches(
         candidate?.contextTextMatches,
         8
       ),
+      entryId: compactBatchString(candidate?.entryId),
       locatorMatches: compactBatchSourceMatches(candidate?.locatorMatches, 6),
+      objectKeyMatches: compactBatchSourceMatches(
+        candidate?.objectKeyMatches,
+        8
+      ),
+      ref: compactBatchString(candidate?.ref),
+      sourceHint: compactBatchSourceMatch(candidate?.sourceHint),
+      textMatches: compactBatchSourceMatches(candidate?.textMatches, 8),
     }));
 }
 
 function compactBatchSourceMatches(matches, limit) {
-  if (!Array.isArray(matches)) return undefined;
+  if (!Array.isArray(matches)) {
+    return;
+  }
   return matches.slice(0, limit).map(compactBatchSourceMatch).filter(Boolean);
 }
 
 function compactBatchSourceMatch(match) {
-  if (!match || typeof match !== "object") return null;
+  if (!match || typeof match !== "object") {
+    return null;
+  }
   return {
-    file: compactBatchString(match.relativeFile || match.file),
-    line: normalizeBatchNumber(match.line),
     column: normalizeBatchNumber(match.column),
+    file: compactBatchString(match.relativeFile || match.file),
     kind: compactBatchString(match.kind),
+    line: normalizeBatchNumber(match.line),
     reason: compactBatchString(match.reason || match.kind),
     status: compactBatchString(match.status),
   };
@@ -447,44 +482,50 @@ function compactBatchSourceMatch(match) {
 
 function compactBatchOp(op) {
   return {
-    entryId: op.entryId,
-    ref: op.ref,
-    contextRef: op.contextRef,
-    tag: op.tag,
-    elementId: op.elementId,
     classes: compactBatchStringList(op.classes, 24),
-    originalText: op.originalText,
-    newText: op.newText,
-    deleted: op.deleted === true || undefined,
-    sourceHint: normalizeBatchSourceHint(op.sourceHint),
-    leaf: compactContextForBatch(op.leaf),
-    nearbyEditableTexts: compactNearbyBatchTexts(op.nearbyEditableTexts),
     container: compactContextForBatch(op.container),
     contextHints: compactBatchStringList(op.contextHints, 12),
+    contextRef: op.contextRef,
+    deleted: op.deleted === true || undefined,
+    elementId: op.elementId,
+    entryId: op.entryId,
+    leaf: compactContextForBatch(op.leaf),
+    nearbyEditableTexts: compactNearbyBatchTexts(op.nearbyEditableTexts),
+    newText: op.newText,
+    originalText: op.originalText,
+    ref: op.ref,
+    sourceHint: normalizeBatchSourceHint(op.sourceHint),
+    tag: op.tag,
   };
 }
 
 function normalizeBatchSourceHint(hint) {
-  if (!hint || typeof hint !== "object") return null;
+  if (!hint || typeof hint !== "object") {
+    return null;
+  }
   let line = normalizeBatchNumber(hint.line);
   let column = normalizeBatchNumber(hint.column);
   if ((line === null || column === null) && typeof hint.loc === "string") {
     const match = hint.loc.match(/^(\d+)(?::(\d+))?/);
     if (match) {
       line = Number(match[1]);
-      if (match[2]) column = Number(match[2]);
+      if (match[2]) {
+        column = Number(match[2]);
+      }
     }
   }
   return {
-    file: compactBatchString(hint.file) || "",
-    loc: compactBatchString(hint.loc) || "",
-    line,
     column,
+    file: compactBatchString(hint.file) || "",
+    line,
+    loc: compactBatchString(hint.loc) || "",
   };
 }
 
 function normalizeBatchNumber(value) {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -499,9 +540,9 @@ function compactNearbyBatchTexts(items) {
     typeof item === "string"
       ? { text: truncate(item, BATCH_OP_TEXT_LIMIT) }
       : {
+          classes: compactBatchStringList(item?.classes, 24),
           ref: compactBatchString(item?.ref),
           tag: compactBatchString(item?.tag),
-          classes: compactBatchStringList(item?.classes, 24),
           text: compactBatchString(item?.text),
         }
   );
@@ -521,26 +562,30 @@ function compactBatchString(value) {
 }
 
 function compactContextForBatch(value) {
-  if (!value || typeof value !== "object") return value || null;
+  if (!value || typeof value !== "object") {
+    return value || null;
+  }
   return {
+    classes: compactBatchStringList(value.classes, 24),
+    id: compactBatchString(value.id),
+    outerHTML: truncate(stripLiveRuntimeHtml(value.outerHTML), 1800),
     ref: compactBatchString(value.ref),
     tagName: compactBatchString(value.tagName),
-    id: compactBatchString(value.id),
-    classes: compactBatchStringList(value.classes, 24),
     textContent: truncate(value.textContent, 900),
-    outerHTML: truncate(stripLiveRuntimeHtml(value.outerHTML), 1800),
   };
 }
 
 function stripLiveRuntimeHtml(html) {
-  if (typeof html !== "string") return html || null;
+  if (typeof html !== "string") {
+    return html || null;
+  }
   return html
-    .replace(
+    .replaceAll(
       /\sdata-impeccable-(?:original-text|editable|text-wrap)(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/g,
       ""
     )
-    .replace(/\scontenteditable(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/g, "")
-    .replace(
+    .replaceAll(/\scontenteditable(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/g, "")
+    .replaceAll(
       /\sstyle=(["'])(?:(?!\1)[\s\S])*(?:-webkit-user-modify|user-select:\s*text|cursor:\s*text)(?:(?!\1)[\s\S])*\1/g,
       ""
     );
@@ -558,9 +603,9 @@ function normalizeBatchResult(result) {
     : [];
   const failed = Array.isArray(result.failed)
     ? result.failed.filter(Boolean).map((item) => ({
+        candidates: Array.isArray(item.candidates) ? item.candidates : [],
         entryId: item.entryId || item.id || null,
         reason: item.reason || item.message || "failed",
-        candidates: Array.isArray(item.candidates) ? item.candidates : [],
       }))
     : [];
   const files = Array.isArray(result.files)
@@ -578,12 +623,12 @@ function normalizeBatchResult(result) {
         .filter((warning) => warning && typeof warning === "object")
     : [];
   return {
-    status,
-    message: result.message || null,
     appliedEntryIds,
     failed,
     files,
+    message: result.message || null,
     notes,
+    status,
     warnings,
   };
 }
@@ -593,32 +638,39 @@ function mockBatchResult(batch, env, cwd = process.cwd()) {
   const raw = env.IMPECCABLE_LIVE_COPY_AGENT_MOCK_RESULT;
   if (raw) {
     const parsed = parseCopyEditBatchResult(raw);
-    if (parsed) return parsed;
+    if (parsed) {
+      return parsed;
+    }
     throw new Error("Invalid IMPECCABLE_LIVE_COPY_AGENT_MOCK_RESULT JSON");
   }
   return {
-    status: "done",
     appliedEntryIds: (batch?.entries || [])
       .map((entry) => entry.id)
       .filter(Boolean),
     failed: [],
     files: [],
     notes: ["mock copy-edit batch result"],
+    status: "done",
   };
 }
 
 function applyMockWrites(env, cwd) {
   const raw = env.IMPECCABLE_LIVE_COPY_AGENT_MOCK_WRITES;
-  if (!raw) return;
+  if (!raw) {
+    return;
+  }
   const writes = tryParseJson(raw);
   if (!writes || typeof writes !== "object" || Array.isArray(writes)) {
     throw new Error("Invalid IMPECCABLE_LIVE_COPY_AGENT_MOCK_WRITES JSON");
   }
   for (const [relativeFile, content] of Object.entries(writes)) {
-    if (typeof relativeFile !== "string" || typeof content !== "string")
+    if (typeof relativeFile !== "string" || typeof content !== "string") {
       continue;
+    }
     const absolute = path.resolve(cwd, relativeFile);
-    if (!isPathInsideOrEqual(cwd, absolute)) continue;
+    if (!isPathInsideOrEqual(cwd, absolute)) {
+      continue;
+    }
     fs.mkdirSync(path.dirname(absolute), { recursive: true });
     fs.writeFileSync(absolute, content, "utf-8");
   }
@@ -626,31 +678,39 @@ function applyMockWrites(env, cwd) {
 
 export function parseCopyEditAgentResult(text) {
   const trimmed = String(text || "").trim();
-  if (!trimmed) return null;
+  if (!trimmed) {
+    return null;
+  }
 
   const parsedOuter = tryParseJson(trimmed);
   if (parsedOuter) {
     if (typeof parsedOuter.result === "string") {
       const nested = parseCopyEditAgentResult(parsedOuter.result);
-      if (nested) return nested;
+      if (nested) {
+        return nested;
+      }
     }
     if (
       parsedOuter.status === "done" ||
       parsedOuter.status === "partial" ||
       parsedOuter.status === "error"
-    )
+    ) {
       return parsedOuter;
+    }
   }
 
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+  if (!jsonMatch) {
+    return null;
+  }
   const parsed = tryParseJson(jsonMatch[0]);
   if (
     parsed?.status === "done" ||
     parsed?.status === "partial" ||
     parsed?.status === "error"
-  )
+  ) {
     return parsed;
+  }
   return null;
 }
 
@@ -660,16 +720,33 @@ export function chooseCopyEditAgent({
   chatAvailable = () => false,
 } = {}) {
   const mode = (env.IMPECCABLE_LIVE_COPY_AGENT || "auto").trim().toLowerCase();
-  if (mode === "0" || mode === "false" || mode === "off" || mode === "none")
+  if (mode === "0" || mode === "false" || mode === "off" || mode === "none") {
     return null;
-  if (mode === "mock") return "mock";
-  if (mode === "chat") return chatAvailable() ? "chat" : null;
-  if (mode === "codex") return commandExists("codex") ? "codex" : null;
-  if (mode === "claude") return commandExists("claude") ? "claude" : null;
-  if (mode !== "auto") return null;
-  if (authCheck("codex")) return "codex";
-  if (authCheck("claude")) return "claude";
-  if (chatAvailable()) return "chat";
+  }
+  if (mode === "mock") {
+    return "mock";
+  }
+  if (mode === "chat") {
+    return chatAvailable() ? "chat" : null;
+  }
+  if (mode === "codex") {
+    return commandExists("codex") ? "codex" : null;
+  }
+  if (mode === "claude") {
+    return commandExists("claude") ? "claude" : null;
+  }
+  if (mode !== "auto") {
+    return null;
+  }
+  if (authCheck("codex")) {
+    return "codex";
+  }
+  if (authCheck("claude")) {
+    return "claude";
+  }
+  if (chatAvailable()) {
+    return "chat";
+  }
   return null;
 }
 
@@ -722,8 +799,8 @@ function runClaude(
     cwd,
     env,
     logPath,
-    timeoutMs,
     mirrorOutputPath: resultPath,
+    timeoutMs,
   });
 }
 
@@ -750,17 +827,23 @@ function runAgentProcess(
     }, timeoutMs);
 
     const rejectOnce = (err) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       clearTimeout(timer);
       log.end();
       reject(err);
     };
     const resolveOnce = () => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       clearTimeout(timer);
-      if (mirrorOutputPath) fs.writeFileSync(mirrorOutputPath, output);
+      if (mirrorOutputPath) {
+        fs.writeFileSync(mirrorOutputPath, output);
+      }
       log.end();
       resolve();
     };
@@ -788,8 +871,11 @@ function runAgentProcess(
         );
       }
     });
-    if (stdin) child.stdin.end(stdin);
-    else child.stdin.end();
+    if (stdin) {
+      child.stdin.end(stdin);
+    } else {
+      child.stdin.end();
+    }
   });
 }
 
@@ -810,9 +896,13 @@ function tryParseJson(text) {
 }
 
 function truncate(value, max) {
-  if (typeof value !== "string") return value;
-  if (value.length <= max) return value;
-  return value.slice(0, max) + `... [truncated ${value.length - max} chars]`;
+  if (typeof value !== "string") {
+    return value;
+  }
+  if (value.length <= max) {
+    return value;
+  }
+  return `${value.slice(0, max)}... [truncated ${value.length - max} chars]`;
 }
 
 function commandExists(command) {
@@ -838,12 +928,8 @@ export function describeNoProviderError({
       );
     } else {
       lines.push(
-        "  • Claude CLI: installed but not selected. If Apply still fails, the subprocess may be unable to read your `claude /login` credentials (on macOS, the Keychain can be unreachable from a no-TTY child)."
-      );
-      lines.push(
-        "      Headless fix: run `claude setup-token` once, then `export CLAUDE_CODE_OAUTH_TOKEN=<the printed sk-ant-oat01-… token>` before starting `live-server.mjs`."
-      );
-      lines.push(
+        "  • Claude CLI: installed but not selected. If Apply still fails, the subprocess may be unable to read your `claude /login` credentials (on macOS, the Keychain can be unreachable from a no-TTY child).",
+        "      Headless fix: run `claude setup-token` once, then `export CLAUDE_CODE_OAUTH_TOKEN=<the printed sk-ant-oat01-… token>` before starting `live-server.mjs`.",
         "      Alternative: `export ANTHROPIC_API_KEY=<key>` if you have console.anthropic.com credits."
       );
     }
@@ -884,17 +970,25 @@ export function describeNoProviderError({
  */
 export function extractRunnerErrorMessage(output, command) {
   const text = String(output || "").trim();
-  if (!text) return null;
+  if (!text) {
+    return null;
+  }
   const candidates = [];
   const direct = tryParseJson(text);
-  if (direct) candidates.push(direct);
+  if (direct) {
+    candidates.push(direct);
+  }
   const trailingMatch = text.match(/\{[\s\S]*\}\s*$/);
   if (trailingMatch) {
     const tail = tryParseJson(trailingMatch[0]);
-    if (tail && tail !== direct) candidates.push(tail);
+    if (tail && tail !== direct) {
+      candidates.push(tail);
+    }
   }
   for (const parsed of candidates) {
-    if (!parsed || typeof parsed !== "object") continue;
+    if (!parsed || typeof parsed !== "object") {
+      continue;
+    }
     if (
       parsed.is_error === true &&
       typeof parsed.result === "string" &&
@@ -914,8 +1008,10 @@ export function extractRunnerErrorMessage(output, command) {
     .map((line) => line.trim())
     .filter(Boolean);
   if (lines.length > 0) {
-    const last = lines[lines.length - 1];
-    if (last.length > 0 && last.length < 400) return `${command}: ${last}`;
+    const last = lines.at(-1);
+    if (last.length > 0 && last.length < 400) {
+      return `${command}: ${last}`;
+    }
   }
   return null;
 }
@@ -936,16 +1032,24 @@ export function extractRunnerErrorMessage(output, command) {
 const COMMAND_AUTH_CACHE = new Map();
 
 function commandAuthed(command) {
-  if (COMMAND_AUTH_CACHE.has(command)) return COMMAND_AUTH_CACHE.get(command);
+  if (COMMAND_AUTH_CACHE.has(command)) {
+    return COMMAND_AUTH_CACHE.get(command);
+  }
   const ok = computeCommandAuthed(command);
   COMMAND_AUTH_CACHE.set(command, ok);
   return ok;
 }
 
 function computeCommandAuthed(command) {
-  if (!commandExists(command)) return false;
-  if (command === "codex") return true;
-  if (command !== "claude") return false;
+  if (!commandExists(command)) {
+    return false;
+  }
+  if (command === "codex") {
+    return true;
+  }
+  if (command !== "claude") {
+    return false;
+  }
   let result;
   try {
     result = spawnSync(
@@ -953,23 +1057,29 @@ function computeCommandAuthed(command) {
       ["--print", "--output-format", "json", "ping"],
       {
         encoding: "utf-8",
-        timeout: 10000,
         env: process.env,
+        timeout: 10_000,
       }
     );
   } catch {
     return false;
   }
-  if (result.error || result.signal) return false;
+  if (result.error || result.signal) {
+    return false;
+  }
   const stdout = String(result.stdout || "").trim();
   if (result.status !== 0) {
     // Non-zero exit: probably an auth or config error. Definitely not usable.
     return false;
   }
-  if (!stdout) return true;
+  if (!stdout) {
+    return true;
+  }
   const parsed =
     tryParseJson(stdout) ||
     tryParseJson(stdout.match(/\{[\s\S]*\}\s*$/)?.[0] || "");
-  if (parsed && parsed.is_error === true) return false;
+  if (parsed && parsed.is_error === true) {
+    return false;
+  }
   return true;
 }

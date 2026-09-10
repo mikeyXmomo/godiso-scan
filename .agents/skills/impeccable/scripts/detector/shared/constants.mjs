@@ -86,22 +86,26 @@ const GOOGLE_DOMAINS = [
 const VERCEL_DOMAINS = ["vercel.com", "nextjs.org", "v0.app"];
 const GITHUB_DOMAINS = ["github.com", "githubnext.com"];
 const BRAND_FONT_DOMAINS = {
-  roboto: GOOGLE_DOMAINS,
-  "google sans": GOOGLE_DOMAINS,
-  "product sans": GOOGLE_DOMAINS,
   geist: VERCEL_DOMAINS,
-  "geist sans": VERCEL_DOMAINS,
   "geist mono": VERCEL_DOMAINS,
+  "geist sans": VERCEL_DOMAINS,
+  "google sans": GOOGLE_DOMAINS,
   "mona sans": GITHUB_DOMAINS,
+  "product sans": GOOGLE_DOMAINS,
+  roboto: GOOGLE_DOMAINS,
 };
 
 function isBrandFontOnOwnDomain(font) {
-  if (typeof location === "undefined") return false;
+  if (typeof location === "undefined") {
+    return false;
+  }
   const allowed = BRAND_FONT_DOMAINS[font];
-  if (!allowed) return false;
+  if (!allowed) {
+    return false;
+  }
   const host = location.hostname.toLowerCase();
   return allowed.some(
-    (suffix) => host === suffix || host.endsWith("." + suffix)
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`)
   );
 }
 

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+
 import { Card, CardPanel } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
@@ -10,12 +11,14 @@ import {
 } from "@/components/ui/select";
 import { useScannerStore } from "@/lib/scanner-store";
 import {
-  type FitMode,
   fitModes,
-  type Orientation,
   orientations,
-  type PaperSize,
   paperSizes,
+} from "@/utils/scan-renderer/config.types";
+import type {
+  FitMode,
+  Orientation,
+  PaperSize,
 } from "@/utils/scan-renderer/config.types";
 
 const PAPER_LABELS: Record<PaperSize, string> = {

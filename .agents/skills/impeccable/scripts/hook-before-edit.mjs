@@ -43,21 +43,27 @@ import {
 } from "./hook-lib.mjs";
 
 async function readStdin() {
-  if (process.stdin.isTTY) return "";
+  if (process.stdin.isTTY) {
+    return "";
+  }
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks).toString("utf-8");
 }
 
 function done(payload = null) {
-  if (payload) process.stdout.write(JSON.stringify(payload));
+  if (payload) {
+    process.stdout.write(JSON.stringify(payload));
+  }
   process.exit(0);
 }
 
 function allow(extra = {}, payload = {}) {
   writeAuditLog(process.env, {
-    ts: new Date().toISOString(),
     event: "preToolUse",
+    ts: new Date().toISOString(),
     ...extra,
   });
   return done({ permission: "allow", ...payload });
@@ -65,15 +71,15 @@ function allow(extra = {}, payload = {}) {
 
 function deny(message, audit) {
   writeAuditLog(process.env, {
-    ts: new Date().toISOString(),
-    event: "preToolUse",
     blocked: true,
+    event: "preToolUse",
+    ts: new Date().toISOString(),
     ...audit,
   });
   return done({
+    agent_message: message,
     permission: "deny",
     user_message: message,
-    agent_message: message,
   });
 }
 
@@ -91,18 +97,24 @@ function proposedFilePath(event, cwd) {
     typeof raw === "string" && raw.trim()
       ? raw
       : shellWriteDestination(shellCommand(input));
-  if (typeof candidate !== "string" || !candidate.trim()) return "";
+  if (typeof candidate !== "string" || !candidate.trim()) {
+    return "";
+  }
   return path.isAbsolute(candidate) ? candidate : path.resolve(cwd, candidate);
 }
 
 function proposedContent(event, cwd, filePath) {
   const input = toolInput(event);
   for (const key of ["content", "streamContent", "text"]) {
-    if (typeof input[key] === "string") return input[key];
+    if (typeof input[key] === "string") {
+      return input[key];
+    }
   }
 
   const editProjection = projectedEditContent(input, filePath, cwd);
-  if (editProjection !== undefined) return editProjection;
+  if (editProjection !== undefined) {
+    return editProjection;
+  }
 
   if (hasFragmentEditContent(input)) {
     return { skipped: "fragment-only-edit" };
@@ -110,16 +122,24 @@ function proposedContent(event, cwd, filePath) {
 
   const command = shellCommand(input);
   const pythonContent = shellPythonWriteContent(command);
-  if (pythonContent) return pythonContent;
+  if (pythonContent) {
+    return pythonContent;
+  }
   const shellContent = shellHereDocContent(command);
-  if (shellContent) return shellContent;
+  if (shellContent) {
+    return shellContent;
+  }
   const copiedContent = shellCopiedFileContent(command, cwd);
-  if (copiedContent) return copiedContent;
+  if (copiedContent) {
+    return copiedContent;
+  }
   return "";
 }
 
 function hasFragmentEditContent(input) {
-  if (!input || typeof input !== "object") return false;
+  if (!input || typeof input !== "object") {
+    return false;
+  }
   if (
     typeof input.new_string === "string" ||
     typeof input.newString === "string" ||
@@ -135,7 +155,9 @@ function hasFragmentEditContent(input) {
 }
 
 function projectedEditContent(input, filePath, cwd) {
-  if (!filePath) return undefined;
+  if (!filePath) {
+    return;
+  }
   const singleOld = firstString(input, [
     "old_string",
     "oldString",
@@ -149,24 +171,32 @@ function projectedEditContent(input, filePath, cwd) {
     "replacement",
   ]);
   if (singleOld !== undefined || singleNew !== undefined) {
-    if (singleOld === undefined || singleNew === undefined)
+    if (singleOld === undefined || singleNew === undefined) {
       return { skipped: "fragment-only-edit" };
+    }
     const original = readExistingProjectFile(filePath, cwd);
-    if (original === null) return { skipped: "edit-original-unreadable" };
+    if (original === null) {
+      return { skipped: "edit-original-unreadable" };
+    }
     const projected = replaceOnce(original, singleOld, singleNew);
     return projected === null
       ? { skipped: "edit-old-string-missing" }
       : projected;
   }
 
-  if (!Array.isArray(input.edits)) return undefined;
+  if (!Array.isArray(input.edits)) {
+    return;
+  }
   const original = readExistingProjectFile(filePath, cwd);
-  if (original === null) return { skipped: "edit-original-unreadable" };
+  if (original === null) {
+    return { skipped: "edit-original-unreadable" };
+  }
 
   let projected = original;
   for (const edit of input.edits) {
-    if (!edit || typeof edit !== "object")
+    if (!edit || typeof edit !== "object") {
       return { skipped: "fragment-only-edit" };
+    }
     const oldString = firstString(edit, [
       "old_string",
       "oldString",
@@ -179,10 +209,13 @@ function projectedEditContent(input, filePath, cwd) {
       "new_str",
       "replacement",
     ]);
-    if (oldString === undefined || newString === undefined)
+    if (oldString === undefined || newString === undefined) {
       return { skipped: "fragment-only-edit" };
+    }
     const next = replaceOnce(projected, oldString, newString);
-    if (next === null) return { skipped: "edit-old-string-missing" };
+    if (next === null) {
+      return { skipped: "edit-old-string-missing" };
+    }
     projected = next;
   }
   return projected;
@@ -190,25 +223,36 @@ function projectedEditContent(input, filePath, cwd) {
 
 function firstString(obj, keys) {
   for (const key of keys) {
-    if (typeof obj?.[key] === "string") return obj[key];
+    if (typeof obj?.[key] === "string") {
+      return obj[key];
+    }
   }
-  return undefined;
+  return;
 }
 
 function replaceOnce(original, oldString, newString) {
-  if (oldString === "") return null;
+  if (oldString === "") {
+    return null;
+  }
   const index = original.indexOf(oldString);
-  if (index === -1) return null;
+  if (index === -1) {
+    return null;
+  }
   return `${original.slice(0, index)}${newString}${original.slice(index + oldString.length)}`;
 }
 
 function readExistingProjectFile(filePath, cwd) {
-  if (!isScanTargetInsideProject(filePath, cwd)) return null;
-  if (SENSITIVE_PATH.test(filePath) || GENERATED_PATH.test(filePath))
+  if (!isScanTargetInsideProject(filePath, cwd)) {
     return null;
+  }
+  if (SENSITIVE_PATH.test(filePath) || GENERATED_PATH.test(filePath)) {
+    return null;
+  }
   try {
     const stat = fs.statSync(filePath);
-    if (!stat.isFile() || stat.size > 1024 * 1024) return null;
+    if (!stat.isFile() || stat.size > 1024 * 1024) {
+      return null;
+    }
     return fs.readFileSync(filePath, "utf-8");
   } catch {
     return null;
@@ -216,14 +260,19 @@ function readExistingProjectFile(filePath, cwd) {
 }
 
 function shellCommand(input) {
-  if (typeof input.command === "string") return input.command;
-  if (input.args && typeof input.args.command === "string")
+  if (typeof input.command === "string") {
+    return input.command;
+  }
+  if (input.args && typeof input.args.command === "string") {
     return input.args.command;
+  }
   return "";
 }
 
 function shellRedirectPath(command) {
-  if (!command || typeof command !== "string") return "";
+  if (!command || typeof command !== "string") {
+    return "";
+  }
   const match = command.match(
     /(?:^|[\s;&|])(?:>>?|1>>?)\s*(?:"([^"]+)"|'([^']+)'|([^<>\s]+))/
   );
@@ -241,12 +290,16 @@ function shellWriteDestination(command) {
 }
 
 function shellPythonWriteDestination(command) {
-  if (!/\bpython(?:3)?\b/.test(command || "")) return "";
+  if (!/\bpython(?:3)?\b/.test(command || "")) {
+    return "";
+  }
   const directPath = firstMatch(
     command,
     /(?:^|[^\w.])(?:pathlib\.)?Path\(\s*(["'])(.*?)\1\s*\)\s*\.write_text\s*\(/
   );
-  if (directPath) return directPath;
+  if (directPath) {
+    return directPath;
+  }
 
   const pathsByVar = new Map();
   const assignmentRe =
@@ -260,7 +313,9 @@ function shellPythonWriteDestination(command) {
   let writeVar;
   while ((writeVar = writeVarRe.exec(command))) {
     const candidate = pathsByVar.get(writeVar[1]);
-    if (candidate) return candidate;
+    if (candidate) {
+      return candidate;
+    }
   }
 
   return firstMatch(
@@ -277,11 +332,19 @@ function firstMatch(value, re) {
 function shellTeeDestination(command) {
   const words = shellWords(command);
   const teeIndex = words.findIndex((word) => path.basename(word) === "tee");
-  if (teeIndex === -1) return "";
+  if (teeIndex === -1) {
+    return "";
+  }
   for (const word of words.slice(teeIndex + 1)) {
-    if (["&&", "||", ";", "|"].includes(word)) break;
-    if (word === "--") continue;
-    if (word.startsWith("-")) continue;
+    if (["&&", "||", ";", "|"].includes(word)) {
+      break;
+    }
+    if (word === "--") {
+      continue;
+    }
+    if (word.startsWith("-")) {
+      continue;
+    }
     return word;
   }
   return "";
@@ -289,16 +352,23 @@ function shellTeeDestination(command) {
 
 function shellCopiedFileContent(command, cwd) {
   const source = shellCopyPaths(command)?.source;
-  if (!source) return "";
+  if (!source) {
+    return "";
+  }
   const sourcePath = path.isAbsolute(source)
     ? source
     : path.resolve(cwd, source);
-  if (!isScanTargetInsideProject(sourcePath, cwd)) return "";
-  if (SENSITIVE_PATH.test(sourcePath) || GENERATED_PATH.test(sourcePath))
+  if (!isScanTargetInsideProject(sourcePath, cwd)) {
     return "";
+  }
+  if (SENSITIVE_PATH.test(sourcePath) || GENERATED_PATH.test(sourcePath)) {
+    return "";
+  }
   try {
     const stat = fs.statSync(sourcePath);
-    if (!stat.isFile() || stat.size > 1024 * 1024) return "";
+    if (!stat.isFile() || stat.size > 1024 * 1024) {
+      return "";
+    }
     return fs.readFileSync(sourcePath, "utf-8");
   } catch {
     return "";
@@ -307,37 +377,53 @@ function shellCopiedFileContent(command, cwd) {
 
 function shellCopyPaths(command) {
   const words = shellWords(command);
-  if (words.length < 3 || path.basename(words[0]) !== "cp") return null;
+  if (words.length < 3 || path.basename(words[0]) !== "cp") {
+    return null;
+  }
   const args = [];
   for (const word of words.slice(1)) {
-    if (["&&", "||", ";", "|"].includes(word)) break;
-    if (word === "--") continue;
-    if (word.startsWith("-")) continue;
+    if (["&&", "||", ";", "|"].includes(word)) {
+      break;
+    }
+    if (word === "--") {
+      continue;
+    }
+    if (word.startsWith("-")) {
+      continue;
+    }
     args.push(word);
   }
-  if (args.length < 2) return null;
-  return { source: args[args.length - 2], dest: args[args.length - 1] };
+  if (args.length < 2) {
+    return null;
+  }
+  return { dest: args.at(-1), source: args.at(-2) };
 }
 
 function shellWords(command) {
-  if (!command || typeof command !== "string") return [];
+  if (!command || typeof command !== "string") {
+    return [];
+  }
   const words = [];
   const re = /"((?:\\"|[^"])*)"|'((?:\\'|[^'])*)'|([^\s]+)/g;
   let match;
   while ((match = re.exec(command))) {
     words.push(
-      (match[1] ?? match[2] ?? match[3] ?? "").replace(/\\(["'])/g, "$1")
+      (match[1] ?? match[2] ?? match[3] ?? "").replaceAll(/\\(["'])/g, "$1")
     );
   }
   return words;
 }
 
 function shellHereDocContent(command) {
-  if (!command || typeof command !== "string") return "";
+  if (!command || typeof command !== "string") {
+    return "";
+  }
   const markerMatch = command.match(
     /<<-?\s*['"]?([A-Za-z0-9_.-]+)['"]?[^\r\n]*\r?\n/
   );
-  if (!markerMatch) return "";
+  if (!markerMatch) {
+    return "";
+  }
   const marker = markerMatch[1];
   const start = (markerMatch.index || 0) + markerMatch[0].length;
   const rest = command.slice(start);
@@ -347,7 +433,9 @@ function shellHereDocContent(command) {
 }
 
 function shellPythonWriteContent(command) {
-  if (!/\bpython(?:3)?\b/.test(command || "")) return "";
+  if (!/\bpython(?:3)?\b/.test(command || "")) {
+    return "";
+  }
   const script = shellHereDocContent(command) || command;
   return (
     pythonStringArg(script, /\.write_text\s*\(\s*/g) ||
@@ -362,11 +450,15 @@ function pythonStringArg(script, prefixRe) {
     const triple = script.slice(start, start + 3);
     if (triple === "'''" || triple === '"""') {
       const end = script.indexOf(triple, start + 3);
-      if (end !== -1) return script.slice(start + 3, end);
+      if (end !== -1) {
+        return script.slice(start + 3, end);
+      }
       continue;
     }
     const quote = script[start];
-    if (quote !== '"' && quote !== "'") continue;
+    if (quote !== '"' && quote !== "'") {
+      continue;
+    }
     let out = "";
     for (let i = start + 1; i < script.length; i++) {
       const ch = script[i];
@@ -384,13 +476,15 @@ function pythonStringArg(script, prefixRe) {
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function relativePath(filePath, cwd) {
   try {
     const rel = path.relative(cwd, filePath);
-    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return filePath;
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+      return filePath;
+    }
     return rel.split(path.sep).join("/");
   } catch {
     return filePath;
@@ -411,7 +505,7 @@ async function detectProposedHtml(detector, content, filePath, scanOptions) {
       f && typeof f === "object" ? { ...f, file: filePath } : f
     );
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { force: true, recursive: true });
   }
 }
 
@@ -469,8 +563,8 @@ function findingSignature(findings) {
 
 function bumpCursorDenial(cache, sessionId, filePath, findings) {
   const session = cache.sessions[sessionId] || {
-    updatedAt: Date.now(),
     files: {},
+    updatedAt: Date.now(),
   };
   cache.sessions[sessionId] = session;
   session.updatedAt = Date.now();
@@ -482,7 +576,7 @@ function bumpCursorDenial(cache, sessionId, filePath, findings) {
       ? fileEntry.cursorDenials
       : {};
   fileEntry.cursorDenials[key] = (fileEntry.cursorDenials[key] || 0) + 1;
-  return { key, count: fileEntry.cursorDenials[key] };
+  return { count: fileEntry.cursorDenials[key], key };
 }
 
 async function main() {
@@ -493,7 +587,9 @@ async function main() {
   let event = null;
   try {
     const raw = await readStdin();
-    if (raw) event = JSON.parse(raw);
+    if (raw) {
+      event = JSON.parse(raw);
+    }
   } catch {
     return allow({ skipped: "stdin-malformed" });
   }
@@ -509,36 +605,40 @@ async function main() {
   // was launched from a non-project umbrella directory (issue #305).
   const cwd = resolveCacheCwd(filePath, sessionCwd);
   const audit = {
-    harness: "cursor",
     cwd,
-    tool: event.tool_name || null,
     file: filePath || null,
+    harness: "cursor",
+    tool: event.tool_name || null,
   };
 
-  if (!filePath)
+  if (!filePath) {
     return allow({
       ...audit,
+      durationMs: Date.now() - started,
       skipped: "no-file-path",
-      durationMs: Date.now() - started,
     });
-  if (!isScanTargetInsideProject(filePath, cwd))
+  }
+  if (!isScanTargetInsideProject(filePath, cwd)) {
     return allow({
       ...audit,
+      durationMs: Date.now() - started,
       skipped: "outside-project",
-      durationMs: Date.now() - started,
     });
-  if (SENSITIVE_PATH.test(filePath))
+  }
+  if (SENSITIVE_PATH.test(filePath)) {
     return allow({
       ...audit,
+      durationMs: Date.now() - started,
       skipped: "sensitive",
-      durationMs: Date.now() - started,
     });
-  if (GENERATED_PATH.test(filePath))
+  }
+  if (GENERATED_PATH.test(filePath)) {
     return allow({
       ...audit,
-      skipped: "generated",
       durationMs: Date.now() - started,
+      skipped: "generated",
     });
+  }
 
   // Config is read before the extension gate so `detector.extensions` entries
   // (e.g. `.blade.php` template files, issue #316) can widen it.
@@ -546,12 +646,13 @@ async function main() {
   const ext = path.extname(filePath).toLowerCase();
   const configuredExt = matchConfiguredExtension(filePath, config.extensions);
   audit.ext = configuredExt ? configuredExt.ext : ext;
-  if (!ALLOWED_EXTS.has(ext) && !configuredExt)
+  if (!ALLOWED_EXTS.has(ext) && !configuredExt) {
     return allow({
       ...audit,
-      skipped: "extension",
       durationMs: Date.now() - started,
+      skipped: "extension",
     });
+  }
 
   const contentResult = proposedContent(event, cwd, filePath);
   if (
@@ -561,33 +662,35 @@ async function main() {
   ) {
     return allow({
       ...audit,
-      skipped: contentResult.skipped,
       durationMs: Date.now() - started,
+      skipped: contentResult.skipped,
     });
   }
   const content = typeof contentResult === "string" ? contentResult : "";
-  if (!content)
+  if (!content) {
     return allow({
       ...audit,
+      durationMs: Date.now() - started,
       skipped: "no-proposed-content",
-      durationMs: Date.now() - started,
     });
+  }
 
-  if (config.enabled === false)
+  if (config.enabled === false) {
     return allow({
       ...audit,
-      skipped: "config-disabled",
       durationMs: Date.now() - started,
+      skipped: "config-disabled",
     });
+  }
 
   // Web rule engine, native project: stand aside (see resolveProjectPlatform).
   const platform = resolveProjectPlatform(cwd);
   if (isNativePlatform(platform)) {
     return allow({
       ...audit,
-      skipped: "native-platform",
-      platform,
       durationMs: Date.now() - started,
+      platform,
+      skipped: "native-platform",
     });
   }
 
@@ -598,8 +701,8 @@ async function main() {
   ) {
     return allow({
       ...audit,
-      skipped: "config-ignore-file",
       durationMs: Date.now() - started,
+      skipped: "config-ignore-file",
     });
   }
 
@@ -607,8 +710,8 @@ async function main() {
   if (!detector || typeof detector.detectText !== "function") {
     return allow({
       ...audit,
-      skipped: "detector-missing",
       durationMs: Date.now() - started,
+      skipped: "detector-missing",
     });
   }
   const scanOptions = designSystemOptions(config, detector, cwd);
@@ -627,8 +730,8 @@ async function main() {
   } catch {
     return allow({
       ...audit,
-      error: "detector-threw",
       durationMs: Date.now() - started,
+      error: "detector-threw",
     });
   }
 
@@ -636,9 +739,9 @@ async function main() {
   if (filtered.length === 0) {
     return allow({
       ...audit,
-      findings: (findings || []).length,
       blockedFindings: 0,
       durationMs: Date.now() - started,
+      findings: (findings || []).length,
     });
   }
 
@@ -669,34 +772,34 @@ async function main() {
     return allow(
       {
         ...audit,
-        findings: (findings || []).length,
         blockedFindings: filtered.length,
-        cursorDenialKey: denial.key,
-        cursorDenialCount: denial.count,
-        downgraded: true,
         chars: warning.length,
+        cursorDenialCount: denial.count,
+        cursorDenialKey: denial.key,
+        downgraded: true,
         durationMs: Date.now() - started,
+        findings: (findings || []).length,
       },
       {
-        user_message: warning,
         agent_message: warning,
+        user_message: warning,
       }
     );
   }
   return deny(message, {
     ...audit,
-    findings: (findings || []).length,
     blockedFindings: filtered.length,
-    cursorDenialKey: denial.key,
-    cursorDenialCount: denial.count,
     chars: message.length,
+    cursorDenialCount: denial.count,
+    cursorDenialKey: denial.key,
     durationMs: Date.now() - started,
+    findings: (findings || []).length,
   });
 }
 
-main().catch((err) => {
+main().catch((error) => {
   if (process.env.IMPECCABLE_HOOK_DEBUG) {
-    process.stderr.write(`[impeccable-hook-before-edit] ${err}\n`);
+    process.stderr.write(`[impeccable-hook-before-edit] ${error}\n`);
   }
   done({ permission: "allow" });
 });

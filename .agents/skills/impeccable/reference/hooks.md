@@ -23,7 +23,7 @@ On **Cursor**, `preToolUse` checks proposed Write/Edit/Shell write content and d
 The first argument is the action. Defaults to `status`.
 
 | Action | What it does |
-|---|---|
+| --- | --- |
 | `status` | Print current state, shared/local config paths, ignored rules / files / values, env override. |
 | `on` | Set `enabled: true` in `.impeccable/config.json`, record local hook consent as accepted, and install/repair provider hook manifests when the skill is installed. |
 | `off` | Set `enabled: false` in `.impeccable/config.json`. |
@@ -85,8 +85,7 @@ Example whole-rule font exception:
 node .agents/skills/impeccable/scripts/hook-admin.mjs ignore-rule overused-font --all-values --reason "User asked to ignore overused fonts generally"
 ```
 
-Example one-rule-in-one-file exception, for a file that is still worth reviewing
-for everything else:
+Example one-rule-in-one-file exception, for a file that is still worth reviewing for everything else:
 
 ```bash
 node .agents/skills/impeccable/scripts/hook-admin.mjs ignore-value design-system-font-size "*" --file "src/overlay/widget.js" --reason "Injected widget builds its own type scale; DESIGN.md's ramp describes the site"

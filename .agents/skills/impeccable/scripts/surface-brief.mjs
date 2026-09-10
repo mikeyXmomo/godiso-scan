@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { resolveProjectRoot } from "./context.mjs";
 import {
   listSurfaceBriefs,
@@ -12,10 +13,10 @@ import {
 
 function summary(brief, projectRoot) {
   return {
-    slug: brief.slug,
     path: path.relative(projectRoot, brief.path).split(path.sep).join("/"),
     primaryTarget: brief.primaryTarget,
     relatedTargets: brief.relatedTargets,
+    slug: brief.slug,
   };
 }
 
@@ -27,8 +28,9 @@ function main(argv) {
   );
   if (command === "path") {
     const filePath = surfaceBriefPathForTarget(target, { projectRoot });
-    if (!filePath)
+    if (!filePath) {
       throw new Error("surface brief path requires a concrete target");
+    }
     process.stdout.write(
       `${path.relative(process.cwd(), filePath) || filePath}\n`
     );
@@ -52,7 +54,7 @@ function main(argv) {
       process.stdout.write(result.brief.text);
       return;
     }
-    if (result.candidates.length)
+    if (result.candidates.length) {
       process.stderr.write(
         `${JSON.stringify(
           result.candidates.map((brief) => summary(brief, projectRoot)),
@@ -60,18 +62,20 @@ function main(argv) {
           2
         )}\n`
       );
+    }
     process.exit(2);
   }
   if (command === "write") {
-    if (!target || !bodyFile)
+    if (!target || !bodyFile) {
       throw new Error(
         "usage: surface-brief.mjs write <primary-target> <body-file>"
       );
+    }
     const filePath = writeSurfaceBrief({
-      projectRoot,
-      primaryTarget: target,
-      relatedTargets,
       body: fs.readFileSync(bodyFile, "utf-8"),
+      primaryTarget: target,
+      projectRoot,
+      relatedTargets,
     });
     process.stdout.write(
       `${path.relative(process.cwd(), filePath) || filePath}\n`
@@ -84,11 +88,12 @@ function main(argv) {
 }
 
 function isMainModule() {
-  if (!process.argv[1]) return false;
+  if (!process.argv[1]) {
+    return false;
+  }
   try {
     return (
-      fs.realpathSync(fileURLToPath(import.meta.url)) ===
-      fs.realpathSync(process.argv[1])
+      fs.realpathSync(import.meta.filename) === fs.realpathSync(process.argv[1])
     );
   } catch {
     return import.meta.url === pathToFileURL(process.argv[1]).href;

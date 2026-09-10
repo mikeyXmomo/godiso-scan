@@ -9,16 +9,20 @@ function createDetectorProfile() {
 }
 
 function recordProfileEvent(profile, event) {
-  if (!profile) return;
+  if (!profile) {
+    return;
+  }
   const normalized = {
     engine: event.engine || "unknown",
+    findings: Number.isFinite(event.findings) ? event.findings : 0,
+    ms: Number.isFinite(event.ms) ? event.ms : 0,
     phase: event.phase || "unknown",
     ruleId: event.ruleId || "unknown",
     target: event.target || "",
-    ms: Number.isFinite(event.ms) ? event.ms : 0,
-    findings: Number.isFinite(event.findings) ? event.findings : 0,
   };
-  if (event.detail) normalized.detail = event.detail;
+  if (event.detail) {
+    normalized.detail = event.detail;
+  }
   if (Array.isArray(event.findingIds) && event.findingIds.length) {
     normalized.findingIds = event.findingIds;
   }
@@ -34,7 +38,9 @@ function recordProfileEvent(profile, event) {
 }
 
 function extractFindingIds(findings) {
-  if (!Array.isArray(findings) || findings.length === 0) return [];
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return [];
+  }
   return [
     ...new Set(
       findings.map((f) => f?.id || f?.type || f?.antipattern).filter(Boolean)
@@ -43,61 +49,71 @@ function extractFindingIds(findings) {
 }
 
 function profileFindings(profile, meta, callback) {
-  if (!profile) return callback();
+  if (!profile) {
+    return callback();
+  }
   const started = profileNow();
   const findings = callback();
   recordProfileEvent(profile, {
     ...meta,
-    ms: profileNow() - started,
-    findings: Array.isArray(findings) ? findings.length : 0,
     findingIds: extractFindingIds(findings),
+    findings: Array.isArray(findings) ? findings.length : 0,
+    ms: profileNow() - started,
   });
   return findings;
 }
 
 function profileStep(profile, meta, callback) {
-  if (!profile) return callback();
+  if (!profile) {
+    return callback();
+  }
   const started = profileNow();
   try {
     return callback();
   } finally {
     recordProfileEvent(profile, {
       ...meta,
-      ms: profileNow() - started,
       findings: 0,
+      ms: profileNow() - started,
     });
   }
 }
 
 async function profileFindingsAsync(profile, meta, callback) {
-  if (!profile) return callback();
+  if (!profile) {
+    return callback();
+  }
   const started = profileNow();
   const findings = await callback();
   recordProfileEvent(profile, {
     ...meta,
-    ms: profileNow() - started,
-    findings: Array.isArray(findings) ? findings.length : 0,
     findingIds: extractFindingIds(findings),
+    findings: Array.isArray(findings) ? findings.length : 0,
+    ms: profileNow() - started,
   });
   return findings;
 }
 
 async function profileStepAsync(profile, meta, callback) {
-  if (!profile) return callback();
+  if (!profile) {
+    return callback();
+  }
   const started = profileNow();
   try {
     return await callback();
   } finally {
     recordProfileEvent(profile, {
       ...meta,
-      ms: profileNow() - started,
       findings: 0,
+      ms: profileNow() - started,
     });
   }
 }
 
 function percentile(sortedValues, pct) {
-  if (!sortedValues.length) return 0;
+  if (!sortedValues.length) {
+    return 0;
+  }
   const idx = Math.min(
     sortedValues.length - 1,
     Math.max(0, Math.ceil((pct / 100) * sortedValues.length) - 1)
@@ -122,14 +138,14 @@ function summarizeDetectorProfile(profile) {
     let group = groups.get(key);
     if (!group) {
       group = {
+        calls: 0,
         engine: event.engine || "unknown",
+        findings: 0,
         phase: event.phase || "unknown",
         ruleId: event.ruleId || "unknown",
-        target: event.target || "",
-        calls: 0,
-        totalMs: 0,
-        findings: 0,
         samples: [],
+        target: event.target || "",
+        totalMs: 0,
       };
       groups.set(key, group);
     }
@@ -143,16 +159,16 @@ function summarizeDetectorProfile(profile) {
     .map((group) => {
       const samples = group.samples.sort((a, b) => a - b);
       return {
+        avgMs: Number((group.totalMs / group.calls).toFixed(3)),
+        calls: group.calls,
         engine: group.engine,
+        findings: group.findings,
+        p50: Number(percentile(samples, 50).toFixed(3)),
+        p95: Number(percentile(samples, 95).toFixed(3)),
         phase: group.phase,
         ruleId: group.ruleId,
         target: group.target,
-        calls: group.calls,
         totalMs: Number(group.totalMs.toFixed(3)),
-        avgMs: Number((group.totalMs / group.calls).toFixed(3)),
-        p50: Number(percentile(samples, 50).toFixed(3)),
-        p95: Number(percentile(samples, 95).toFixed(3)),
-        findings: group.findings,
       };
     })
     .sort((a, b) => b.totalMs - a.totalMs);

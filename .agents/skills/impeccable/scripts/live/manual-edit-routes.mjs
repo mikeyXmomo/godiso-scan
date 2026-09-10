@@ -1,4 +1,11 @@
+import { commitManualEdits } from "../live-commit-manual-edits.mjs";
+import { buildManualEditEvidence } from "../live-manual-edit-evidence.mjs";
 import { validateEvent } from "./event-validation.mjs";
+import {
+  summarizeManualApplyFailures,
+  summarizeManualDiagnostics,
+  summarizeManualLogFile,
+} from "./manual-apply.mjs";
 import {
   countByPage as countPendingByPage,
   readBuffer as readManualEditsBuffer,
@@ -6,13 +13,6 @@ import {
   stageEntry as stageManualEditEntry,
   truncateBuffer as truncateManualEditsBuffer,
 } from "./manual-edits-buffer.mjs";
-import {
-  summarizeManualApplyFailures,
-  summarizeManualDiagnostics,
-  summarizeManualLogFile,
-} from "./manual-apply.mjs";
-import { buildManualEditEvidence } from "../live-manual-edit-evidence.mjs";
-import { commitManualEdits } from "../live-commit-manual-edits.mjs";
 
 export function createManualEditRoutes({
   getToken,
@@ -57,26 +57,21 @@ export function createManualEditRoutes({
         }
         try {
           stageManualEditEntry(projectCwd(), {
-            id: msg.id,
-            pageUrl: msg.pageUrl,
             element: msg.element,
+            id: msg.id,
             ops: msg.ops,
+            pageUrl: msg.pageUrl,
           });
-        } catch (err) {
+        } catch (error) {
           sendJson(res, 500, {
             error: "stash_write_failed",
-            message: err.message,
+            message: error.message,
           });
           return;
         }
         const { totalCount, perPage } = countPendingByPage(projectCwd());
         const pendingCount = perPage[msg.pageUrl] || 0;
         recordManualEditActivity("manual_edit_stashed", {
-          id: msg.id,
-          pageUrl: msg.pageUrl,
-          opCount: msg.ops.length,
-          pendingCount,
-          totalCount,
           hintedFileCount: new Set(
             (msg.ops || [])
               .map((op) =>
@@ -84,8 +79,13 @@ export function createManualEditRoutes({
               )
               .filter(Boolean)
           ).size,
+          id: msg.id,
+          opCount: msg.ops.length,
+          pageUrl: msg.pageUrl,
+          pendingCount,
+          totalCount,
         });
-        sendJson(res, 200, { ok: true, pendingCount, totalCount, perPage });
+        sendJson(res, 200, { ok: true, pendingCount, perPage, totalCount });
       });
       return true;
     }
@@ -105,9 +105,9 @@ export function createManualEditRoutes({
         : buffer.entries;
       sendJson(res, 200, {
         count: pageUrl ? perPage[pageUrl] || 0 : totalCount,
-        totalCount,
-        perPage,
         entries: entriesForPage,
+        perPage,
+        totalCount,
       });
       return true;
     }
@@ -143,29 +143,29 @@ export function createManualEditRoutes({
         : before.totalCount;
       recordManualEditActivity("manual_edit_commit_started", {
         pageUrl,
-        repairOnly,
         pendingCount,
-        totalCount: before.totalCount,
         recoveredTransaction: recoveredTransaction
           ? {
               id: recoveredTransaction.id,
               reason: recoveredTransaction.reason,
-              skipped: recoveredTransaction.skipped,
-              rolledBackFiles: recoveredTransaction.rolledBackFiles,
               rollbackFailures: summarizeManualDiagnostics(
                 recoveredTransaction.rollbackFailures,
                 projectCwd()
               ),
+              rolledBackFiles: recoveredTransaction.rolledBackFiles,
+              skipped: recoveredTransaction.skipped,
             }
           : null,
+        repairOnly,
+        totalCount: before.totalCount,
         ...summarizePendingManualEditBatch(projectCwd(), pageUrl),
       });
       if (asyncMode) {
         sendJson(res, 202, {
-          status: "started",
           pendingCount,
-          totalCount: before.totalCount,
           perPage: before.perPage,
+          status: "started",
+          totalCount: before.totalCount,
         });
       }
       (async () => {
@@ -182,8 +182,8 @@ export function createManualEditRoutes({
             commitBatch = transactionBatch;
             if (!repairOnly && manualApply.countOps(transactionBatch) > 0) {
               transaction = manualApply.writeTransaction({
-                pageUrl,
                 batch: transactionBatch,
+                pageUrl,
               });
             } else if (repairOnly && existingTransaction) {
               transaction = existingTransaction;
@@ -199,53 +199,53 @@ export function createManualEditRoutes({
           if (useChatRoute) {
             routedProvider = "chat";
             const timeoutMs = Number(
-              envValue.IMPECCABLE_LIVE_COPY_AGENT_TIMEOUT_MS || 120000
+              envValue.IMPECCABLE_LIVE_COPY_AGENT_TIMEOUT_MS || 120_000
             );
             result = await commitManualEdits({
-              cwd: projectCwd(),
-              pageUrl,
-              provider: "chat",
-              env: envValue,
-              timeoutMs,
-              chatAvailable: chatAgentLikelyActive,
               applyBatchToSource: (batch, context) =>
                 manualApply.pushBatchInChunksAndWait(batch, pageUrl, context),
-              repairOnly,
-              transactionId: transaction?.id || existingTransaction?.id || null,
               batch: commitBatch,
+              chatAvailable: chatAgentLikelyActive,
+              cwd: projectCwd(),
+              env: envValue,
+              pageUrl,
+              provider: "chat",
+              repairOnly,
+              timeoutMs,
+              transactionId: transaction?.id || existingTransaction?.id || null,
             });
           } else {
             const timeoutMs = Number(
-              envValue.IMPECCABLE_LIVE_COPY_AGENT_TIMEOUT_MS || 120000
+              envValue.IMPECCABLE_LIVE_COPY_AGENT_TIMEOUT_MS || 120_000
             );
             const provider = ["codex", "claude", "mock"].includes(requestedMode)
               ? requestedMode
               : undefined;
             result = await commitManualEdits({
+              batch: commitBatch,
+              chatAvailable: chatAgentLikelyActive,
               cwd: projectCwd(),
+              env: envValue,
               pageUrl,
               provider,
-              env: envValue,
-              timeoutMs,
-              chatAvailable: chatAgentLikelyActive,
               repairOnly,
+              timeoutMs,
               transactionId: transaction?.id || existingTransaction?.id || null,
-              batch: commitBatch,
             });
           }
-        } catch (err) {
+        } catch (error) {
           if (transaction) {
             manualApply.rollbackTransaction({
               pageUrl,
               reason: "manual_edit_commit_exception",
             });
           }
-          const message = err.stderr?.toString?.() || err.message;
+          const message = error.stderr?.toString?.() || error.message;
           recordManualEditActivity("manual_edit_commit_failed", {
-            pageUrl,
-            provider: routedProvider,
             error: "manual_edit_commit_failed",
             message,
+            pageUrl,
+            provider: routedProvider,
             transactionId: transaction?.id || null,
           });
           if (!asyncMode) {
@@ -258,17 +258,14 @@ export function createManualEditRoutes({
         } finally {
           if (transaction) {
             const shouldKeepTransaction = result?.needsManualDecision === true;
-            if (!shouldKeepTransaction)
+            if (!shouldKeepTransaction) {
               manualApply.clearTransaction(transaction.id);
+            }
           }
         }
         const { totalCount, perPage } = countPendingByPage(projectCwd());
         if (result?.needsManualDecision) {
           recordManualEditActivity("manual_edit_repair_needs_decision", {
-            pageUrl,
-            provider: routedProvider,
-            transactionId: transaction?.id || existingTransaction?.id || null,
-            repair: result.repair || null,
             failed: summarizeManualApplyFailures(result.failed, projectCwd()),
             files: Array.isArray(result.files)
               ? result.files
@@ -276,53 +273,57 @@ export function createManualEditRoutes({
                   .map((file) => summarizeManualLogFile(file, projectCwd()))
                   .filter(Boolean)
               : [],
+            pageUrl,
+            provider: routedProvider,
             remainingCount: pageUrl ? perPage[pageUrl] || 0 : totalCount,
+            repair: result.repair || null,
             totalCount,
+            transactionId: transaction?.id || existingTransaction?.id || null,
           });
         } else {
           recordManualEditActivity("manual_edit_commit_done", {
-            pageUrl,
-            provider: routedProvider,
-            reason: result.reason || null,
-            repair: result.repair || null,
             appliedCount: Array.isArray(result.applied)
               ? result.applied.length
               : 0,
+            cleared: result.cleared || 0,
+            failed: summarizeManualApplyFailures(result.failed, projectCwd()),
             failedCount: Array.isArray(result.failed)
               ? result.failed.length
               : 0,
-            failed: summarizeManualApplyFailures(result.failed, projectCwd()),
             files: Array.isArray(result.files)
               ? result.files
                   .slice(0, 20)
                   .map((file) => summarizeManualLogFile(file, projectCwd()))
                   .filter(Boolean)
               : [],
-            warnings: summarizeManualDiagnostics(result.warnings, projectCwd()),
+            noteCount: Array.isArray(result.notes) ? result.notes.length : 0,
+            pageUrl,
+            provider: routedProvider,
+            reason: result.reason || null,
+            remainingCount: pageUrl ? perPage[pageUrl] || 0 : totalCount,
+            repair: result.repair || null,
+            rollbackFailures: summarizeManualDiagnostics(
+              result.rollbackFailures,
+              projectCwd()
+            ),
             rolledBackFiles: Array.isArray(result.rolledBackFiles)
               ? result.rolledBackFiles
                   .slice(0, 20)
                   .map((file) => summarizeManualLogFile(file, projectCwd()))
                   .filter(Boolean)
               : [],
-            rollbackFailures: summarizeManualDiagnostics(
-              result.rollbackFailures,
-              projectCwd()
-            ),
+            totalCount,
             unreportedFiles: Array.isArray(result.unreportedFiles)
               ? result.unreportedFiles
                   .slice(0, 20)
                   .map((file) => summarizeManualLogFile(file, projectCwd()))
                   .filter(Boolean)
               : undefined,
-            noteCount: Array.isArray(result.notes) ? result.notes.length : 0,
-            cleared: result.cleared || 0,
-            remainingCount: pageUrl ? perPage[pageUrl] || 0 : totalCount,
-            totalCount,
+            warnings: summarizeManualDiagnostics(result.warnings, projectCwd()),
           });
         }
         if (!asyncMode) {
-          sendJson(res, 200, { ...result, totalCount, perPage });
+          sendJson(res, 200, { ...result, perPage, totalCount });
         }
       })();
       return true;
@@ -356,8 +357,8 @@ export function createManualEditRoutes({
           .toLowerCase();
         if (action !== "rollback") {
           sendJson(res, 400, {
-            error: "unsupported_manual_edit_repair_decision",
             action,
+            error: "unsupported_manual_edit_repair_decision",
           });
           return;
         }
@@ -369,10 +370,10 @@ export function createManualEditRoutes({
         const response = {
           action,
           pageUrl,
-          rollback,
-          remainingCount: pageUrl ? perPage[pageUrl] || 0 : totalCount,
-          totalCount,
           perPage,
+          remainingCount: pageUrl ? perPage[pageUrl] || 0 : totalCount,
+          rollback,
+          totalCount,
         };
         recordManualEditActivity("manual_edit_repair_rollback_done", response);
         sendJson(res, 200, response);
@@ -411,37 +412,37 @@ export function createManualEditRoutes({
           discarded = truncateManualEditsBuffer(projectCwd());
         }
         canceledApplyEvents = manualApply.cancelPendingEvents(pageUrl);
-      } catch (err) {
-        sendJson(res, 500, { error: "discard_failed", message: err.message });
+      } catch (error) {
+        sendJson(res, 500, { error: "discard_failed", message: error.message });
         return true;
       }
       const { totalCount, perPage } = countPendingByPage(projectCwd());
       recordManualEditActivity("manual_edit_discarded", {
-        pageUrl,
-        discarded,
         canceledApplyIds: canceledApplyEvents.map((event) => event.id),
+        discarded,
+        pageUrl,
+        totalCount,
         transactionRollback: transactionRollback
           ? {
               id: transactionRollback.id,
-              rolledBackFiles:
-                transactionRollback.rolledBackFiles
-                  ?.map((file) => summarizeManualLogFile(file, projectCwd()))
-                  .filter(Boolean) || [],
               rollbackFailures: summarizeManualDiagnostics(
                 transactionRollback.rollbackFailures,
                 projectCwd()
               ),
+              rolledBackFiles:
+                transactionRollback.rolledBackFiles
+                  ?.map((file) => summarizeManualLogFile(file, projectCwd()))
+                  .filter(Boolean) || [],
               skipped: transactionRollback.skipped,
             }
           : undefined,
-        totalCount,
       });
       sendJson(res, 200, {
+        canceledApplyEvents,
         discarded,
         entries: discardedEntries,
-        canceledApplyEvents,
-        totalCount,
         perPage,
+        totalCount,
       });
       return true;
     }
@@ -476,7 +477,7 @@ function summarizePendingManualEditBatch(cwd, pageUrl = null) {
         0
       ),
     };
-  } catch (err) {
-    return { pendingSummaryError: err.message || String(err) };
+  } catch (error) {
+    return { pendingSummaryError: error.message || String(error) };
   }
 }

@@ -21,12 +21,12 @@ function targetSignature(event) {
   const isInsert = event.mode === "insert";
   const target = isInsert ? insertTarget(event) : replaceTarget(event);
   return JSON.stringify({
-    mode: isInsert ? "insert" : "replace",
-    position: isInsert ? target.position : null,
-    elementId: target.elementId || null,
     classes: target.classes || null,
-    tag: target.tag || null,
+    elementId: target.elementId || null,
+    mode: isInsert ? "insert" : "replace",
     pageUrl: event.pageUrl || null,
+    position: isInsert ? target.position : null,
+    tag: target.tag || null,
   });
 }
 
@@ -35,11 +35,15 @@ export function buildGenerationPreflight(
   scriptsDir,
   { cache = null } = {}
 ) {
-  if (!event || event.type !== "generate" || !event.id) return null;
+  if (!event || event.type !== "generate" || !event.id) {
+    return null;
+  }
 
   const isInsert = event.mode === "insert";
   const target = isInsert ? insertTarget(event) : replaceTarget(event);
-  if (!target.elementId && !target.classes) return null;
+  if (!target.elementId && !target.classes) {
+    return null;
+  }
 
   const script = path.join(
     scriptsDir,
@@ -51,19 +55,33 @@ export function buildGenerationPreflight(
   // server-side write reloads the framework and strands the browser at 0/N.
   // No-op on the svelte-component path, which never writes the route source.
   args.push("--defer-source-write");
-  if (isInsert) args.push("--position", target.position);
-  if (target.elementId) args.push("--element-id", target.elementId);
-  if (target.classes) args.push("--classes", target.classes);
-  if (target.tag) args.push("--tag", target.tag);
-  if (target.text) args.push("--text", target.text);
-  if (!isInsert && event.pageUrl) args.push("--page-url", event.pageUrl);
+  if (isInsert) {
+    args.push("--position", target.position);
+  }
+  if (target.elementId) {
+    args.push("--element-id", target.elementId);
+  }
+  if (target.classes) {
+    args.push("--classes", target.classes);
+  }
+  if (target.tag) {
+    args.push("--tag", target.tag);
+  }
+  if (target.text) {
+    args.push("--text", target.text);
+  }
+  if (!isInsert && event.pageUrl) {
+    args.push("--page-url", event.pageUrl);
+  }
   const signature = targetSignature(event);
   // A cached resolution points the helper straight at the file, skipping the
   // tree search. The helper still reads current content, so line ranges stay
   // fresh; only discovery is cached.
   const cachedFile = cache ? cache.get(signature) : null;
-  if (cachedFile) args.push("--file", cachedFile);
-  return { script, args, mode: isInsert ? "insert" : "replace", signature };
+  if (cachedFile) {
+    args.push("--file", cachedFile);
+  }
+  return { args, mode: isInsert ? "insert" : "replace", script, signature };
 }
 
 /**
@@ -88,7 +106,7 @@ export async function runGenerationPreflight(
 ) {
   const command = buildGenerationPreflight(event, scriptsDir, { cache });
   if (!command) {
-    return { ok: false, skipped: true, reason: "insufficient_locator" };
+    return { ok: false, reason: "insufficient_locator", skipped: true };
   }
 
   const startedAt = performance.now();
@@ -99,7 +117,9 @@ export async function runGenerationPreflight(
       timeout: timeoutMs,
     });
     const line = String(stdout).trim().split("\n").filter(Boolean).pop();
-    if (!line) throw new Error("preflight returned no scaffold metadata");
+    if (!line) {
+      throw new Error("preflight returned no scaffold metadata");
+    }
     const scaffold = JSON.parse(line);
     // Cache the resolved SOURCE file (route source, not the svelte manifest) so
     // the next generate on this target skips the tree search.
@@ -108,20 +128,22 @@ export async function runGenerationPreflight(
       cache.set(command.signature, resolvedSource);
     }
     return {
-      ok: true,
-      mode: command.mode,
       durationMs: performance.now() - startedAt,
+      mode: command.mode,
+      ok: true,
       scaffold,
     };
   } catch (error) {
     // Evict a stale/failed resolution so the next attempt does a full search
     // (the element may have moved out of the previously cached file).
-    if (cache && command.signature) cache.delete(command.signature);
+    if (cache && command.signature) {
+      cache.delete(command.signature);
+    }
     return {
-      ok: false,
-      mode: command.mode,
       durationMs: performance.now() - startedAt,
       error: compactError(error),
+      mode: command.mode,
+      ok: false,
     };
   }
 }
@@ -146,8 +168,8 @@ function normalizeTarget(target) {
       ? target.textContent.trim().slice(0, 80)
       : "";
   return {
-    elementId: target.id || target.elementId || undefined,
     classes: classes || undefined,
+    elementId: target.id || target.elementId || undefined,
     tag: target.tagName || target.tag || undefined,
     text: text || undefined,
   };

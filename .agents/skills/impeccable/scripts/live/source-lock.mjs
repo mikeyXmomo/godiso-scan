@@ -1,6 +1,7 @@
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+
 import {
   getLiveDir,
   isLiveServerPidReachable,
@@ -16,7 +17,7 @@ export function sourceLockPath(file, cwd = process.cwd()) {
     .update(path.resolve(cwd, file))
     .digest("hex")
     .slice(0, 24);
-  return path.join(getLiveDir(cwd), "locks", digest + ".lock");
+  return path.join(getLiveDir(cwd), "locks", `${digest}.lock`);
 }
 
 export function withSourceLockSync(
@@ -40,17 +41,19 @@ export function withSourceLockSync(
       fd = fs.openSync(lockPath, "wx");
       fs.writeFileSync(
         fd,
-        JSON.stringify({
-          owner,
-          token,
-          pid: process.pid,
+        `${JSON.stringify({
           at: Date.now(),
           file: path.resolve(cwd, file),
-        }) + "\n"
+          owner,
+          pid: process.pid,
+          token,
+        })}\n`
       );
       acquired = true;
     } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
       if (Date.now() >= deadline) {
         const locked = new Error("source_locked");
         locked.code = "SOURCE_LOCKED";
@@ -62,7 +65,9 @@ export function withSourceLockSync(
       );
     } finally {
       try {
-        if (fd !== undefined) fs.closeSync(fd);
+        if (fd !== undefined) {
+          fs.closeSync(fd);
+        }
       } catch {}
     }
   }
@@ -93,7 +98,9 @@ function readLock(lockPath) {
  */
 function releaseOwnLock(lockPath, token) {
   const held = readLock(lockPath);
-  if (held && held.token !== token) return;
+  if (held && held.token !== token) {
+    return;
+  }
   try {
     fs.unlinkSync(lockPath);
   } catch {}
@@ -116,15 +123,17 @@ function clearStaleLock(lockPath) {
     // between create and write in a live acquisition. mtime distinguishes them.
     try {
       const stat = fs.statSync(lockPath);
-      if (Date.now() - stat.mtimeMs > UNREADABLE_LOCK_STALE_MS)
+      if (Date.now() - stat.mtimeMs > UNREADABLE_LOCK_STALE_MS) {
         fs.unlinkSync(lockPath);
+      }
     } catch {
       /* gone already */
     }
     return;
   }
-  if (typeof held.pid === "number" && isLiveServerPidReachable(held.pid))
+  if (typeof held.pid === "number" && isLiveServerPidReachable(held.pid)) {
     return;
+  }
   try {
     fs.unlinkSync(lockPath);
   } catch {}

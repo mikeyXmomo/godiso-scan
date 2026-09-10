@@ -47,16 +47,20 @@ const START_PACKAGES = [
 ];
 
 export function detectTanStackStartProject(cwd = process.cwd()) {
-  if (!hasAnyDependency(cwd, START_PACKAGES)) return null;
+  if (!hasAnyDependency(cwd, START_PACKAGES)) {
+    return null;
+  }
   const rootRoute = firstExistingFile(cwd, ROOT_ROUTE_CANDIDATES);
-  if (!rootRoute) return null;
+  if (!rootRoute) {
+    return null;
+  }
 
   const ext = path.extname(rootRoute);
   const componentExt = ext === ".jsx" || ext === ".js" ? ".jsx" : ".tsx";
   const componentFile = `${TANSTACK_COMPONENT_DIR}/${TANSTACK_COMPONENT_BASENAME}${componentExt}`;
   const componentImport = relativeImportSpecifier(rootRoute, componentFile);
 
-  return { rootRoute, componentFile, componentImport, ext };
+  return { componentFile, componentImport, ext, rootRoute };
 }
 
 export function applyTanStackLiveAdapter({
@@ -65,9 +69,11 @@ export function applyTanStackLiveAdapter({
   token,
   project = detectTanStackStartProject(cwd),
 } = {}) {
-  if (!project) return { error: "tanstack_not_detected" };
+  if (!project) {
+    return { error: "tanstack_not_detected" };
+  }
   if (!Number.isFinite(Number(port))) {
-    throw new Error("TanStack Start live adapter requires a numeric port");
+    throw new TypeError("TanStack Start live adapter requires a numeric port");
   }
 
   // Write the managed mount component.
@@ -80,8 +86,8 @@ export function applyTanStackLiveAdapter({
   ) {
     // A non-Impeccable file already sits at our managed path — refuse to clobber.
     return {
-      file: project.componentFile,
       error: "tanstack_component_conflict",
+      file: project.componentFile,
       hint: `${project.componentFile} already exists and is not managed by Impeccable Live`,
     };
   }
@@ -93,14 +99,16 @@ export function applyTanStackLiveAdapter({
   const before = fs.readFileSync(rootAbs, "utf-8");
   const after = patchTanStackRoot(before, project.componentImport);
   const changed = after !== before;
-  if (changed) fs.writeFileSync(rootAbs, after, "utf-8");
+  if (changed) {
+    fs.writeFileSync(rootAbs, after, "utf-8");
+  }
 
   return {
-    file: project.rootRoute,
     adapter: "tanstack-start",
-    inserted: changed || !componentExisted,
     componentFile: project.componentFile,
     devOnly: true,
+    file: project.rootRoute,
+    inserted: changed || !componentExisted,
   };
 }
 
@@ -108,7 +116,9 @@ export function removeTanStackLiveAdapter({
   cwd = process.cwd(),
   project = detectTanStackStartProject(cwd),
 } = {}) {
-  if (!project) return { error: "tanstack_not_detected" };
+  if (!project) {
+    return { error: "tanstack_not_detected" };
+  }
   let removed = false;
 
   const rootAbs = path.join(cwd, project.rootRoute);
@@ -129,10 +139,10 @@ export function removeTanStackLiveAdapter({
   pruneEmptyDir(path.dirname(componentAbs), path.join(cwd, "src"));
 
   return {
-    file: project.rootRoute,
     adapter: "tanstack-start",
-    removed,
     componentFile: project.componentFile,
+    file: project.rootRoute,
+    removed,
   };
 }
 
@@ -175,15 +185,16 @@ export function unpatchTanStackRoot(content) {
   // leading indent before the open marker intact hands it back to the anchor
   // (e.g. `<Scripts />`) so the file round-trips byte-for-byte.
   const blockRe = new RegExp(
-    escapeRegExp(TANSTACK_MARKER_OPEN) +
-      "\\s*<ImpeccableLiveRoot\\s*/>\\s*" +
-      escapeRegExp(TANSTACK_MARKER_CLOSE) +
-      "\\r?\\n?[ \\t]*",
+    `${escapeRegExp(
+      TANSTACK_MARKER_OPEN
+    )}\\s*<ImpeccableLiveRoot\\s*/>\\s*${escapeRegExp(
+      TANSTACK_MARKER_CLOSE
+    )}\\r?\\n?[ \\t]*`,
     "g"
   );
   out = out.replace(blockRe, "");
   // Remove only the managed import line — not any following blank line.
-  out = out.replace(
+  out = out.replaceAll(
     new RegExp("^import ImpeccableLiveRoot from '[^']*';[ \\t]*\\r?\\n", "gm"),
     ""
   );
@@ -257,16 +268,16 @@ function insertAfterLastImport(content, importStatement) {
   if (lastEnd === -1) {
     return `${importStatement}\n${content}`;
   }
-  return (
-    content.slice(0, lastEnd) + importStatement + "\n" + content.slice(lastEnd)
-  );
+  return `${content.slice(0, lastEnd) + importStatement}\n${content.slice(lastEnd)}`;
 }
 
 function pruneEmptyDir(dir, stopDir) {
   let current = dir;
   while (current.startsWith(stopDir) && current !== stopDir) {
     try {
-      if (fs.readdirSync(current).length > 0) return;
+      if (fs.readdirSync(current).length > 0) {
+        return;
+      }
       fs.rmdirSync(current);
       current = path.dirname(current);
     } catch {
@@ -276,5 +287,5 @@ function pruneEmptyDir(dir, stopDir) {
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

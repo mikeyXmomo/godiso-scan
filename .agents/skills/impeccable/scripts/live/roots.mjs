@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 /**
  * Live root resolution: the single place that decides which directories a live
  * session operates on. Every live entry script resolves this once at startup
@@ -27,7 +28,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+
 import { resolveProjectRoot } from "../context.mjs";
 
 const ROOTS_MANIFEST_VERSION = 1;
@@ -103,14 +104,17 @@ function isDir(p) {
 function firstExisting(dir, names) {
   for (const name of names) {
     const abs = path.join(dir, name);
-    if (exists(abs)) return abs;
+    if (exists(abs)) {
+      return abs;
+    }
   }
   return null;
 }
 
 function hasDevConfig(dir) {
-  if (DEV_CONFIG_MARKERS.some((name) => exists(path.join(dir, name))))
+  if (DEV_CONFIG_MARKERS.some((name) => exists(path.join(dir, name)))) {
     return true;
+  }
   // A plain Vite app can run with zero config: index.html + package.json.
   return (
     exists(path.join(dir, "index.html")) &&
@@ -129,10 +133,14 @@ function isAppRoot(dir) {
 
 function findContextFile(dir, names) {
   const direct = firstExisting(dir, names);
-  if (direct) return direct;
+  if (direct) {
+    return direct;
+  }
   for (const rel of CONTEXT_FALLBACK_DIRS) {
     const nested = firstExisting(path.join(dir, rel), names);
-    if (nested) return nested;
+    if (nested) {
+      return nested;
+    }
   }
   return null;
 }
@@ -141,10 +149,16 @@ export function findGitRoot(startDir) {
   let dir = path.resolve(startDir);
   const home = path.resolve(os.homedir());
   while (true) {
-    if (dir === home) return null;
-    if (exists(path.join(dir, ".git"))) return dir;
+    if (dir === home) {
+      return null;
+    }
+    if (exists(path.join(dir, ".git"))) {
+      return dir;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) return null;
+    if (parent === dir) {
+      return null;
+    }
     dir = parent;
   }
 }
@@ -154,12 +168,20 @@ function walkUp(startDir, upperBound, visit) {
   const stop = path.resolve(upperBound);
   const home = path.resolve(os.homedir());
   while (true) {
-    if (dir === home) return null;
+    if (dir === home) {
+      return null;
+    }
     const hit = visit(dir);
-    if (hit) return hit;
-    if (dir === stop) return null;
+    if (hit) {
+      return hit;
+    }
+    if (dir === stop) {
+      return null;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) return null;
+    if (parent === dir) {
+      return null;
+    }
     dir = parent;
   }
 }
@@ -185,9 +207,15 @@ export function discoverAppCandidates(rootDir, depth = CANDIDATE_SCAN_DEPTH) {
       return;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith(".") || CANDIDATE_SCAN_IGNORED.has(entry.name))
+      if (!entry.isDirectory()) {
         continue;
+      }
+      if (
+        entry.name.startsWith(".") ||
+        CANDIDATE_SCAN_IGNORED.has(entry.name)
+      ) {
+        continue;
+      }
       const abs = path.join(dir, entry.name);
       // Same criterion as the upward walk (isAppRoot): a live-configured
       // plain-static site with no bundler markers is still an app, and
@@ -196,7 +224,9 @@ export function discoverAppCandidates(rootDir, depth = CANDIDATE_SCAN_DEPTH) {
         found.push(abs);
         continue; // nested apps below an app root are that app's business
       }
-      if (remaining > 1) scan(abs, remaining - 1);
+      if (remaining > 1) {
+        scan(abs, remaining - 1);
+      }
     }
   };
   scan(path.resolve(rootDir), depth);
@@ -303,14 +333,14 @@ export function resolveRoots({ cwd = process.cwd(), targetPath = null } = {}) {
 
   return {
     manifest: {
-      version: ROOTS_MANIFEST_VERSION,
       appRoot,
-      repoRoot: effectiveRepoRoot,
       contextRoot,
-      sessionRoot: path.join(appRoot, ".impeccable", "live"),
-      productPath,
       designPath,
+      productPath,
+      repoRoot: effectiveRepoRoot,
       resolvedFrom,
+      sessionRoot: path.join(appRoot, ".impeccable", "live"),
+      version: ROOTS_MANIFEST_VERSION,
     },
   };
 }
@@ -343,7 +373,7 @@ export function writeRootsManifest(manifest) {
     });
     fs.writeFileSync(
       pointer,
-      JSON.stringify({ version: 2, appRoots: entries })
+      JSON.stringify({ appRoots: entries, version: 2 })
     );
   }
   return file;
@@ -358,8 +388,9 @@ function readPointerEntries(repoRoot) {
       );
     }
     // v1 shape: a single { appRoot } value.
-    if (raw && typeof raw.appRoot === "string")
+    if (raw && typeof raw.appRoot === "string") {
       return [{ appRoot: raw.appRoot }];
+    }
     return [];
   } catch {
     return [];
@@ -386,14 +417,18 @@ function hasLiveServer(appRoot) {
         "utf-8"
       )
     );
-    if (!info || typeof info.pid !== "number") return false;
+    if (!info || typeof info.pid !== "number") {
+      return false;
+    }
     pid = info.pid;
     port = Number(info.port);
     token = typeof info.token === "string" ? info.token : null;
     process.kill(pid, 0);
-  } catch (err) {
+  } catch (error) {
     // EPERM: the process exists but is not signalable by this user.
-    if (err?.code !== "EPERM") return false;
+    if (error?.code !== "EPERM") {
+      return false;
+    }
   }
   // Liveness alone misclassifies a REUSED pid, and a bare TCP connect
   // misclassifies a coincidental listener on a reused port. The decisive
@@ -415,7 +450,7 @@ function hasLiveServer(appRoot) {
           String(port),
           token,
         ],
-        { timeout: 4000, stdio: "ignore" }
+        { stdio: "ignore", timeout: 4000 }
       );
       return true;
     } catch {
@@ -447,13 +482,16 @@ function hasActiveDurableSession(appRoot) {
     return false;
   }
   for (const name of entries) {
-    if (!name.endsWith(".snapshot.json")) continue;
+    if (!name.endsWith(".snapshot.json")) {
+      continue;
+    }
     try {
       const snapshot = JSON.parse(
         fs.readFileSync(path.join(dir, name), "utf-8")
       );
-      if (snapshot?.phase && !TERMINAL_SESSION_PHASES.has(snapshot.phase))
+      if (snapshot?.phase && !TERMINAL_SESSION_PHASES.has(snapshot.phase)) {
         return true;
+      }
     } catch {
       /* skip unreadable snapshots */
     }
@@ -464,10 +502,14 @@ function hasActiveDurableSession(appRoot) {
 function readManifestAt(appRoot) {
   try {
     const raw = JSON.parse(fs.readFileSync(rootsFilePath(appRoot), "utf-8"));
-    if (!raw || typeof raw.appRoot !== "string") return null;
+    if (!raw || typeof raw.appRoot !== "string") {
+      return null;
+    }
     // A manifest is only trusted where it claims to live; anything else is a
     // copied or stale file.
-    if (path.resolve(raw.appRoot) !== path.resolve(appRoot)) return null;
+    if (path.resolve(raw.appRoot) !== path.resolve(appRoot)) {
+      return null;
+    }
     return raw;
   } catch {
     return null;
@@ -496,7 +538,9 @@ export function resolveLiveRoots(
     const persisted = walkUp(absCwd, findGitRoot(absCwd) || absCwd, (dir) =>
       readManifestAt(dir)
     );
-    if (persisted) return { manifest: persisted, source: "persisted" };
+    if (persisted) {
+      return { manifest: persisted, source: "persisted" };
+    }
 
     const gitRoot = findGitRoot(absCwd);
     if (gitRoot) {
@@ -540,7 +584,9 @@ export function resolveLiveRoots(
   }
 
   const fresh = resolveRoots({ cwd: absCwd, targetPath });
-  if (fresh.selection) return { selection: fresh.selection, source: "fresh" };
+  if (fresh.selection) {
+    return { selection: fresh.selection, source: "fresh" };
+  }
   return { manifest: fresh.manifest, source: "fresh" };
 }
 
@@ -594,13 +640,15 @@ export function enterLiveRoot(cwd = process.cwd()) {
   let targetPath;
   try {
     targetPath = consumeTargetArg(process.argv);
-  } catch (err) {
-    console.error(`[impeccable live] ${err.message}`);
+  } catch (error) {
+    console.error(`[impeccable live] ${error.message}`);
     process.exit(1);
   }
   const resolved = resolveLiveRoots(cwd, targetPath ? { targetPath } : {});
-  if (!resolved.manifest) return null;
-  const appRoot = resolved.manifest.appRoot;
+  if (!resolved.manifest) {
+    return null;
+  }
+  const { appRoot } = resolved.manifest;
   if (path.resolve(cwd) !== path.resolve(appRoot)) {
     // Failing to land on the resolved appRoot must be fatal: a helper that
     // silently keeps its ambient cwd derives server, session, and source
@@ -615,9 +663,9 @@ export function enterLiveRoot(cwd = process.cwd()) {
     }
     try {
       process.chdir(appRoot);
-    } catch (err) {
+    } catch (error) {
       console.error(
-        `[impeccable live] could not enter app root ${appRoot}: ${err.message}`
+        `[impeccable live] could not enter app root ${appRoot}: ${error.message}`
       );
       process.exit(1);
     }

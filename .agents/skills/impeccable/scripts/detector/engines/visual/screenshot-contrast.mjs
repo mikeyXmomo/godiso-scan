@@ -1,5 +1,7 @@
 function sanitizeScreenshotClip(clip, viewport) {
-  if (!clip) return null;
+  if (!clip) {
+    return null;
+  }
   const x = Math.max(0, Math.floor(clip.x || 0));
   const y = Math.max(0, Math.floor(clip.y || 0));
   const width = Math.min(
@@ -7,8 +9,10 @@ function sanitizeScreenshotClip(clip, viewport) {
     Math.max(1, viewport?.width || 1600)
   );
   const height = Math.min(Math.max(1, Math.ceil(clip.height || 0)), 320);
-  if (width < 1 || height < 1) return null;
-  return { x, y, width, height };
+  if (width < 1 || height < 1) {
+    return null;
+  }
+  return { height, width, x, y };
 }
 
 async function compareScreenshotContrast(
@@ -33,13 +37,17 @@ async function compareScreenshotContrast(
       ]);
       const width = Math.min(before.width, after.width);
       const height = Math.min(before.height, after.height);
-      if (width < 1 || height < 1) return null;
+      if (width < 1 || height < 1) {
+        return null;
+      }
 
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return null;
+      if (!ctx) {
+        return null;
+      }
 
       ctx.drawImage(before, 0, 0, width, height);
       const beforePixels = ctx.getImageData(0, 0, width, height).data;
@@ -63,9 +71,9 @@ async function compareScreenshotContrast(
       const cssTextColor =
         candidate.textColor && !candidate.preferRenderedForeground
           ? {
-              r: candidate.textColor.r,
-              g: candidate.textColor.g,
               b: candidate.textColor.b,
+              g: candidate.textColor.g,
+              r: candidate.textColor.r,
             }
           : null;
       const ratios = [];
@@ -78,17 +86,19 @@ async function compareScreenshotContrast(
           Math.abs(beforePixels[i + 2] - afterPixels[i + 2]) +
           Math.abs(beforePixels[i + 3] - afterPixels[i + 3]);
         strongestDelta = Math.max(strongestDelta, delta);
-        if (delta < 10) continue;
+        if (delta < 10) {
+          continue;
+        }
         glyphPixels++;
         const fg = cssTextColor || {
-          r: beforePixels[i],
-          g: beforePixels[i + 1],
           b: beforePixels[i + 2],
+          g: beforePixels[i + 1],
+          r: beforePixels[i],
         };
         const bg = {
-          r: afterPixels[i],
-          g: afterPixels[i + 1],
           b: afterPixels[i + 2],
+          g: afterPixels[i + 1],
+          r: afterPixels[i],
         };
         ratios.push(ratio(fg, bg));
       }
@@ -96,10 +106,10 @@ async function compareScreenshotContrast(
       if (ratios.length < 8) {
         return {
           glyphPixels,
+          medianRatio: null,
+          p10Ratio: null,
           strongestDelta,
           worstRatio: null,
-          p10Ratio: null,
-          medianRatio: null,
         };
       }
 
@@ -113,24 +123,26 @@ async function compareScreenshotContrast(
         ];
       return {
         glyphPixels,
+        medianRatio: pick(50),
+        p10Ratio: pick(10),
         strongestDelta,
         worstRatio: ratios[0],
-        p10Ratio: pick(10),
-        medianRatio: pick(50),
       };
     },
-    { beforeBase64, afterBase64, candidate }
+    { afterBase64, beforeBase64, candidate }
   );
 }
 
 async function captureVisualContrastCandidate(page, candidate, viewport) {
   const clip = sanitizeScreenshotClip(candidate.clip, viewport);
-  if (!clip) return null;
+  if (!clip) {
+    return null;
+  }
 
   const beforeBase64 = await page.screenshot({
-    encoding: "base64",
-    clip,
     captureBeyondViewport: true,
+    clip,
+    encoding: "base64",
   });
   const token = `impeccable-contrast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const applied = await page.evaluate(
@@ -141,9 +153,11 @@ async function captureVisualContrastCandidate(page, candidate, viewport) {
       } catch {
         return false;
       }
-      if (!el) return false;
-      let style = document.getElementById(
-        "impeccable-visual-contrast-hide-style"
+      if (!el) {
+        return false;
+      }
+      let style = document.querySelector(
+        "#impeccable-visual-contrast-hide-style"
       );
       if (!style) {
         style = document.createElement("style");
@@ -158,27 +172,30 @@ async function captureVisualContrastCandidate(page, candidate, viewport) {
           "  background-image: none !important;",
           "}",
         ].join("\n");
-        document.head.appendChild(style);
+        document.head.append(style);
       }
-      el.setAttribute("data-impeccable-visual-contrast-target", token);
-      if (backgroundClipText)
-        el.setAttribute("data-impeccable-bgclip-text", "true");
+      el.dataset.impeccableVisualContrastTarget = token;
+      if (backgroundClipText) {
+        el.dataset.impeccableBgclipText = "true";
+      }
       return true;
     },
     {
+      backgroundClipText: candidate.backgroundClipText,
       selector: candidate.selector,
       token,
-      backgroundClipText: candidate.backgroundClipText,
     }
   );
-  if (!applied) return null;
+  if (!applied) {
+    return null;
+  }
 
   let afterBase64;
   try {
     afterBase64 = await page.screenshot({
-      encoding: "base64",
-      clip,
       captureBeyondViewport: true,
+      clip,
+      encoding: "base64",
     });
   } finally {
     await page
@@ -187,8 +204,8 @@ async function captureVisualContrastCandidate(page, candidate, viewport) {
           try {
             const el = document.querySelector(selector);
             if (el) {
-              el.removeAttribute("data-impeccable-visual-contrast-target");
-              el.removeAttribute("data-impeccable-bgclip-text");
+              delete el.dataset.impeccableVisualContrastTarget;
+              delete el.dataset.impeccableBgclipText;
             }
           } catch {
             // Ignore invalid or stale selectors during cleanup.
@@ -205,10 +222,17 @@ async function captureVisualContrastCandidate(page, candidate, viewport) {
     afterBase64,
     candidate
   );
-  if (!metrics || !Number.isFinite(metrics.p10Ratio) || metrics.glyphPixels < 8)
+  if (
+    !metrics ||
+    !Number.isFinite(metrics.p10Ratio) ||
+    metrics.glyphPixels < 8
+  ) {
     return null;
+  }
   const measuredRatio = metrics.p10Ratio;
-  if (measuredRatio >= candidate.threshold) return null;
+  if (measuredRatio >= candidate.threshold) {
+    return null;
+  }
   const textLabel = candidate.text ? ` "${candidate.text}"` : "";
   const reasonLabel =
     (candidate.reasons || []).slice(0, 3).join(", ") || "visual background";

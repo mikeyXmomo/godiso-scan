@@ -5,27 +5,33 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { createLiveSessionStore } from "./live/session-store.mjs";
+
 import { readLiveServerInfo } from "./lib/impeccable-paths.mjs";
-import { enterLiveRoot } from "./live/roots.mjs";
 import { verifyAcceptedFile } from "./live/accept-verify.mjs";
+import { enterLiveRoot } from "./live/roots.mjs";
+import { createLiveSessionStore } from "./live/session-store.mjs";
 
 function parseArgs(argv) {
   const out = { status: "complete" };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--id") out.id = argv[++i];
-    else if (arg.startsWith("--id=")) out.id = arg.slice("--id=".length);
-    else if (arg === "--discarded" || arg === "--discard")
+    if (arg === "--id") {
+      out.id = argv[++i];
+    } else if (arg.startsWith("--id=")) {
+      out.id = arg.slice("--id=".length);
+    } else if (arg === "--discarded" || arg === "--discard") {
       out.status = "discarded";
-    else if (arg === "--error") {
+    } else if (arg === "--error") {
       out.status = "agent_error";
       out.message = argv[++i] || "unknown error";
     } else if (arg.startsWith("--error=")) {
       out.status = "agent_error";
       out.message = arg.slice("--error=".length);
-    } else if (arg === "--force") out.force = true;
-    else if (arg === "--help" || arg === "-h") out.help = true;
+    } else if (arg === "--force") {
+      out.force = true;
+    } else if (arg === "--help" || arg === "-h") {
+      out.help = true;
+    }
   }
   return out;
 }
@@ -62,7 +68,7 @@ export async function completeCli() {
       !path.isAbsolute(relSource);
     if (
       insideProject &&
-      !relSource.startsWith("node_modules" + path.sep) &&
+      !relSource.startsWith(`node_modules${path.sep}`) &&
       !relSource.startsWith("node_modules/")
     ) {
       const verify = verifyAcceptedFile(fs, absSource);
@@ -70,12 +76,12 @@ export async function completeCli() {
         console.log(
           JSON.stringify(
             {
-              ok: false,
               error: "source_dirty",
-              id: args.id,
               file: sourceFile,
               findings: verify.findings,
               hint: "The accepted source still carries live-mode leftovers. Finish the carbonize cleanup (bake params, remove markers and data-p-* attributes), then run live-complete again. Use --force only if a finding is a false positive.",
+              id: args.id,
+              ok: false,
             },
             null,
             2
@@ -99,8 +105,8 @@ export async function completeCli() {
     console.log(
       JSON.stringify(
         {
-          ok: true,
           id: args.id,
+          ok: true,
           phase: snapshot?.phase || args.status,
           snapshot,
         },
@@ -117,18 +123,18 @@ export async function completeCli() {
   });
   const event =
     args.status === "discarded"
-      ? { type: "discarded", id: args.id }
+      ? { id: args.id, type: "discarded" }
       : args.status === "agent_error"
         ? {
-            type: "agent_error",
             id: args.id,
             message: args.message || "unknown error",
+            type: "agent_error",
           }
-        : { type: "complete", id: args.id };
+        : { id: args.id, type: "complete" };
   const snapshot = store.appendEvent(event);
   console.log(
     JSON.stringify(
-      { ok: true, id: args.id, phase: snapshot.phase, snapshot },
+      { id: args.id, ok: true, phase: snapshot.phase, snapshot },
       null,
       2
     )
@@ -148,16 +154,18 @@ async function completeThroughServer(info, args) {
         : "complete";
   try {
     const res = await fetch(`http://localhost:${info.port}/poll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        token: info.token,
         id: args.id,
-        type,
         message: args.message,
+        token: info.token,
+        type,
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return null;
+    }
     return await res.json();
   } catch {
     return null;

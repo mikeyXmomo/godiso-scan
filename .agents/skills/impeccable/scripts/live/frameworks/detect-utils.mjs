@@ -15,9 +15,9 @@ export function readPackageDeps(cwd) {
   try {
     const pkg = JSON.parse(fs.readFileSync(file, "utf-8"));
     return {
-      ...(pkg.dependencies || {}),
-      ...(pkg.devDependencies || {}),
-      ...(pkg.peerDependencies || {}),
+      ...pkg.dependencies,
+      ...pkg.devDependencies,
+      ...pkg.peerDependencies,
     };
   } catch {
     return {};
@@ -52,7 +52,9 @@ export function fileExists(cwd, rel) {
 
 export function firstExistingFile(cwd, candidates) {
   for (const rel of candidates) {
-    if (fileExists(cwd, rel)) return rel;
+    if (fileExists(cwd, rel)) {
+      return rel;
+    }
   }
   return null;
 }
@@ -67,10 +69,13 @@ export function literalConfigFiles(cwd, config) {
   const files = Array.isArray(config?.files) ? config.files : [];
   const out = [];
   for (const rel of files) {
-    if (typeof rel !== "string" || rel.includes("*") || rel.includes("?"))
+    if (typeof rel !== "string" || rel.includes("*") || rel.includes("?")) {
       continue;
+    }
     const normalized = rel.split(path.sep).join("/");
-    if (fileExists(cwd, normalized)) out.push(normalized);
+    if (fileExists(cwd, normalized)) {
+      out.push(normalized);
+    }
   }
   return out;
 }

@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import { resolveProjectRoot } from "../context.mjs";
 import { designSidecarCandidatesFor } from "./staleness.mjs";
+
 export { IMPECCABLE_COMMAND_PREFIX } from "./provider.mjs";
 
 export const IMPECCABLE_DIR = ".impeccable";
@@ -60,10 +62,14 @@ export function resolveLiveConfigPath({
       : path.resolve(cwd, configured);
   }
   const primary = getLiveConfigPath(cwd, { targetPath });
-  if (fs.existsSync(primary)) return primary;
+  if (fs.existsSync(primary)) {
+    return primary;
+  }
   if (scriptsDir) {
     const legacy = getLegacyLiveConfigPath(scriptsDir);
-    if (fs.existsSync(legacy)) return legacy;
+    if (fs.existsSync(legacy)) {
+      return legacy;
+    }
   }
   return primary;
 }
@@ -105,10 +111,10 @@ export function isLiveServerPidReachable(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (err) {
+  } catch (error) {
     // ESRCH means "no such process". EPERM means the process exists but this
     // user cannot signal it, so the live server info is still valid.
-    return err?.code !== "ESRCH";
+    return error?.code !== "ESRCH";
   }
 }
 
@@ -139,7 +145,7 @@ export function removeLiveServerInfo(cwd = process.cwd(), options = {}) {
  */
 export function safeSessionId(id) {
   if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
-    throw new Error("invalid session id: " + id);
+    throw new Error(`invalid session id: ${id}`);
   }
   return id;
 }

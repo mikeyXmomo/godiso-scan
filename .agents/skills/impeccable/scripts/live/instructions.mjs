@@ -30,36 +30,48 @@ export function instructionsForEvent(
   event,
   { scriptsPath = "{{scripts_path}}" } = {}
 ) {
-  if (!event || typeof event !== "object") return undefined;
+  if (!event || typeof event !== "object") {
+    return;
+  }
   switch (event.type) {
-    case "generate":
+    case "generate": {
       return generateInstructions(event, scriptsPath);
-    case "steer":
+    }
+    case "steer": {
       return `Do what the message asks (page edits, navigation help, or a short answer). Then reply exactly once: ${replyCmd(scriptsPath, event.id, 'steer_done ["optional short toast"]')} (on failure: --reply ${event.id} error "Short reason"). No pickup ack; poll again immediately after.`;
-    case "prefetch":
+    }
+    case "prefetch": {
       return `Speculative pre-read, no reply owed: resolve ${JSON.stringify(event.pageUrl || "/")} to its source file (root "/" is usually the boot's pageFile; multi-page sites map /foo to public/foo/index.html; SPAs map all routes to one entry), read it into context, then poll again. Skip if you cannot resolve it confidently.`;
-    case "variant_mount_failed":
+    }
+    case "variant_mount_failed": {
       return `The browser could NOT render variant ${event.variant}${event.url ? ` (module: ${event.url})` : ""}${event.error ? `: ${String(event.error).slice(0, 200)}` : ""}. The user sees a persistent error card, not variants. Fix the variant source files, then reply ${replyCmd(scriptsPath, event.id, "done --file <manifest or source path>")}; the browser retries on its own. Poll again after the reply.`;
-    case "accept":
+    }
+    case "accept": {
       return acceptInstructions(event, scriptsPath);
-    case "discard":
+    }
+    case "discard": {
       return event?._completionAck?.ok === true
         ? "Original restored and durable completion acknowledged; nothing to do. Poll again."
         : `Completion was not acknowledged: run node ${scriptsPath}/live-complete.mjs --id ${event.id} --discarded, then poll again.`;
-    case "manual_edit_apply":
+    }
+    case "manual_edit_apply": {
       return `The user already clicked Apply; never ask, discard, or redirect. Delegate the source edits to the impeccable_manual_edit_applier subagent when available (pass cwd, scripts path, event id, page URL, chunk/deadline, batch, evidencePath); it must not poll or reply. ${event.repair ? "A `repair` payload is present: the previous Apply changed source but validation failed; fix the CURRENT source, never roll back yourself. " : ""}Reply exactly once: ${replyCmd(scriptsPath, event.id, `done --data '{"status":"done","appliedEntryIds":[...],"failed":[],"files":[...],"notes":[]}'`)} (status "partial"/"error" with failed[] when not every entry applied). Then poll again.`;
-    case "timeout":
+    }
+    case "timeout": {
       return "No event arrived; poll again immediately.";
-    case "exit":
+    }
+    case "exit": {
       return `Session over: kill any background poll, then node ${scriptsPath}/live-server.mjs stop (removes the injected script tag). Sweep leftover impeccable-variants-start / impeccable-carbonize-start markers from source.`;
-    default:
-      return undefined;
+    }
+    default: {
+      return;
+    }
   }
 }
 
 function generateInstructions(event, scriptsPath) {
-  const id = event.id;
-  const scaffold = event.scaffold;
+  const { id } = event;
+  const { scaffold } = event;
   const steps = [];
 
   if (event.screenshotPath) {
@@ -91,10 +103,7 @@ function generateInstructions(event, scriptsPath) {
   steps.push(
     event.action && event.action !== "impeccable"
       ? `Action is "${event.action}": read reference/${event.action}.md before planning; its MUST params are non-negotiable. ${PLAN_POINTER}`
-      : `Freeform action: work from SKILL.md rules plus craft-floor.md; no sub-command file. ${PLAN_POINTER}`
-  );
-
-  steps.push(
+      : `Freeform action: work from SKILL.md rules plus craft-floor.md; no sub-command file. ${PLAN_POINTER}`,
     `When all ${event.count} variants are delivered: ${replyCmd(scriptsPath, id, "done --file <project-root-relative path you wrote>")}. Then poll again. If generation fails after the browser flipped to GENERATING, reply --reply ${id} error "Short reason" so the bar resets (never live-accept --discard for this).`
   );
 
@@ -103,7 +112,7 @@ function generateInstructions(event, scriptsPath) {
 
 function svelteComponentInstructions(event, scaffold, scriptsPath) {
   const dir = scaffold.componentDir;
-  const count = event.count;
+  const { count } = event;
   return `Svelte component preview. EDIT the existing stubs ${dir}/v1.svelte ... v${count}.svelte in place; never delete or recreate them; do not read them back (the prop-substituted markup is in scaffold.componentStubMarkup). Keep the stub's control flow ({#each}, {#if}) and propContract prop names exactly; never flatten a loop into literal items. The stub <style> is seeded with the source rules that style the selection; restyle or delete freely, and know that any seeded rule you do not re-declare is REMOVED from source on accept (the preview never applied it). ALL your CSS goes inside that ONE existing <style> block: Svelte forbids a second top-level style element, and a publish with a non-compiling variant is bounced back to you with file and line. Semantic class selectors only: no @scope, no data-impeccable-* attributes. Params go in ${dir}/params.json keyed by variant number (never an attribute); author knob CSS against var(--p-<id>, default) and :global([data-p-<id>="..."]). Reply with --file ${scaffold.file}. Accept later merges everything into ${scaffold.sourceFile} mechanically; you have no post-accept cleanup.`;
 }
 
@@ -116,7 +125,7 @@ function deferredWrapperInstructions(event, scaffold, scriptsPath) {
 }
 
 function insertScaffoldInstructions(event, scriptsPath) {
-  const scaffold = event.scaffold;
+  const { scaffold } = event;
   const base = `Insert mode: net-new content sized around ${event.placeholder?.width || "?"}x${event.placeholder?.height || "?"} at the chosen anchor; load craft-floor.md before writing net-new markup.`;
   if (scaffold?.previewMode === "svelte-component") {
     return `${base} Write each inserted variant as a single-root Svelte component under ${scaffold.componentDir} (no data-impeccable-* attributes, CSS in each component's <style>). Never edit the route during generation; reply with --file ${scaffold.file}.`;

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+
 import { Card, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 
 interface SideBySidePreviewProps {

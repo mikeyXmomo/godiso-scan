@@ -17,7 +17,7 @@ export default defineConfig({
           if (id.includes("node_modules/pdf-lib")) {
             return "pdf-lib";
           }
-          return undefined;
+          return;
         },
       },
     },

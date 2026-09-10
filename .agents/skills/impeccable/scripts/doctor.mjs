@@ -28,19 +28,13 @@ import {
   extractPlatform,
   resolveTargetSelection,
 } from "./context.mjs";
-import { parseTargetOptions } from "./lib/target-args.mjs";
-import { IMPECCABLE_COMMAND, IMPECCABLE_PROVIDER_ID } from "./lib/provider.mjs";
-import { parseDesignMd } from "./lib/design-parser.mjs";
 import {
   PRODUCT_SCHEMA_VERSION,
   readProductSchemaVersion,
   stampProductSchema,
 } from "./lib/artifact-schema.mjs";
-import {
-  collectBootFindingGroups,
-  checkNativePlatformEvidence,
-  designSidecarCandidatesFor,
-} from "./lib/staleness.mjs";
+import { parseDesignMd } from "./lib/design-parser.mjs";
+import { IMPECCABLE_COMMAND, IMPECCABLE_PROVIDER_ID } from "./lib/provider.mjs";
 import {
   checkDesignCoverage,
   checkDesignDrift,
@@ -50,8 +44,14 @@ import {
   checkWorkspaces,
   loadKnownRuleIds,
 } from "./lib/staleness-deep.mjs";
+import {
+  collectBootFindingGroups,
+  checkNativePlatformEvidence,
+  designSidecarCandidatesFor,
+} from "./lib/staleness.mjs";
+import { parseTargetOptions } from "./lib/target-args.mjs";
 
-const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPTS_DIR = import.meta.dirname;
 
 function safeRead(filePath) {
   try {
@@ -63,12 +63,17 @@ function safeRead(filePath) {
 
 function parseArgs(argv) {
   const passthrough = [];
-  const flags = { json: false, fix: false, help: false };
+  const flags = { fix: false, help: false, json: false };
   for (const arg of argv) {
-    if (arg === "--json") flags.json = true;
-    else if (arg === "--fix") flags.fix = true;
-    else if (arg === "--help" || arg === "-h") flags.help = true;
-    else passthrough.push(arg);
+    if (arg === "--json") {
+      flags.json = true;
+    } else if (arg === "--fix") {
+      flags.fix = true;
+    } else if (arg === "--help" || arg === "-h") {
+      flags.help = true;
+    } else {
+      passthrough.push(arg);
+    }
   }
   return {
     flags,
@@ -109,16 +114,16 @@ async function collect(cwd, targetOptions) {
   const workspaceCandidates = selection?.targetCandidates || [];
 
   const workspaceResult = checkWorkspaces({
-    repoRoot: ctx.repoRoot,
     candidates: workspaceCandidates,
     checkNativePlatformEvidence,
     extractPlatform,
     readFile: safeRead,
+    repoRoot: ctx.repoRoot,
   });
   const bootFindings = collectBootFindingGroups(ctx, {
     absDesignPath,
-    sidecarCandidates,
     projectRootPatterns: readProjectRootPatterns(ctx.repoRoot),
+    sidecarCandidates,
     targetCandidates: workspaceCandidates,
   });
 
@@ -134,12 +139,12 @@ async function collect(cwd, targetOptions) {
     }),
     ...bootFindings.config,
     ...bootFindings.buildPath,
-    ...checkDetectorIgnores({ projectRoot, knownRuleIds }),
+    ...checkDetectorIgnores({ knownRuleIds, projectRoot }),
     ...bootFindings.surfaceBriefs,
     ...checkHookInstallation({
       projectRoot,
-      repoRoot: ctx.repoRoot,
       providerId: IMPECCABLE_PROVIDER_ID,
+      repoRoot: ctx.repoRoot,
     }),
     ...checkLegacyLiveState({ projectRoot }),
     ...bootFindings.projectRoots,
@@ -147,20 +152,22 @@ async function collect(cwd, targetOptions) {
   ];
 
   return {
-    ctx,
-    projectRoot,
     absProductPath,
-    sidecarCandidates,
+    ctx,
     findings,
-    workspaces: workspaceResult.workspaces,
+    projectRoot,
     ruleRegistryAvailable: knownRuleIds !== null,
+    sidecarCandidates,
+    workspaces: workspaceResult.workspaces,
   };
 }
 
 // Read straight from disk rather than importing context.mjs's private reader.
 // Only the positive/negative pattern strings matter here.
 function readProjectRootPatterns(repoRoot) {
-  if (!repoRoot) return [];
+  if (!repoRoot) {
+    return [];
+  }
   const patterns = [];
   for (const name of ["config.json", "config.local.json"]) {
     try {
@@ -169,8 +176,9 @@ function readProjectRootPatterns(repoRoot) {
       );
       if (Array.isArray(raw?.projectRoots)) {
         for (const entry of raw.projectRoots) {
-          if (typeof entry === "string" && entry.trim())
+          if (typeof entry === "string" && entry.trim()) {
             patterns.push(entry.trim());
+          }
         }
       }
     } catch {
@@ -202,8 +210,9 @@ function applyFixes(report) {
         !canonical ||
         !present ||
         path.resolve(canonical) === path.resolve(present)
-      )
+      ) {
         continue;
+      }
       if (fs.existsSync(canonical)) {
         skipped.push({
           id: entry.id,
@@ -283,23 +292,27 @@ function renderText(report, fixes) {
   }
   lines.push("");
 
-  if (!findings.length) {
-    lines.push(
-      "No drift found. Every artifact matches what this version reads."
-    );
-  } else {
+  if (findings.length) {
     const order = ["route", "mention", "auto"];
     for (const severity of order) {
       const group = findings.filter((entry) => entry.severity === severity);
-      if (!group.length) continue;
+      if (!group.length) {
+        continue;
+      }
       lines.push(`${SEVERITY_LABEL[severity]} (${group.length}):`);
       for (const entry of group) {
-        lines.push(`  ${entry.id}${entry.path ? `  [${entry.path}]` : ""}`);
-        lines.push(`    ${entry.summary}`);
-        lines.push(`    → ${entry.fix}`);
+        lines.push(
+          `  ${entry.id}${entry.path ? `  [${entry.path}]` : ""}`,
+          `    ${entry.summary}`,
+          `    → ${entry.fix}`
+        );
       }
       lines.push("");
     }
+  } else {
+    lines.push(
+      "No drift found. Every artifact matches what this version reads."
+    );
   }
 
   if (report.workspaces.length) {
@@ -316,20 +329,24 @@ function renderText(report, fixes) {
 
   if (!report.ruleRegistryAvailable) {
     lines.push(
-      "Note: the bundled detector could not be resolved, so ignored rule ids were not validated."
+      "Note: the bundled detector could not be resolved, so ignored rule ids were not validated.",
+      ""
     );
-    lines.push("");
   }
 
   if (fixes) {
     lines.push(fixes.applied.length ? "Applied:" : "Applied nothing.");
-    for (const entry of fixes.applied) lines.push(`  ${entry}`);
+    for (const entry of fixes.applied) {
+      lines.push(`  ${entry}`);
+    }
     const held = fixes.skipped.filter(
       (entry) => entry.reason !== "needs a decision from the user"
     );
     if (held.length) {
       lines.push("Left alone:");
-      for (const entry of held) lines.push(`  ${entry.id}: ${entry.reason}`);
+      for (const entry of held) {
+        lines.push(`  ${entry.id}: ${entry.reason}`);
+      }
     }
   } else if (findings.some((entry) => entry.severity === "auto")) {
     lines.push(
@@ -345,8 +362,8 @@ async function cli() {
   let parsed;
   try {
     parsed = parseArgs(process.argv.slice(2));
-  } catch (err) {
-    process.stderr.write(`${err.message}\n`);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
     process.exit(1);
   }
   if (parsed.flags.help) {
@@ -361,14 +378,14 @@ async function cli() {
     process.stdout.write(
       `${JSON.stringify(
         {
+          designPath: report.ctx.designPath,
+          findings: report.findings,
+          isMonorepo: report.ctx.isMonorepo,
+          platform: report.ctx.platform,
+          productPath: report.ctx.productPath,
           projectRoot: report.projectRoot,
           repoRoot: report.ctx.repoRoot,
-          isMonorepo: report.ctx.isMonorepo,
-          productPath: report.ctx.productPath,
-          designPath: report.ctx.designPath,
-          platform: report.ctx.platform,
           ruleRegistryAvailable: report.ruleRegistryAvailable,
-          findings: report.findings,
           workspaces: report.workspaces,
           ...(fixes ? { fixes } : {}),
         },
@@ -384,19 +401,21 @@ async function cli() {
 
 function invokedAsScript() {
   const arg = process.argv[1];
-  if (!arg) return false;
+  if (!arg) {
+    return false;
+  }
   try {
-    return (
-      fs.realpathSync(arg) === fs.realpathSync(fileURLToPath(import.meta.url))
-    );
+    return fs.realpathSync(arg) === fs.realpathSync(import.meta.filename);
   } catch {
     return false;
   }
 }
 
 if (invokedAsScript()) {
-  cli().catch((err) => {
-    process.stderr.write(`impeccable doctor failed: ${err?.message || err}\n`);
+  cli().catch((error) => {
+    process.stderr.write(
+      `impeccable doctor failed: ${error?.message || error}\n`
+    );
     process.exit(1);
   });
 }

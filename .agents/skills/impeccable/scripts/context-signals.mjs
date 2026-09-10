@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 /**
  * Context-signals gatherer for the bare Impeccable invocation
  * (no-argument) path. Collects cheap, deterministic signals about the current
@@ -20,13 +21,15 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+
 import { loadContext, extractPlatform } from "./context.mjs";
 import { readLatestSnapshotAcrossTargets } from "./critique-storage.mjs";
 
 /** Is there code here at all, or just context files / an empty repo? */
 function hasCode(cwd) {
-  if (fs.existsSync(path.join(cwd, "package.json"))) return true;
+  if (fs.existsSync(path.join(cwd, "package.json"))) {
+    return true;
+  }
   for (const d of [
     "src",
     "app",
@@ -36,7 +39,9 @@ function hasCode(cwd) {
     "components",
     "lib",
   ]) {
-    if (fs.existsSync(path.join(cwd, d))) return true;
+    if (fs.existsSync(path.join(cwd, d))) {
+      return true;
+    }
   }
   return false;
 }
@@ -47,20 +52,24 @@ function hasCode(cwd) {
 function latestCritique(cwd) {
   try {
     const latest = readLatestSnapshotAcrossTargets({ cwd });
-    if (!latest) return null;
+    if (!latest) {
+      return null;
+    }
     const get = (key) => latest.meta[key] ?? null;
     const num = (v) => {
-      if (v == null || (typeof v === "string" && v.trim() === "")) return null;
+      if (v == null || (typeof v === "string" && v.trim() === "")) {
+        return null;
+      }
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
     };
     return {
-      slug: get("slug"),
-      score: num(get("total_score") ?? get("score")),
+      file: path.relative(cwd, latest.path),
       p0: num(get("p0_count") ?? get("p0")),
       p1: num(get("p1_count") ?? get("p1")),
+      score: num(get("total_score") ?? get("score")),
+      slug: get("slug"),
       timestamp: get("timestamp"),
-      file: path.relative(cwd, latest.path),
     };
   } catch {
     return null;
@@ -83,11 +92,11 @@ function gitSignals(cwd) {
   };
   if (run(["rev-parse", "--is-inside-work-tree"]) !== "true") {
     return {
-      isRepo: false,
-      branch: null,
       base: null,
-      changedFiles: [],
+      branch: null,
       changedCount: 0,
+      changedFiles: [],
+      isRepo: false,
     };
   }
   const branch = run(["rev-parse", "--abbrev-ref", "HEAD"]);
@@ -114,7 +123,9 @@ function gitSignals(cwd) {
   // from feature's remote-tracking refs by the full ref namespace.
   const resolveUpstream = () => {
     const full = run(["rev-parse", "--symbolic-full-name", "@{u}"]);
-    if (!full) return null;
+    if (!full) {
+      return null;
+    }
     if (full.startsWith("refs/heads/")) {
       const name = full.slice("refs/heads/".length);
       return { name, rev: name };
@@ -122,7 +133,9 @@ function gitSignals(cwd) {
     if (full.startsWith("refs/remotes/")) {
       const rest = full.slice("refs/remotes/".length);
       const i = rest.indexOf("/");
-      if (i > 0) return { name: rest.slice(i + 1), rev: rest };
+      if (i > 0) {
+        return { name: rest.slice(i + 1), rev: rest };
+      }
     }
     return null;
   };
@@ -143,8 +156,9 @@ function gitSignals(cwd) {
     // directly; the remote need not be in `git remote` output (tests and
     // partial clones fabricate refs/remotes/origin/* without a remote).
     const ref = run(["symbolic-ref", "--short", `refs/remotes/${r}/HEAD`]);
-    if (ref && ref.startsWith(`${r}/`))
+    if (ref && ref.startsWith(`${r}/`)) {
       remoteHeads.push({ name: ref.slice(r.length + 1), rev: ref });
+    }
   }
   const onIntegrationBranch =
     branch === "HEAD" ||
@@ -167,13 +181,17 @@ function gitSignals(cwd) {
     const candidates = [];
     const seen = new Set();
     const addCandidate = (name, revs) => {
-      if (!name || name === branch || seen.has(name)) return;
+      if (!name || name === branch || seen.has(name)) {
+        return;
+      }
       seen.add(name);
       candidates.push({ name, revs });
     };
     // The upstream tracks the actual merge target, so its own rev wins over
     // a possibly stale local branch of the same name.
-    if (upstream) addCandidate(upstream.name, [upstream.rev]);
+    if (upstream) {
+      addCandidate(upstream.name, [upstream.rev]);
+    }
     // A develop branch marks a git-flow repo where features merge to develop
     // even when the platform default (origin/HEAD) was never flipped off
     // main; an existing develop therefore outranks the remote default. This
@@ -189,9 +207,12 @@ function gitSignals(cwd) {
     addCandidate("develop", [
       ...new Set([...advertisedRevs("develop"), ...revsFor("develop")]),
     ]);
-    for (const head of remoteHeads)
+    for (const head of remoteHeads) {
       addCandidate(head.name, [...new Set([head.rev, ...revsFor(head.name)])]);
-    for (const name of ["main", "master"]) addCandidate(name, revsFor(name));
+    }
+    for (const name of ["main", "master"]) {
+      addCandidate(name, revsFor(name));
+    }
     for (const c of candidates) {
       const rev = c.revs.find(
         (r) => run(["rev-parse", "--verify", "--quiet", r]) !== null
@@ -229,11 +250,11 @@ function gitSignals(cwd) {
       });
   }
   return {
-    isRepo: true,
-    branch,
     base: diffBase,
-    changedFiles: changed.slice(0, 50),
+    branch,
     changedCount: changed.length,
+    changedFiles: changed.slice(0, 50),
+    isRepo: true,
   };
 }
 
@@ -244,7 +265,9 @@ function probePort(port, timeout = 250) {
     const sock = new net.Socket();
     let settled = false;
     const finish = (ok) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       try {
         sock.destroy();
@@ -265,11 +288,13 @@ async function devServerSignals() {
   const open = [];
   await Promise.all(
     COMMON_DEV_PORTS.map(async (p) => {
-      if (await probePort(p)) open.push(p);
+      if (await probePort(p)) {
+        open.push(p);
+      }
     })
   );
   open.sort((a, b) => a - b);
-  return { running: open.length > 0, ports: open };
+  return { ports: open, running: open.length > 0 };
 }
 
 // Extensions the detector scans (mirrors the engine's walkDir set + HTML).
@@ -326,17 +351,23 @@ function scanTargets(cwd, git) {
       .filter((f) => SCANNABLE_EXT.has(path.extname(f).toLowerCase()))
       .filter((f) => !isVendoredPath(f))
       .filter((f) => fs.existsSync(path.join(cwd, f)));
-    if (changed.length)
+    if (changed.length) {
       return { targets: changed.slice(0, 50), via: "git-changes" };
+    }
   }
   // 2. Otherwise scan the local source dirs that exist.
   const dirs = SOURCE_DIRS.filter((d) => fs.existsSync(path.join(cwd, d)));
-  if (dirs.length) return { targets: dirs, via: "source-dir" };
+  if (dirs.length) {
+    return { targets: dirs, via: "source-dir" };
+  }
   // 3. A root HTML entry, or the project root as a last resort when there's
   //    code but no conventional source dir (walkDir still skips heavy dirs).
-  if (fs.existsSync(path.join(cwd, "index.html")))
+  if (fs.existsSync(path.join(cwd, "index.html"))) {
     return { targets: ["index.html"], via: "html" };
-  if (hasCode(cwd)) return { targets: ["."], via: "root" };
+  }
+  if (hasCode(cwd)) {
+    return { targets: ["."], via: "root" };
+  }
   return { targets: [], via: null };
 }
 
@@ -344,18 +375,18 @@ export async function gatherSignals(cwd = process.cwd()) {
   const ctx = loadContext(cwd);
   const git = gitSignals(cwd);
   return {
+    critique: { latest: latestCritique(cwd) },
+    devServer: await devServerSignals(),
+    git,
+    scan: scanTargets(cwd, git),
     setup: {
-      hasProduct: ctx.hasProduct,
-      productPath: ctx.productPath,
-      hasDesign: ctx.hasDesign,
       designPath: ctx.designPath,
       hasCode: hasCode(cwd),
+      hasDesign: ctx.hasDesign,
+      hasProduct: ctx.hasProduct,
       platform: extractPlatform(ctx.product),
+      productPath: ctx.productPath,
     },
-    critique: { latest: latestCritique(cwd) },
-    git,
-    devServer: await devServerSignals(),
-    scan: scanTargets(cwd, git),
   };
 }
 
@@ -366,11 +397,11 @@ async function cli() {
 
 function invokedAsScript() {
   const arg = process.argv[1];
-  if (!arg) return false;
+  if (!arg) {
+    return false;
+  }
   try {
-    return (
-      fs.realpathSync(arg) === fs.realpathSync(fileURLToPath(import.meta.url))
-    );
+    return fs.realpathSync(arg) === fs.realpathSync(import.meta.filename);
   } catch {
     return false;
   }

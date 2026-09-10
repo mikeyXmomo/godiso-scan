@@ -68,7 +68,9 @@ export function isPlatform(value) {
  */
 export function runSyncSelection(generator, hash) {
   let step = generator.next();
-  while (!step.done) step = generator.next(step.value.map(hash));
+  while (!step.done) {
+    step = generator.next(step.value.map(hash));
+  }
   return step.value;
 }
 
@@ -79,8 +81,9 @@ export function runSyncSelection(generator, hash) {
  */
 export async function runAsyncSelection(generator, hash) {
   let step = generator.next();
-  while (!step.done)
+  while (!step.done) {
     step = generator.next(await Promise.all(step.value.map(hash)));
+  }
   return step.value;
 }
 
@@ -91,7 +94,7 @@ function* rank(items, input, idFor = (item) => item.id) {
   const ids = items.map(idFor);
   const digests = yield ids.map((id) => `${input}:${id}`);
   return items
-    .map((item, index) => ({ item, id: ids[index], score: digests[index] }))
+    .map((item, index) => ({ id: ids[index], item, score: digests[index] }))
     .sort((a, b) => b.score.localeCompare(a.score) || a.id.localeCompare(b.id))
     .map((entry) => entry.item);
 }
@@ -118,7 +121,9 @@ const ticketsForRating = (rating) => RATING_TICKETS[rating] ?? 2;
 
 function challengerTickets(pool) {
   return pool.flatMap((concept) => {
-    if (concept.review?.breadth === "niche") return [];
+    if (concept.review?.breadth === "niche") {
+      return [];
+    }
     return Array.from(
       { length: ticketsForRating(concept.review?.rating) },
       (_, ticket) => ({ concept, ticket })
@@ -151,7 +156,9 @@ function compositionTickets(pool) {
 // additive: nothing has to be backfilled for the filter to be safe.
 function modeAllows(concept, mode) {
   const allowed = concept.review?.allowedModes;
-  if (!Array.isArray(allowed) || allowed.length === 0) return true;
+  if (!Array.isArray(allowed) || allowed.length === 0) {
+    return true;
+  }
   return allowed.includes(mode);
 }
 
@@ -192,7 +199,9 @@ export function* selectApprovedChallengers({
       const rated = pool.filter(
         (concept) => (concept.review?.rating || 0) >= minRating
       );
-      if (rated.length > 0) approvedByTier.set(tier, rated);
+      if (rated.length > 0) {
+        approvedByTier.set(tier, rated);
+      }
     }
   }
   // Mode eligibility, per tier and skipped where it would empty a tier. Worlds
@@ -204,12 +213,16 @@ export function* selectApprovedChallengers({
   if (mode) {
     for (const [tier, pool] of approvedByTier) {
       const eligible = pool.filter((concept) => modeAllows(concept, mode));
-      if (eligible.length > 0) approvedByTier.set(tier, eligible);
+      if (eligible.length > 0) {
+        approvedByTier.set(tier, eligible);
+      }
     }
   }
   for (const [tier, pool] of approvedByTier) {
     const matching = pool.filter((concept) => wanted.has(concept.strength));
-    if (matching.length > 0) approvedByTier.set(tier, matching);
+    if (matching.length > 0) {
+      approvedByTier.set(tier, matching);
+    }
   }
 
   // Two challengers per tier, so every roll carries near-zero-translation
@@ -228,10 +241,13 @@ export function* selectApprovedChallengers({
         .get(tier)
         .filter((concept) => !excluded.has(concept.id));
       // A tier exhausted by prior rounds falls back to reuse over starvation.
-      if (pool.length === 0) pool = approvedByTier.get(tier);
+      if (pool.length === 0) {
+        pool = approvedByTier.get(tier);
+      }
       let tickets = challengerTickets(pool);
-      if (tickets.length === 0)
+      if (tickets.length === 0) {
         tickets = pool.map((concept) => ({ concept, ticket: 0 }));
+      }
       const ranked = yield* rank(
         tickets,
         `${scope}:${key}:challenger-${index}${salt}`,
@@ -240,7 +256,9 @@ export function* selectApprovedChallengers({
       const order = [];
       const seen = new Set();
       for (const entry of ranked) {
-        if (seen.has(entry.concept.id)) continue;
+        if (seen.has(entry.concept.id)) {
+          continue;
+        }
         seen.add(entry.concept.id);
         order.push(entry.concept);
       }
@@ -258,7 +276,9 @@ export function* selectApprovedChallengers({
   const excluded = new Set();
   let picks = yield* pickRound(0, excluded);
   for (let round = 1; round <= reroll; round += 1) {
-    for (const pick of picks) excluded.add(pick.id);
+    for (const pick of picks) {
+      excluded.add(pick.id);
+    }
     picks = yield* pickRound(round, excluded);
   }
   return { approved, picks };
@@ -266,8 +286,8 @@ export function* selectApprovedChallengers({
 
 function emptyMatch(grain, platform, platformExcluded = 0) {
   return {
-    grain: grain ?? null,
     atGrain: grain ? 0 : null,
+    grain: grain ?? null,
     grainAvailable: grain ? 0 : null,
     platform: platform ?? null,
     platformExcluded,
@@ -317,15 +337,19 @@ export function* selectApprovedCompositions({
   const broad = approved.filter(
     (composition) => composition.review?.breadth !== "niche"
   );
-  if (broad.length > 0) approved = broad;
-  if (approved.length === 0)
-    return { picks: [], match: emptyMatch(grain, platform) };
+  if (broad.length > 0) {
+    approved = broad;
+  }
+  if (approved.length === 0) {
+    return { match: emptyMatch(grain, platform), picks: [] };
+  }
   if (mode) {
     const matching = approved.filter(
       (composition) => composition.surface === mode
     );
-    if (matching.length === 0)
-      return { picks: [], match: emptyMatch(grain, platform) };
+    if (matching.length === 0) {
+      return { match: emptyMatch(grain, platform), picks: [] };
+    }
     approved = matching;
   }
   // Platform is a hard filter, unlike grain. A composition that needs hover or a
@@ -344,11 +368,12 @@ export function* selectApprovedCompositions({
     // No fallback here either: dealing a hover-only composition to a phone build
     // is worse than dealing nothing, and an empty deal is a visible gap.
     approved = survives;
-    if (approved.length === 0)
+    if (approved.length === 0) {
       return {
-        picks: [],
         match: emptyMatch(grain, platform, platformExcluded),
+        picks: [],
       };
+    }
   }
 
   const prior = new Set();
@@ -369,8 +394,9 @@ export function* selectApprovedCompositions({
     // second copy, making the weighting a no-op.
     let tickets = compositionTickets(base);
     // A pool of nothing but 1-star keeps still has to yield compositions.
-    if (tickets.length === 0)
+    if (tickets.length === 0) {
       tickets = base.map((composition) => ({ composition, ticket: 0 }));
+    }
     const ranked = (yield* rank(
       tickets,
       // The salt keeps the word "staging" deliberately. It is hash input, so
@@ -401,25 +427,32 @@ export function* selectApprovedCompositions({
     picks = [];
     for (const composition of ordered) {
       const family = composition.familyId ?? composition.id;
-      if (families.has(family)) continue;
+      if (families.has(family)) {
+        continue;
+      }
       picks.push(composition);
       families.add(family);
-      if (picks.length >= count) break;
+      if (picks.length >= count) {
+        break;
+      }
     }
     for (const composition of ordered) {
-      if (picks.length >= count) break;
-      if (!picks.some((pick) => pick.id === composition.id))
+      if (picks.length >= count) {
+        break;
+      }
+      if (!picks.some((pick) => pick.id === composition.id)) {
         picks.push(composition);
+      }
     }
-    if (round < reroll)
+    if (round < reroll) {
       picks.forEach((composition) => prior.add(composition.id));
+    }
   }
 
   const atGrain = grain
     ? picks.filter((composition) => composition.grain === grain).length
     : null;
   return {
-    picks,
     match: {
       grain: grain ?? null,
       // How many of the dealt compositions actually sit at the requested grain.
@@ -431,5 +464,6 @@ export function* selectApprovedCompositions({
       platform: platform ?? null,
       platformExcluded,
     },
+    picks,
   };
 }

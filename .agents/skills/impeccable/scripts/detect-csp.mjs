@@ -100,15 +100,15 @@ export function detectCsp(cwd = process.cwd()) {
   const hits = {
     appendArrays: [],
     appendString: [],
-    middleware: [],
     metaTag: [],
+    middleware: [],
   };
 
   walk(cwd, cwd, 0, (absPath, relPath, body) => {
     const ext = path.extname(absPath);
     const base = path.basename(absPath).toLowerCase();
     const isConfig = (name) =>
-      new RegExp("(^|/)" + name + "\\.config\\.").test(relPath);
+      new RegExp(`(^|/)${name}\\.config\\.`).test(relPath);
 
     // === append-arrays candidates ===
 
@@ -193,7 +193,9 @@ export function detectCsp(cwd = process.cwd()) {
 }
 
 function walk(root, dir, depth, visit) {
-  if (depth > MAX_DEPTH) return;
+  if (depth > MAX_DEPTH) {
+    return;
+  }
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -204,13 +206,19 @@ function walk(root, dir, depth, visit) {
   for (const entry of entries) {
     const abs = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
+      if (SKIP_DIRS.has(entry.name)) {
+        continue;
+      }
       walk(root, abs, depth + 1, visit);
       continue;
     }
-    if (!entry.isFile()) continue;
+    if (!entry.isFile()) {
+      continue;
+    }
     const ext = path.extname(entry.name);
-    if (!SCAN_EXTS.has(ext) && !LAYOUT_EXTS.has(ext)) continue;
+    if (!SCAN_EXTS.has(ext) && !LAYOUT_EXTS.has(ext)) {
+      continue;
+    }
     let body;
     try {
       const fd = fs.openSync(abs, "r");

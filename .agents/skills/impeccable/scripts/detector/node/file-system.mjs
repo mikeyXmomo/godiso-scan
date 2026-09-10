@@ -42,9 +42,13 @@ const HTML_EXTENSIONS = new Set([".html", ".htm"]);
 
 function hasScannableExtension(filename) {
   const lower = filename.toLowerCase();
-  if (SCANNABLE_EXTENSIONS.has(path.extname(lower))) return true;
+  if (SCANNABLE_EXTENSIONS.has(path.extname(lower))) {
+    return true;
+  }
   for (const ext of SCANNABLE_EXTENSIONS) {
-    if (ext.indexOf(".", 1) !== -1 && lower.endsWith(ext)) return true;
+    if (ext.indexOf(".", 1) !== -1 && lower.endsWith(ext)) {
+      return true;
+    }
   }
   return false;
 }
@@ -64,16 +68,22 @@ function walkDir(dir) {
     return files;
   }
   for (const entry of entries) {
-    if (SKIP_DIRS.has(entry.name)) continue;
+    if (SKIP_DIRS.has(entry.name)) {
+      continue;
+    }
     if (
       entry.isDirectory() &&
       entry.name.startsWith(".") &&
       !HIDDEN_SOURCE_DIRS.has(entry.name)
-    )
+    ) {
       continue;
+    }
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...walkDir(full));
-    else if (hasScannableExtension(entry.name)) files.push(full);
+    if (entry.isDirectory()) {
+      files.push(...walkDir(full));
+    } else if (hasScannableExtension(entry.name)) {
+      files.push(full);
+    }
   }
   return files;
 }
@@ -83,17 +93,25 @@ function walkDir(dir) {
 // ---------------------------------------------------------------------------
 
 function resolveImport(specifier, fromDir, fileSet) {
-  if (!/^[./]/.test(specifier)) return null; // skip bare specifiers
+  if (!/^[./]/.test(specifier)) {
+    return null;
+  } // skip bare specifiers
   const base = path.resolve(fromDir, specifier);
-  if (fileSet.has(base)) return base;
+  if (fileSet.has(base)) {
+    return base;
+  }
   for (const ext of SCANNABLE_EXTENSIONS) {
     const withExt = base + ext;
-    if (fileSet.has(withExt)) return withExt;
+    if (fileSet.has(withExt)) {
+      return withExt;
+    }
   }
   // index file convention
   for (const ext of SCANNABLE_EXTENSIONS) {
-    const indexFile = path.join(base, "index" + ext);
-    if (fileSet.has(indexFile)) return indexFile;
+    const indexFile = path.join(base, `index${ext}`);
+    if (fileSet.has(indexFile)) {
+      return indexFile;
+    }
   }
   return null;
 }
@@ -110,7 +128,9 @@ function buildImportGraph(files) {
     for (const pattern of IMPORT_SPECIFIER_PATTERNS) {
       for (const match of content.matchAll(pattern)) {
         const resolved = resolveImport(match[1], dir, fileSet);
-        if (resolved) imports.add(resolved);
+        if (resolved) {
+          imports.add(resolved);
+        }
       }
     }
 
@@ -125,53 +145,53 @@ function buildImportGraph(files) {
 
 const FRAMEWORK_CONFIGS = [
   {
-    name: "Next.js",
+    defaultPort: 3000,
     files: ["next.config.js", "next.config.mjs", "next.config.ts"],
-    defaultPort: 3000,
-    portRe: /port\s*[:=]\s*(\d+)/,
     fingerprint: { header: "x-powered-by", value: /next/i },
+    name: "Next.js",
+    portRe: /port\s*[:=]\s*(\d+)/,
   },
   {
-    name: "SvelteKit",
+    defaultPort: 5173,
     files: ["svelte.config.js", "svelte.config.ts"],
-    defaultPort: 5173,
-    portRe: /port\s*[:=]\s*(\d+)/,
     fingerprint: { header: "x-sveltekit-page", value: null },
+    name: "SvelteKit",
+    portRe: /port\s*[:=]\s*(\d+)/,
   },
   {
-    name: "Nuxt",
+    defaultPort: 3000,
     files: ["nuxt.config.js", "nuxt.config.ts"],
-    defaultPort: 3000,
-    portRe: /port\s*[:=]\s*(\d+)/,
     fingerprint: { header: "x-powered-by", value: /nuxt/i },
+    name: "Nuxt",
+    portRe: /port\s*[:=]\s*(\d+)/,
   },
   {
-    name: "Vite",
-    files: ["vite.config.js", "vite.config.ts", "vite.config.mjs"],
     defaultPort: 5173,
-    portRe: /port\s*[:=]\s*(\d+)/,
+    files: ["vite.config.js", "vite.config.ts", "vite.config.mjs"],
     fingerprint: { body: /@vite\/client/ },
+    name: "Vite",
+    portRe: /port\s*[:=]\s*(\d+)/,
   },
   {
-    name: "Astro",
-    files: ["astro.config.js", "astro.config.ts", "astro.config.mjs"],
     defaultPort: 4321,
-    portRe: /port\s*[:=]\s*(\d+)/,
+    files: ["astro.config.js", "astro.config.ts", "astro.config.mjs"],
     fingerprint: { body: /astro/i },
-  },
-  {
-    name: "Angular",
-    files: ["angular.json"],
-    defaultPort: 4200,
-    portRe: /"port"\s*:\s*(\d+)/,
-    fingerprint: { body: /ng-version/i },
-  },
-  {
-    name: "Remix",
-    files: ["remix.config.js", "remix.config.ts"],
-    defaultPort: 3000,
+    name: "Astro",
     portRe: /port\s*[:=]\s*(\d+)/,
+  },
+  {
+    defaultPort: 4200,
+    files: ["angular.json"],
+    fingerprint: { body: /ng-version/i },
+    name: "Angular",
+    portRe: /"port"\s*:\s*(\d+)/,
+  },
+  {
+    defaultPort: 3000,
+    files: ["remix.config.js", "remix.config.ts"],
     fingerprint: { header: "x-powered-by", value: /remix/i },
+    name: "Remix",
+    portRe: /port\s*[:=]\s*(\d+)/,
   },
 ];
 
@@ -186,19 +206,23 @@ function detectFrameworkConfig(dir) {
 
   for (const cfg of FRAMEWORK_CONFIGS) {
     const match = cfg.files.find((f) => entrySet.has(f));
-    if (!match) continue;
+    if (!match) {
+      continue;
+    }
 
     const configPath = path.join(dir, match);
     let port = cfg.defaultPort;
     try {
       const content = fs.readFileSync(configPath, "utf-8");
       const portMatch = content.match(cfg.portRe);
-      if (portMatch) port = parseInt(portMatch[1], 10);
+      if (portMatch) {
+        port = Number.parseInt(portMatch[1], 10);
+      }
     } catch {
       /* use default */
     }
 
-    return { name: cfg.name, port, configPath, fingerprint: cfg.fingerprint };
+    return { configPath, fingerprint: cfg.fingerprint, name: cfg.name, port };
   }
   return null;
 }
@@ -212,7 +236,7 @@ async function isPortListening(port, fingerprint = null) {
     // Simple TCP probe fallback
     const net = await import("node:net");
     return new Promise((resolve) => {
-      const sock = net.default.createConnection({ port, host: "127.0.0.1" });
+      const sock = net.default.createConnection({ host: "127.0.0.1", port });
       sock.setTimeout(500);
       sock.on("connect", () => {
         sock.destroy();
@@ -231,8 +255,8 @@ async function isPortListening(port, fingerprint = null) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`http://localhost:${port}/`, {
-      signal: controller.signal,
       redirect: "follow",
+      signal: controller.signal,
     });
     clearTimeout(timeout);
 

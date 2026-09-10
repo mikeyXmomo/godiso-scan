@@ -39,29 +39,35 @@ export function parseStylesheet(css, offset = 0) {
   let i = 0;
 
   const skipWs = () => {
-    while (i < text.length && /\s/.test(text[i])) i++;
+    while (i < text.length && /\s/.test(text[i])) {
+      i++;
+    }
   };
 
   while (i < text.length) {
     skipWs();
-    if (i >= text.length) break;
+    if (i >= text.length) {
+      break;
+    }
 
     if (text[i] === "/" && text[i + 1] === "*") {
       const start = i;
       const close = text.indexOf("*/", i + 2);
       i = close === -1 ? text.length : close + 2;
       nodes.push({
-        type: "comment",
-        text: text.slice(start, i),
-        start: offset + start,
         end: offset + i,
+        start: offset + start,
+        text: text.slice(start, i),
+        type: "comment",
       });
       continue;
     }
 
     const preludeStart = i;
     const boundary = scanToBlockOrStatementEnd(text, i);
-    if (boundary.kind === "none") break; // trailing garbage / declarations at top level
+    if (boundary.kind === "none") {
+      break;
+    } // trailing garbage / declarations at top level
     if (boundary.kind === "statement") {
       // Block-less at-statement (@import, @charset, @layer names;). Emitted
       // as its own node so the FOLLOWING rule still indexes for
@@ -69,12 +75,12 @@ export function parseStylesheet(css, offset = 0) {
       const raw = text.slice(preludeStart, boundary.index + 1).trim();
       if (raw) {
         nodes.push({
-          type: "at",
+          end: offset + boundary.index + 1,
           name: (raw.match(/^@([A-Za-z-]+)/) || [])[1] || "",
           prelude: raw.replace(/;$/, ""),
-          statement: true,
           start: offset + preludeStart,
-          end: offset + boundary.index + 1,
+          statement: true,
+          type: "at",
         });
       }
       i = boundary.index + 1;
@@ -91,31 +97,31 @@ export function parseStylesheet(css, offset = 0) {
       const name = (prelude.match(/^@([A-Za-z-]+)/) || [])[1] || "";
       if (["media", "supports", "layer", "container", "scope"].includes(name)) {
         nodes.push({
-          type: "at",
+          children: parseStylesheet(body, offset + bodyStart),
+          end: offset + nodeEnd,
           name,
           prelude,
-          children: parseStylesheet(body, offset + bodyStart),
           start: offset + preludeStart,
-          end: offset + nodeEnd,
+          type: "at",
         });
       } else {
         nodes.push({
-          type: "at",
+          body,
+          end: offset + nodeEnd,
           name,
           prelude,
-          body,
           start: offset + preludeStart,
-          end: offset + nodeEnd,
+          type: "at",
         });
       }
     } else if (prelude) {
       nodes.push({
-        type: "rule",
-        prelude,
         body,
-        start: offset + preludeStart,
         end: offset + nodeEnd,
+        prelude,
         preludeStart: offset + preludeStart,
+        start: offset + preludeStart,
+        type: "rule",
       });
     }
     i = nodeEnd;
@@ -134,21 +140,24 @@ function scanToBlockOrStatementEnd(text, from) {
   while (i < text.length) {
     const ch = text[i];
     if (quote) {
-      if (ch === "\\") i++;
-      else if (ch === quote) quote = null;
+      if (ch === "\\") {
+        i++;
+      } else if (ch === quote) {
+        quote = null;
+      }
     } else if (ch === '"' || ch === "'") {
       quote = ch;
     } else if (ch === "/" && text[i + 1] === "*") {
       const close = text.indexOf("*/", i + 2);
       i = close === -1 ? text.length : close + 1;
     } else if (ch === "{") {
-      return { kind: "block", index: i };
+      return { index: i, kind: "block" };
     } else if (ch === ";") {
-      return { kind: "statement", index: i };
+      return { index: i, kind: "statement" };
     }
     i++;
   }
-  return { kind: "none", index: -1 };
+  return { index: -1, kind: "none" };
 }
 
 function scanBlockEnd(text, from) {
@@ -158,8 +167,11 @@ function scanBlockEnd(text, from) {
   while (i < text.length) {
     const ch = text[i];
     if (quote) {
-      if (ch === "\\") i++;
-      else if (ch === quote) quote = null;
+      if (ch === "\\") {
+        i++;
+      } else if (ch === quote) {
+        quote = null;
+      }
     } else if (ch === '"' || ch === "'") {
       quote = ch;
     } else if (ch === "/" && text[i + 1] === "*") {
@@ -169,7 +181,9 @@ function scanBlockEnd(text, from) {
       depth++;
     } else if (ch === "}") {
       depth--;
-      if (depth === 0) return i;
+      if (depth === 0) {
+        return i;
+      }
     }
     i++;
   }
@@ -184,9 +198,11 @@ export function serializeNodes(nodes, indent = "") {
     } else if (node.type === "rule") {
       out.push(`${indent}${node.prelude} {${formatBody(node.body, indent)}}`);
     } else if (node.type === "at" && node.children) {
-      out.push(`${indent}${node.prelude} {`);
-      out.push(serializeNodes(node.children, indent + "  "));
-      out.push(`${indent}}`);
+      out.push(
+        `${indent}${node.prelude} {`,
+        serializeNodes(node.children, `${indent}  `),
+        `${indent}}`
+      );
     } else if (node.type === "at" && node.statement) {
       out.push(`${indent}${node.prelude};`);
     } else if (node.type === "at") {
@@ -198,19 +214,23 @@ export function serializeNodes(nodes, indent = "") {
 
 function formatBody(body, indent) {
   const trimmed = String(body || "").trim();
-  if (!trimmed) return " ";
+  if (!trimmed) {
+    return " ";
+  }
   const lines = trimmed
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length === 1 && lines[0].length < 60) return ` ${lines[0]} `;
-  return "\n" + lines.map((l) => `${indent}  ${l}`).join("\n") + `\n${indent}`;
+  if (lines.length === 1 && lines[0].length < 60) {
+    return ` ${lines[0]} `;
+  }
+  return `\n${lines.map((l) => `${indent}  ${l}`).join("\n")}\n${indent}`;
 }
 
 export function normalizeSelector(prelude) {
   return String(prelude || "")
-    .replace(/\s+/g, " ")
-    .replace(/\s*([>+~,])\s*/g, "$1")
+    .replaceAll(/\s+/g, " ")
+    .replaceAll(/\s*([>+~,])\s*/g, "$1")
     .trim();
 }
 
@@ -233,20 +253,24 @@ export function reconcileCss(existingCss, variantCss) {
   const mergeLevel = (existingNodes, incomingNodes) => {
     const index = new Map();
     for (const node of existingNodes) {
-      if (node.type === "rule")
+      if (node.type === "rule") {
         index.set(normalizeSelector(node.prelude), node);
+      }
     }
     const atIndex = new Map();
     for (const node of existingNodes) {
-      if (node.type === "at" && node.children)
+      if (node.type === "at" && node.children) {
         atIndex.set(normalizeSelector(node.prelude), node);
+      }
     }
     // Baking can leave several incoming rules with the same selector (e.g. a
     // base rule plus a stripped param branch). The first one REPLACES the
     // existing body; later same-selector rules extend it, never clobber it.
     const touched = new Set();
     for (const node of incomingNodes) {
-      if (node.type === "comment") continue;
+      if (node.type === "comment") {
+        continue;
+      }
       if (node.type === "rule") {
         const key = normalizeSelector(node.prelude);
         const match = index.get(key);
@@ -267,8 +291,11 @@ export function reconcileCss(existingCss, variantCss) {
           const firstAt = existingNodes.findIndex(
             (n) => n.type === "at" && n.children
           );
-          if (firstAt === -1) existingNodes.push(appendedNode);
-          else existingNodes.splice(firstAt, 0, appendedNode);
+          if (firstAt === -1) {
+            existingNodes.push(appendedNode);
+          } else {
+            existingNodes.splice(firstAt, 0, appendedNode);
+          }
           index.set(key, appendedNode);
           touched.add(key);
           appended++;
@@ -280,7 +307,7 @@ export function reconcileCss(existingCss, variantCss) {
           mergeLevel(match.children, node.children);
         } else {
           existingNodes.push({ ...node });
-          atIndex.set(key, existingNodes[existingNodes.length - 1]);
+          atIndex.set(key, existingNodes.at(-1));
           appended++;
         }
       } else {
@@ -291,7 +318,7 @@ export function reconcileCss(existingCss, variantCss) {
   };
 
   mergeLevel(existing, incoming);
-  return { css: serializeNodes(existing), replaced, appended };
+  return { appended, css: serializeNodes(existing), replaced };
 }
 
 // ---------------------------------------------------------------------------
@@ -324,8 +351,11 @@ export function substituteParamVar(css, id, value) {
     let j = after;
     let depth = 1; // we are inside var(
     while (j < text.length && depth > 0) {
-      if (text[j] === "(") depth++;
-      else if (text[j] === ")") depth--;
+      if (text[j] === "(") {
+        depth++;
+      } else if (text[j] === ")") {
+        depth--;
+      }
       j++;
     }
     out += text.slice(i, idx) + String(value);
@@ -363,8 +393,9 @@ export function stripParamSelector(selector, id, kind, chosenValue) {
   let drop = false;
   let out = String(selector).replace(attrRe, (_m, _q, expected) => {
     if (kind === "steps") {
-      if (expected == null || String(expected) === String(chosenValue))
+      if (expected == null || String(expected) === String(chosenValue)) {
         return "";
+      }
       drop = true;
       return "";
     }
@@ -383,10 +414,12 @@ export function stripParamSelector(selector, id, kind, chosenValue) {
     }
     return "";
   });
-  if (drop) return null;
+  if (drop) {
+    return null;
+  }
   out = out
-    .replace(/:global\(\s*\)/g, "")
-    .replace(/\s+/g, " ")
+    .replaceAll(/:global\(\s*\)/g, "")
+    .replaceAll(/\s+/g, " ")
     .replace(/^\s*[>+~]\s*/, "")
     .trim();
   return out || null;
@@ -402,9 +435,10 @@ export function bakeParamValues(css, params = [], values = {}) {
 
   const chosen = new Map();
   for (const param of params || []) {
-    if (!param || !param.id) continue;
-    const has =
-      values && Object.prototype.hasOwnProperty.call(values, param.id);
+    if (!param || !param.id) {
+      continue;
+    }
+    const has = values && Object.hasOwn(values, param.id);
     chosen.set(param.id, {
       kind: param.kind,
       value: has ? values[param.id] : param.default,
@@ -413,7 +447,9 @@ export function bakeParamValues(css, params = [], values = {}) {
   // Values sent for params that were never declared still bake as ranges,
   // so an out-of-sync manifest degrades to the old behavior, not to silence.
   for (const [id, value] of Object.entries(values || {})) {
-    if (!chosen.has(id)) chosen.set(id, { kind: "range", value });
+    if (!chosen.has(id)) {
+      chosen.set(id, { kind: "range", value });
+    }
   }
 
   const bakeBody = (body) => {
@@ -426,8 +462,8 @@ export function bakeParamValues(css, params = [], values = {}) {
     // Strip the readiness sentinel as a DECLARATION, not a line: a one-line
     // rule carrying the sentinel plus real declarations must keep the rest.
     return out
-      .replace(/(^|;)\s*--impeccable-variant-ready\s*:[^;{}]*/g, "$1")
-      .replace(/;\s*;/g, ";")
+      .replaceAll(/(^|;)\s*--impeccable-variant-ready\s*:[^;{}]*/g, "$1")
+      .replaceAll(/;\s*;/g, ";")
       .replace(/^\s*;\s*/, "");
   };
 
@@ -436,13 +472,17 @@ export function bakeParamValues(css, params = [], values = {}) {
     for (const node of list) {
       if (node.type === "at" && node.children) {
         const children = transform(node.children);
-        if (children.length > 0) result.push({ ...node, children });
+        if (children.length > 0) {
+          result.push({ ...node, children });
+        }
         continue;
       }
       if (node.type !== "rule") {
-        if (node.type === "at")
+        if (node.type === "at") {
           result.push({ ...node, body: bakeBody(node.body) });
-        else result.push(node);
+        } else {
+          result.push(node);
+        }
         continue;
       }
       const selectors = splitSelectorList(node.prelude);
@@ -450,8 +490,12 @@ export function bakeParamValues(css, params = [], values = {}) {
       for (let selector of selectors) {
         let alive = true;
         for (const [id, { kind, value }] of chosen) {
-          if (kind !== "steps" && kind !== "toggle") continue;
-          if (!selector.includes(`data-p-${id}`)) continue;
+          if (kind !== "steps" && kind !== "toggle") {
+            continue;
+          }
+          if (!selector.includes(`data-p-${id}`)) {
+            continue;
+          }
           const next = stripParamSelector(selector, id, kind, value);
           if (next == null) {
             alive = false;
@@ -459,12 +503,18 @@ export function bakeParamValues(css, params = [], values = {}) {
           }
           selector = next;
         }
-        if (alive && selector.trim()) kept.push(selector.trim());
+        if (alive && selector.trim()) {
+          kept.push(selector.trim());
+        }
       }
-      if (kept.length === 0) continue;
+      if (kept.length === 0) {
+        continue;
+      }
       const body = bakeBody(node.body);
-      if (!body.trim()) continue;
-      result.push({ ...node, prelude: kept.join(", "), body });
+      if (!body.trim()) {
+        continue;
+      }
+      result.push({ ...node, body, prelude: kept.join(", ") });
     }
     return result;
   };
@@ -483,16 +533,24 @@ export function splitSelectorList(prelude) {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (quote) {
-      if (ch === "\\") i++;
-      else if (ch === quote) quote = null;
+      if (ch === "\\") {
+        i++;
+      } else if (ch === quote) {
+        quote = null;
+      }
       continue;
     }
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === "[") bracket++;
-    else if (ch === "]") bracket = Math.max(0, bracket - 1);
-    else if (ch === "(") paren++;
-    else if (ch === ")") paren = Math.max(0, paren - 1);
-    else if (ch === "," && bracket === 0 && paren === 0) {
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "[") {
+      bracket++;
+    } else if (ch === "]") {
+      bracket = Math.max(0, bracket - 1);
+    } else if (ch === "(") {
+      paren++;
+    } else if (ch === ")") {
+      paren = Math.max(0, paren - 1);
+    } else if (ch === "," && bracket === 0 && paren === 0) {
       selectors.push(text.slice(start, i));
       start = i + 1;
     }
@@ -551,7 +609,7 @@ export function pruneUnusedSelectors(
     try {
       ({ warnings } = compileFn(source, { generate: false }));
     } catch {
-      return { source, removed }; // never let pruning break an accept
+      return { removed, source }; // never let pruning break an accept
     }
     const unused = (warnings || [])
       .filter(
@@ -565,7 +623,9 @@ export function pruneUnusedSelectors(
           !skip.has(source.slice(w.start.character, w.end.character).trim())
       )
       .sort((a, b) => b.start.character - a.start.character);
-    if (unused.length === 0) break;
+    if (unused.length === 0) {
+      break;
+    }
 
     let next = source;
     for (const warning of unused) {
@@ -579,10 +639,12 @@ export function pruneUnusedSelectors(
         next = result.source;
       }
     }
-    if (next === source) break;
+    if (next === source) {
+      break;
+    }
     source = next;
   }
-  return { source, removed };
+  return { removed, source };
 }
 
 /**
@@ -594,7 +656,9 @@ function removeSelectorAt(source, start, end) {
 
   // Find the rule boundaries around the selector.
   const braceIdx = source.indexOf("{", end);
-  if (braceIdx === -1) return { changed: false, selector, source };
+  if (braceIdx === -1) {
+    return { changed: false, selector, source };
+  }
   const bodyEnd = scanBlockEnd(source, braceIdx + 1);
 
   // Prelude spans backward from the brace to the previous } ; { or the end
@@ -617,7 +681,9 @@ function removeSelectorAt(source, start, end) {
       }
       continue; // child combinator inside the prelude
     }
-    if (i === 0) preludeStart = 0;
+    if (i === 0) {
+      preludeStart = 0;
+    }
   }
   const prelude = source.slice(preludeStart, braceIdx);
   const selectors = splitSelectorList(prelude);
@@ -632,13 +698,16 @@ function removeSelectorAt(source, start, end) {
   if (kept.length === 0) {
     // Remove the entire rule including trailing newline.
     let ruleEnd = Math.min(source.length, bodyEnd + 1);
-    while (ruleEnd < source.length && source[ruleEnd] === "\n") ruleEnd++;
+    while (ruleEnd < source.length && source[ruleEnd] === "\n") {
+      ruleEnd++;
+    }
     let ruleStart = preludeStart;
     while (
       ruleStart > 0 &&
       (source[ruleStart - 1] === " " || source[ruleStart - 1] === "\t")
-    )
+    ) {
       ruleStart--;
+    }
     return {
       changed: true,
       selector: target,
@@ -650,17 +719,14 @@ function removeSelectorAt(source, start, end) {
   return {
     changed: true,
     selector: target,
-    source:
-      source.slice(0, preludeStart) +
-      indent +
-      kept.join(", ") +
-      " " +
-      source.slice(braceIdx, source.length),
+    source: `${
+      source.slice(0, preludeStart) + indent + kept.join(", ")
+    } ${source.slice(braceIdx)}`,
   };
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -673,13 +739,15 @@ function escapeRegExp(value) {
 export function collectAllSelectors(css, out = new Set()) {
   for (const node of parseStylesheet(css)) {
     if (node.type === "rule") {
-      for (const selector of splitSelectorList(node.prelude))
+      for (const selector of splitSelectorList(node.prelude)) {
         out.add(normalizeSelector(selector));
+      }
     } else if (node.type === "at" && node.children) {
       for (const child of node.children) {
         if (child.type === "rule") {
-          for (const selector of splitSelectorList(child.prelude))
+          for (const selector of splitSelectorList(child.prelude)) {
             out.add(normalizeSelector(selector));
+          }
         } else if (child.type === "at" && child.children) {
           collectSelectorsFromNodes(child.children, out);
         }
@@ -692,8 +760,9 @@ export function collectAllSelectors(css, out = new Set()) {
 function collectSelectorsFromNodes(nodes, out) {
   for (const node of nodes) {
     if (node.type === "rule") {
-      for (const selector of splitSelectorList(node.prelude))
+      for (const selector of splitSelectorList(node.prelude)) {
         out.add(normalizeSelector(selector));
+      }
     } else if (node.type === "at" && node.children) {
       collectSelectorsFromNodes(node.children, out);
     }

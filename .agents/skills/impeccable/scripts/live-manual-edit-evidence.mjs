@@ -10,6 +10,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
 import { isGeneratedFile } from "./lib/is-generated.mjs";
 import { readBuffer, getBufferPath } from "./live/manual-edits-buffer.mjs";
 
@@ -74,11 +75,11 @@ export function buildManualEditEvidence({
 
   if (opCount === 0) {
     return {
-      pageUrl,
+      candidates: [],
       count: 0,
       entries: [],
       ops: [],
-      candidates: [],
+      pageUrl,
     };
   }
 
@@ -88,25 +89,26 @@ export function buildManualEditEvidence({
     buildCandidatesForOp(op, cwd, searchFiles)
   );
   return {
-    version: EVIDENCE_VERSION,
-    pageUrl: pageUrl || null,
-    count: opCount,
-    entries,
-    ops,
+    candidates,
     context: {
-      cwd,
       bufferPath: path.relative(cwd, getBufferPath(cwd)),
+      cwd,
       totalEntries: entries.length,
       totalOps: opCount,
     },
-    candidates,
+    count: opCount,
+    entries,
+    ops,
+    pageUrl: pageUrl || null,
+    version: EVIDENCE_VERSION,
   };
 }
 
 function countOps(entries) {
   let count = 0;
-  for (const entry of entries)
+  for (const entry of entries) {
     count += Array.isArray(entry.ops) ? entry.ops.length : 0;
+  }
   return count;
 }
 
@@ -116,23 +118,23 @@ function flattenOps(entries) {
     const contextHintsByRef = buildContextHintsByRef(entry);
     for (const op of entry.ops || []) {
       out.push({
-        entryId: entry.id,
-        pageUrl: entry.pageUrl,
-        ref: op.ref,
-        contextRef: op.contextRef || null,
-        tag: op.tag,
-        elementId: op.elementId || null,
         classes: Array.isArray(op.classes) ? op.classes : [],
-        originalText: op.originalText,
-        newText: op.newText,
+        container: op.container || null,
+        contextHints: contextHintsByRef.get(op.ref) || [],
+        contextRef: op.contextRef || null,
         deleted: op.deleted === true,
-        sourceHint: op.sourceHint || null,
+        elementId: op.elementId || null,
+        entryId: entry.id,
         leaf: op.leaf || null,
         nearbyEditableTexts: Array.isArray(op.nearbyEditableTexts)
           ? op.nearbyEditableTexts
           : [],
-        container: op.container || null,
-        contextHints: contextHintsByRef.get(op.ref) || [],
+        newText: op.newText,
+        originalText: op.originalText,
+        pageUrl: entry.pageUrl,
+        ref: op.ref,
+        sourceHint: op.sourceHint || null,
+        tag: op.tag,
       });
     }
   }
@@ -145,12 +147,15 @@ function buildContextHintsByRef(entry) {
     const hints = new Set();
     const add = (value) => {
       const text = normalizeText(decodeBasicHtml(String(value || "")));
-      if (text.length < 3 || text.length > 160) return;
+      if (text.length < 3 || text.length > 160) {
+        return;
+      }
       if (
         text === normalizeText(op.originalText) ||
         text === normalizeText(op.newText)
-      )
+      ) {
         return;
+      }
       hints.add(text);
     };
 
@@ -163,11 +168,13 @@ function buildContextHintsByRef(entry) {
         : "";
     for (const match of outer.matchAll(
       /data-impeccable-original-text="([^"]*)"/g
-    ))
+    )) {
       add(match[1]);
+    }
     if (typeof entry.element?.textContent === "string") {
-      for (const chunk of entry.element.textContent.split(/\s{2,}|\n|\t/))
+      for (const chunk of entry.element.textContent.split(/\s{2,}|\n|\t/)) {
         add(chunk);
+      }
     }
     map.set(op.ref, [...hints].slice(0, 16));
   }
@@ -178,27 +185,27 @@ function buildCandidatesForOp(op, cwd, searchFiles) {
   const originalText = String(op.originalText || "");
   const contextNeedles = op.contextHints || [];
   return {
+    contextTextMatches: findContextMatches(searchFiles, contextNeedles, {
+      max: CONTEXT_MATCH_LIMIT,
+      maxPerHint: CONTEXT_MATCH_PER_HINT,
+    }),
     entryId: op.entryId,
-    ref: op.ref,
+    locatorMatches: findLocatorMatches(searchFiles, op, {
+      max: LOCATOR_MATCH_LIMIT,
+    }),
+    objectKeyMatches: originalText
+      ? findObjectKeyMatches(searchFiles, originalText, {
+          max: OBJECT_KEY_MATCH_LIMIT,
+        })
+      : [],
     originalText,
+    ref: op.ref,
     sourceHint: analyzeSourceHint(op, cwd),
     textMatches: originalText
       ? findLiteralMatches(searchFiles, originalText, {
           max: literalMatchLimit(originalText),
         })
       : [],
-    objectKeyMatches: originalText
-      ? findObjectKeyMatches(searchFiles, originalText, {
-          max: OBJECT_KEY_MATCH_LIMIT,
-        })
-      : [],
-    locatorMatches: findLocatorMatches(searchFiles, op, {
-      max: LOCATOR_MATCH_LIMIT,
-    }),
-    contextTextMatches: findContextMatches(searchFiles, contextNeedles, {
-      maxPerHint: CONTEXT_MATCH_PER_HINT,
-      max: CONTEXT_MATCH_LIMIT,
-    }),
   };
 }
 
@@ -215,17 +222,19 @@ function isWeakSourceNeedle(text) {
 
 function analyzeSourceHint(op, cwd) {
   const hint = normalizeSourceHint(op.sourceHint);
-  if (!hint.file) return null;
+  if (!hint.file) {
+    return null;
+  }
   const file = path.resolve(cwd, hint.file);
   const relativeFile = path.relative(cwd, file);
   if (!isPathInsideOrEqual(cwd, file)) {
-    return { ...hint, status: "outside_cwd", relativeFile: hint.file };
+    return { ...hint, relativeFile: hint.file, status: "outside_cwd" };
   }
   if (!fs.existsSync(file)) {
-    return { ...hint, status: "file_missing", relativeFile };
+    return { ...hint, relativeFile, status: "file_missing" };
   }
   if (isGeneratedFile(file, { cwd })) {
-    return { ...hint, status: "generated", relativeFile };
+    return { ...hint, relativeFile, status: "generated" };
   }
 
   const content = fs.readFileSync(file, "utf-8");
@@ -238,17 +247,19 @@ function analyzeSourceHint(op, cwd) {
     typeof op.originalText === "string" && windowText.includes(op.originalText);
   return {
     ...hint,
-    status: containsOriginalText ? "ok" : "text_not_found_near_hint",
-    relativeFile,
     excerpt: lines.slice(start, end).map((text, index) => ({
       line: start + index + 1,
       text: text.slice(0, 240),
     })),
+    relativeFile,
+    status: containsOriginalText ? "ok" : "text_not_found_near_hint",
   };
 }
 
 function normalizeSourceHint(hint) {
-  if (!hint || typeof hint !== "object") return {};
+  if (!hint || typeof hint !== "object") {
+    return {};
+  }
   let line = Number.isFinite(Number(hint.line)) ? Number(hint.line) : null;
   let column = Number.isFinite(Number(hint.column))
     ? Number(hint.column)
@@ -257,14 +268,16 @@ function normalizeSourceHint(hint) {
     const match = hint.loc.match(/^(\d+)(?::(\d+))?/);
     if (match) {
       line = Number(match[1]);
-      if (match[2]) column = Number(match[2]);
+      if (match[2]) {
+        column = Number(match[2]);
+      }
     }
   }
   return {
-    file: typeof hint.file === "string" ? hint.file : "",
-    loc: typeof hint.loc === "string" ? hint.loc : "",
-    line,
     column,
+    file: typeof hint.file === "string" ? hint.file : "",
+    line,
+    loc: typeof hint.loc === "string" ? hint.loc : "",
   };
 }
 
@@ -280,14 +293,18 @@ function collectSearchFiles(cwd) {
 }
 
 function scanDir(dir, cwd, seenDirs, seenFiles, out, depth) {
-  if (depth > 7 || !fs.existsSync(dir)) return;
+  if (depth > 7 || !fs.existsSync(dir)) {
+    return;
+  }
   let realDir;
   try {
     realDir = fs.realpathSync(dir);
   } catch {
     return;
   }
-  if (seenDirs.has(realDir)) return;
+  if (seenDirs.has(realDir)) {
+    return;
+  }
   seenDirs.add(realDir);
 
   let entries;
@@ -299,15 +316,18 @@ function scanDir(dir, cwd, seenDirs, seenFiles, out, depth) {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
+      if (SKIP_DIRS.has(entry.name)) {
+        continue;
+      }
       scanDir(fullPath, cwd, seenDirs, seenFiles, out, depth + 1);
       continue;
     }
     if (
       !entry.isFile() ||
       !TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase())
-    )
+    ) {
       continue;
+    }
     maybeAddSearchFile(fullPath, cwd, seenFiles, out);
   }
 }
@@ -323,8 +343,9 @@ function scanRootFiles(cwd, seenFiles, out) {
     if (
       !entry.isFile() ||
       !TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase())
-    )
+    ) {
       continue;
+    }
     maybeAddSearchFile(path.join(cwd, entry.name), cwd, seenFiles, out);
   }
 }
@@ -336,9 +357,13 @@ function maybeAddSearchFile(file, cwd, seenFiles, out) {
   } catch {
     return;
   }
-  if (seenFiles.has(realFile)) return;
+  if (seenFiles.has(realFile)) {
+    return;
+  }
   seenFiles.add(realFile);
-  if (isGeneratedFile(file, { cwd })) return;
+  if (isGeneratedFile(file, { cwd })) {
+    return;
+  }
   let content;
   try {
     content = fs.readFileSync(file, "utf-8");
@@ -346,10 +371,10 @@ function maybeAddSearchFile(file, cwd, seenFiles, out) {
     return;
   }
   out.push({
-    file,
-    relativeFile: path.relative(cwd, file),
     content,
+    file,
     lines: content.split("\n"),
+    relativeFile: path.relative(cwd, file),
   });
 }
 
@@ -358,15 +383,14 @@ function findLiteralMatches(searchFiles, needle, { max }) {
 }
 
 function findObjectKeyMatches(searchFiles, text, { max }) {
-  const re = new RegExp(
-    "([\"\\'`])" + escapeRegExp(text) + "\\1(?=\\s*:)",
-    "g"
-  );
+  const re = new RegExp(`(["\\'\`])${escapeRegExp(text)}\\1(?=\\s*:)`, "g");
   const out = [];
   for (const file of searchFiles) {
     for (const match of file.content.matchAll(re)) {
       out.push(matchForIndex(file, match.index, "object_key", text));
-      if (out.length >= max) return out;
+      if (out.length >= max) {
+        return out;
+      }
     }
   }
   return out;
@@ -374,21 +398,31 @@ function findObjectKeyMatches(searchFiles, text, { max }) {
 
 function findLocatorMatches(searchFiles, op, { max }) {
   const needles = [];
-  if (op.elementId) needles.push({ kind: "id", needle: op.elementId });
-  for (const cls of op.classes || []) {
-    if (cls) needles.push({ kind: "class", needle: cls });
+  if (op.elementId) {
+    needles.push({ kind: "id", needle: op.elementId });
   }
-  if (op.tag) needles.push({ kind: "tag", needle: "<" + op.tag });
+  for (const cls of op.classes || []) {
+    if (cls) {
+      needles.push({ kind: "class", needle: cls });
+    }
+  }
+  if (op.tag) {
+    needles.push({ kind: "tag", needle: `<${op.tag}` });
+  }
 
   const out = [];
   const seen = new Set();
   for (const { kind, needle } of needles) {
     for (const match of findMatches(searchFiles, needle, { kind, max })) {
-      const key = match.file + ":" + match.line + ":" + kind + ":" + needle;
-      if (seen.has(key)) continue;
+      const key = `${match.file}:${match.line}:${kind}:${needle}`;
+      if (seen.has(key)) {
+        continue;
+      }
       seen.add(key);
       out.push({ ...match, needle });
-      if (out.length >= max) return out;
+      if (out.length >= max) {
+        return out;
+      }
     }
   }
   return out;
@@ -402,11 +436,15 @@ function findContextMatches(searchFiles, hints, { maxPerHint, max }) {
       kind: "context",
       max: maxPerHint,
     })) {
-      const key = match.file + ":" + match.line + ":" + hint;
-      if (seen.has(key)) continue;
+      const key = `${match.file}:${match.line}:${hint}`;
+      if (seen.has(key)) {
+        continue;
+      }
       seen.add(key);
       out.push({ ...match, needle: hint });
-      if (out.length >= max) return out;
+      if (out.length >= max) {
+        return out;
+      }
     }
   }
   return out;
@@ -414,17 +452,23 @@ function findContextMatches(searchFiles, hints, { maxPerHint, max }) {
 
 function findMatches(searchFiles, needle, { kind, max }) {
   const text = String(needle || "");
-  if (!text) return [];
+  if (!text) {
+    return [];
+  }
   const out = [];
   for (const file of searchFiles) {
     let index = 0;
     while (out.length < max) {
       index = file.content.indexOf(text, index);
-      if (index === -1) break;
+      if (index === -1) {
+        break;
+      }
       out.push(matchForIndex(file, index, kind, text));
       index += Math.max(1, text.length);
     }
-    if (out.length >= max) break;
+    if (out.length >= max) {
+      break;
+    }
   }
   return out;
 }
@@ -433,11 +477,11 @@ function matchForIndex(file, index, kind, needle) {
   const line = file.content.slice(0, index).split("\n").length;
   const lineText = file.lines[line - 1] || "";
   return {
-    kind,
+    excerpt: lineText.trim().slice(0, 240),
     file: file.relativeFile,
+    kind,
     line,
     needle,
-    excerpt: lineText.trim().slice(0, 240),
   };
 }
 
@@ -448,20 +492,20 @@ function isPathInsideOrEqual(cwd, file) {
 
 function normalizeText(value) {
   return String(value || "")
-    .replace(/\s+/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 
 function decodeBasicHtml(value) {
   return value
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&apos;", "'")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

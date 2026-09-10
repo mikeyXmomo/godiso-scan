@@ -1,10 +1,9 @@
 import { useCallback, useMemo } from "react";
+
 import { Button } from "@/components/ui/button";
 import { useScannerStore } from "@/lib/scanner-store";
-import {
-  SCAN_PRESETS,
-  type ScanPreset,
-} from "@/utils/scan-renderer/config.types";
+import { SCAN_PRESETS } from "@/utils/scan-renderer/config.types";
+import type { ScanPreset } from "@/utils/scan-renderer/config.types";
 
 type PresetKey = keyof ScanPreset["values"];
 

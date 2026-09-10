@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
+import fs from "node:fs";
 /**
  * Visual question server: present a decision to the user as a themed page
  * instead of a plain-text prompt, then block until they answer.
@@ -107,15 +109,16 @@
  *   node serve-question.mjs --payload question.json [--timeout 900] [--idle-grace 600] [--no-open] [--port 0]
  */
 import http from "node:http";
-import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+
 import { openSystemBrowser } from "./lib/open-system-browser.mjs";
 
 function arg(name, fallback = null) {
   const i = process.argv.indexOf(`--${name}`);
-  if (i === -1) return fallback;
+  if (i === -1) {
+    return fallback;
+  }
   const v = process.argv[i + 1];
   return v && !v.startsWith("--") ? v : fallback;
 }
@@ -228,7 +231,7 @@ const idleGraceMs =
 // is coming back: --wait reads it to keep a stalled page from counting as
 // closed mid-delivery, and the daemon reads it to survive until the page's
 // watch claims a hand delivered moments before the idle deadline.
-const NEXT_CLAIM_GRACE_MS = 10000;
+const NEXT_CLAIM_GRACE_MS = 10_000;
 const portArg = Number(arg("port", "0"));
 const QUESTION_DIR = path.join(process.cwd(), ".impeccable", "questions");
 const stateFile = (key) => path.join(QUESTION_DIR, `${key}.state.json`);
@@ -243,22 +246,29 @@ if (hasFlag("schema")) {
   console.log(
     JSON.stringify(
       {
-        title: "Choose the visual world",
-        question:
-          "The roll assigned Fillmore Handbill. Keep it, take an alternate, or re-roll.",
+        buildPath: { toggle: true, value: "comp" },
+        canon: true,
+        canonCard: {
+          comp: ".impeccable/mocks/decision/canon.webp",
+          label: "The category standard",
+          materials: ["clean grid", "product photography"],
+          palette: ["#ffffff", "#111827", "#2563eb"],
+          risk: "Indistinguishable from the competition by design.",
+          thesis: "What this category ships, executed impeccably.",
+          viewport: "The arrangement a visitor expects, at full craft.",
+        },
         options: [
           {
+            board:
+              "https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill.webp",
+            comp: ".impeccable/mocks/decision/assigned.webp",
+            hero: "https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill-hero.webp",
             id: "assigned",
-            label: "Fillmore Handbill",
             kicker: "THE ROLL",
+            label: "Fillmore Handbill",
             lineage: "1966-71 Fillmore psychedelic handbills",
-            thesis:
-              "The gig poster that treats every release like a one-night stand.",
-            palette: ["#e8452c", "#f5d64c", "#1b2a52", "#f3ead8"],
             materials: ["letterpress", "split-fountain ink"],
-            viewport:
-              "A full-bleed dated bill with the product name in warped display type.",
-            risk: "Reads nostalgic when the type is set timidly.",
+            palette: ["#e8452c", "#f5d64c", "#1b2a52", "#f3ead8"],
             raised: [
               {
                 from: "challenger-microfiche",
@@ -266,62 +276,55 @@ if (hasFlag("schema")) {
                   "The bill now owns its whole viewport as one continuous printed sheet.",
               },
             ],
-            comp: ".impeccable/mocks/decision/assigned.webp",
-            hero: "https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill-hero.webp",
-            board:
-              "https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill.webp",
+            risk: "Reads nostalgic when the type is set timidly.",
+            thesis:
+              "The gig poster that treats every release like a one-night stand.",
+            viewport:
+              "A full-bleed dated bill with the product name in warped display type.",
           },
           {
-            id: "model-pick",
-            label: "The Broadside Ballad",
-            kicker: "IMPECCABLE’S PICK",
-            lineage: "street-sold ballad sheets",
-            thesis: "Every release printed as the day’s ballad sheet.",
-            palette: ["#1f1c18", "#efe5d0", "#a33327"],
-            materials: ["woodcut", "rag paper"],
-            viewport: "One tall sheet, the newest release as today’s ballad.",
-            risk: "Also the direction most runs in this category land on.",
             comp: ".impeccable/mocks/decision/model-pick.webp",
+            id: "model-pick",
+            kicker: "IMPECCABLE’S PICK",
+            label: "The Broadside Ballad",
+            lineage: "street-sold ballad sheets",
+            materials: ["woodcut", "rag paper"],
+            palette: ["#1f1c18", "#efe5d0", "#a33327"],
+            risk: "Also the direction most runs in this category land on.",
+            thesis: "Every release printed as the day’s ballad sheet.",
+            viewport: "One tall sheet, the newest release as today’s ballad.",
           },
           {
-            id: "challenger-teletext",
-            label: "Teletext Service",
-            verdict: "competitive",
-            lineage: "broadcast teletext magazines",
-            thesis: "The catalog as a broadcast index: pages, not sections.",
-            palette: ["#0000c0", "#ffff00", "#00c000", "#ffffff"],
-            materials: ["block mosaic", "phosphor glow"],
-            viewport: "P100 index page, releases as numbered rows.",
             case: "Fuses cleanly: releases map to numbered pages; loses narrowly on clarity.",
-            risk: "Reads retro-novelty when the grid is not strict.",
             comp: ".impeccable/mocks/decision/challenger-teletext.webp",
             hero: "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp",
+            id: "challenger-teletext",
+            label: "Teletext Service",
+            lineage: "broadcast teletext magazines",
+            materials: ["block mosaic", "phosphor glow"],
+            palette: ["#0000c0", "#ffff00", "#00c000", "#ffffff"],
+            risk: "Reads retro-novelty when the grid is not strict.",
+            thesis: "The catalog as a broadcast index: pages, not sections.",
+            verdict: "competitive",
+            viewport: "P100 index page, releases as numbered rows.",
           },
           {
-            id: "challenger-microfiche",
-            label: "Microfiche Reader",
-            verdict: "declined",
-            lineage: "library microfiche stations",
-            palette: ["#101418", "#9fb4c0"],
-            materials: ["film grain", "backlit glass"],
             case: "Fuses poorly: listeners do not identify with archival retrieval.",
-            kept: "Total environmental commitment.",
             hero: "https://impeccable.style/worlds/cards/archives-microfiche-reader-hero.webp",
+            id: "challenger-microfiche",
+            kept: "Total environmental commitment.",
+            label: "Microfiche Reader",
+            lineage: "library microfiche stations",
+            materials: ["film grain", "backlit glass"],
+            palette: ["#101418", "#9fb4c0"],
+            verdict: "declined",
           },
         ],
+        question:
+          "The roll assigned Fillmore Handbill. Keep it, take an alternate, or re-roll.",
         reroll: { registers: ["safer", "bolder"] },
-        buildPath: { value: "comp", toggle: true },
-        canon: true,
-        canonCard: {
-          label: "The category standard",
-          thesis: "What this category ships, executed impeccably.",
-          palette: ["#ffffff", "#111827", "#2563eb"],
-          materials: ["clean grid", "product photography"],
-          viewport: "The arrangement a visitor expects, at full craft.",
-          risk: "Indistinguishable from the competition by design.",
-          comp: ".impeccable/mocks/decision/canon.webp",
-        },
         steer: true,
+        title: "Choose the visual world",
       },
       null,
       2
@@ -350,13 +353,15 @@ if (hasFlag("wait")) {
   // the user had walked away while they were still reading the board.
   const alive = () => {
     try {
-      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf8"));
-      if (state.lastBeat && Date.now() - state.lastBeat < 12000) return true;
+      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf-8"));
+      if (state.lastBeat && Date.now() - state.lastBeat < 12_000) {
+        return true;
+      }
       try {
         process.kill(state.pid, 0);
         return true;
-      } catch (err) {
-        return err.code === "EPERM";
+      } catch (error) {
+        return error.code === "EPERM";
       }
     } catch {
       return false;
@@ -364,7 +369,9 @@ if (hasFlag("wait")) {
   };
   let sawClose = false;
   while (Date.now() < deadline) {
-    if (answered()) break;
+    if (answered()) {
+      break;
+    }
     // A build-path flip is its own event, not an answer: the round stays
     // open, and the agent's job right now is comps, not code.
     if (fs.existsSync(flipFile(key))) {
@@ -385,7 +392,7 @@ if (hasFlag("wait")) {
       process.exit(2);
     }
     try {
-      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf8"));
+      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf-8"));
       // A silent page is not a closed one while a freshly delivered next
       // hand sits unclaimed: a stalled page stops beating by design and its
       // watch reloads, beating again, within seconds of the file landing.
@@ -397,8 +404,9 @@ if (hasFlag("wait")) {
             Date.now() -
               fs.statSync(path.join(QUESTION_DIR, `${key}.next.json`)).mtimeMs <
             NEXT_CLAIM_GRACE_MS
-          )
+          ) {
             return true;
+          }
         } catch {
           /* nothing delivered */
         }
@@ -412,7 +420,7 @@ if (hasFlag("wait")) {
       if (
         !midDelivery &&
         state.lastBeat &&
-        Date.now() - state.lastBeat > 15000
+        Date.now() - state.lastBeat > 15_000
       ) {
         sawClose = true;
         break;
@@ -434,7 +442,7 @@ if (hasFlag("wait")) {
     );
     process.exit(3);
   }
-  const collected = fs.readFileSync(answerFile(key), "utf8").trim();
+  const collected = fs.readFileSync(answerFile(key), "utf-8").trim();
   printAnswer(collected);
   // A re-roll or a followup-round pick keeps the table open: the server stays
   // alive awaiting --update, so only the answer file is consumed. Terminal
@@ -469,7 +477,7 @@ if (hasFlag("stop")) {
     process.exit(1);
   }
   try {
-    process.kill(JSON.parse(fs.readFileSync(stateFile(key), "utf8")).pid);
+    process.kill(JSON.parse(fs.readFileSync(stateFile(key), "utf-8")).pid);
   } catch {
     /* dead already */
   }
@@ -491,7 +499,7 @@ if (hasFlag("update")) {
   }
   // A hand the server cannot load must fail here, at the sender: delivered
   // anyway, the page would see ready:true for a round that never renders.
-  const nextRound = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
+  const nextRound = JSON.parse(fs.readFileSync(payloadPath, "utf-8"));
   if (
     !nextRound ||
     !Array.isArray(nextRound.options) ||
@@ -508,13 +516,15 @@ if (hasFlag("update")) {
   // false "no live server" here strands the page mid-shuffle.
   const live = (() => {
     try {
-      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf8"));
-      if (state.lastBeat && Date.now() - state.lastBeat < 12000) return true;
+      const state = JSON.parse(fs.readFileSync(stateFile(key), "utf-8"));
+      if (state.lastBeat && Date.now() - state.lastBeat < 12_000) {
+        return true;
+      }
       try {
         process.kill(state.pid, 0);
         return true;
-      } catch (err) {
-        return err.code === "EPERM";
+      } catch (error) {
+        return error.code === "EPERM";
       }
     } catch {
       return false;
@@ -542,7 +552,7 @@ if (hasFlag("start")) {
     console.error("serve-question: --start needs --payload <file>");
     process.exit(1);
   }
-  JSON.parse(fs.readFileSync(payloadPath, "utf8"));
+  JSON.parse(fs.readFileSync(payloadPath, "utf-8"));
   fs.mkdirSync(QUESTION_DIR, { recursive: true });
   const key = arg("key") || Math.random().toString(16).slice(2, 10);
   // In start mode the agent is alive and owns browser routing; the server
@@ -554,7 +564,7 @@ if (hasFlag("start")) {
   const child = spawn(
     process.execPath,
     [
-      fileURLToPath(import.meta.url),
+      import.meta.filename,
       "--payload",
       payloadPath,
       "--detached-serve",
@@ -570,13 +580,14 @@ if (hasFlag("start")) {
   child.unref();
   fs.closeSync(logFd);
   const deadline = Date.now() + 8000;
-  while (Date.now() < deadline && !fs.existsSync(stateFile(key)))
+  while (Date.now() < deadline && !fs.existsSync(stateFile(key))) {
     await new Promise((r) => setTimeout(r, 100));
+  }
   if (!fs.existsSync(stateFile(key))) {
     let tail = "";
     try {
       tail = fs
-        .readFileSync(logFile, "utf8")
+        .readFileSync(logFile, "utf-8")
         .trim()
         .split("\n")
         .slice(-4)
@@ -592,21 +603,24 @@ if (hasFlag("start")) {
     );
     process.exit(1);
   }
-  const state = JSON.parse(fs.readFileSync(stateFile(key), "utf8"));
+  const state = JSON.parse(fs.readFileSync(stateFile(key), "utf-8"));
   console.log(`QUESTION URL: ${state.url}`);
   console.log(`QUESTION KEY: ${key}`);
   console.log(
     "Open the URL for the user now: in-app browser when the harness has one, otherwise the system opener (macOS `open`, Linux `xdg-open`), otherwise show the URL."
   );
   console.log(
-    `Then collect the answer with: node ${fileURLToPath(import.meta.url)} --wait --key ${key}`
+    `Then collect the answer with: node ${import.meta.filename} --wait --key ${key}`
   );
   process.exit(0);
 }
 
 let raw;
-if (payloadPath) raw = fs.readFileSync(payloadPath, "utf8");
-else raw = fs.readFileSync(0, "utf8");
+if (payloadPath) {
+  raw = fs.readFileSync(payloadPath, "utf-8");
+} else {
+  raw = fs.readFileSync(0, "utf-8");
+}
 
 // Round state is mutable: a re-roll keeps this server alive and --update
 // swaps in the next hand, so payload, options, and the local-image table
@@ -639,10 +653,16 @@ function loadRound(json) {
   }
   localImages = [];
   const imageSrc = (value) => {
-    if (!value) return null;
-    if (/^https?:\/\//.test(value)) return value;
+    if (!value) {
+      return null;
+    }
+    if (/^https?:\/\//.test(value)) {
+      return value;
+    }
     const abs = path.resolve(value);
-    if (!fs.existsSync(abs)) return null;
+    if (!fs.existsSync(abs)) {
+      return null;
+    }
     localImages.push(abs);
     return `/img/${localImages.length - 1}`;
   };
@@ -650,17 +670,21 @@ function loadRound(json) {
   // whether or not the file exists yet; /img answers 404 until it lands and
   // the page polls the slot. Remote comp URLs pass through untouched.
   const compSrc = (value) => {
-    if (!value) return null;
-    if (/^https?:\/\//.test(value)) return value;
+    if (!value) {
+      return null;
+    }
+    if (/^https?:\/\//.test(value)) {
+      return value;
+    }
     localImages.push(path.resolve(value));
     return `/img/${localImages.length - 1}`;
   };
   payload = parsed;
   const decorate = (option) => ({
     ...option,
-    heroSrc: imageSrc(option.hero),
     boardSrc: imageSrc(option.board),
     compSrc: compSrc(option.comp ?? option.sketch),
+    heroSrc: imageSrc(option.hero),
   });
   options = parsed.options.map(decorate);
   // The verdict routes rendering: full cards first, then the canon, then the
@@ -683,8 +707,8 @@ function loadRound(json) {
     parsed.buildPath &&
     (parsed.buildPath.value === "comp" || parsed.buildPath.value === "code")
       ? {
-          value: parsed.buildPath.value,
           toggle: parsed.buildPath.toggle === true,
+          value: parsed.buildPath.value,
         }
       : null;
   liveBuildPath = buildPathDefault?.value ?? null;
@@ -703,9 +727,9 @@ const nextFile = () =>
   detachedKey ? path.join(QUESTION_DIR, `${detachedKey}.next.json`) : null;
 
 const esc = (s) =>
-  String(s ?? "").replace(
+  String(s ?? "").replaceAll(
     /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]
+    (c) => ({ '"': "&quot;", "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]
   );
 
 function page(waiting = false) {
@@ -755,7 +779,7 @@ function page(waiting = false) {
   const hasMedia = (option) =>
     Boolean(
       faceComp(option) ||
-        ((option.heroSrc || option.boardSrc) && !thumbOnly(option))
+      ((option.heroSrc || option.boardSrc) && !thumbOnly(option))
     );
   // The back exists to keep long facts off a card whose front is an image;
   // a card with no art has no flip chip to reach it, so it gets no back and
@@ -767,7 +791,9 @@ function page(waiting = false) {
     );
   const anatomy = (option) => {
     const rows = [];
-    if (option.thesis) rows.push(`<p class="thesis">${esc(option.thesis)}</p>`);
+    if (option.thesis) {
+      rows.push(`<p class="thesis">${esc(option.thesis)}</p>`);
+    }
     const idBits = [];
     if (Array.isArray(option.palette) && option.palette.length) {
       idBits.push(
@@ -785,8 +811,9 @@ function page(waiting = false) {
           .join("")
       );
     }
-    if (idBits.length)
+    if (idBits.length) {
       rows.push(`<div class="identity">${idBits.join("")}</div>`);
+    }
     // Donations from declined challengers render as named raise lines: the
     // assigned card arrives already raised by the hand it beat, and the raise
     // is readable, because a raise nobody can read did not happen. One raise
@@ -829,15 +856,18 @@ function page(waiting = false) {
     if (hasMedia(option)) {
       rows.push(fact("Risk", option.risk, "clamp"));
     } else {
-      rows.push(fact("First viewport", option.viewport));
-      rows.push(fact("The case", option.case));
-      rows.push(fact("Kept", option.kept));
-      rows.push(fact("Risk", option.risk));
+      rows.push(
+        fact("First viewport", option.viewport),
+        fact("The case", option.case),
+        fact("Kept", option.kept),
+        fact("Risk", option.risk)
+      );
     }
-    if (!option.thesis && option.body)
+    if (!option.thesis && option.body) {
       rows.push(`<p class="detail">${esc(option.body)}</p>`);
-    else if (option.body && option.thesis && !hasBack(option))
+    } else if (option.body && option.thesis && !hasBack(option)) {
       rows.push(`<p class="detail more">${esc(option.body)}</p>`);
+    }
     return rows.join("\n            ");
   };
   const backFacts = (option) =>
@@ -863,7 +893,9 @@ function page(waiting = false) {
     const details = hasBack(option) ? flipChip("Details") : "";
     // Thumb-only art renders inside the body via anatomy(), never as a face,
     // and a declined card's comp slot is ignored outright.
-    if (thumbOnly(option)) return "";
+    if (thumbOnly(option)) {
+      return "";
+    }
     if (faceComp(option)) {
       const textOnlyFacts = backFacts(option);
       return `<div class="media comp-pending" data-comp="${esc(option.compSrc)}">
@@ -898,8 +930,9 @@ function page(waiting = false) {
       !frame.regions.length ||
       media(option) ||
       demoted(option)
-    )
+    ) {
       return "";
+    }
     const cols = Number(frame.cols) > 0 ? Number(frame.cols) : 12;
     const rows = Number(frame.rows) > 0 ? Number(frame.rows) : 10;
     const pct = (n, total) =>
@@ -1331,7 +1364,9 @@ ${
 <footer>
   ${payload.steer ? '<input id="steer" placeholder="Optional steer: what should be different or kept?">' : ""}
   ${(() => {
-    if (!payload.reroll) return "";
+    if (!payload.reroll) {
+      return "";
+    }
     const die =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.4" cy="8.4" r="1.5" fill="currentColor"/><circle cx="15.6" cy="8.4" r="1.5" fill="currentColor"/><circle cx="8.4" cy="15.6" r="1.5" fill="currentColor"/><circle cx="15.6" cy="15.6" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
     const registers = Array.isArray(payload.reroll.registers)
@@ -1913,7 +1948,7 @@ const server = http.createServer((req, res) => {
       // kept, /next-status stays ready:true and the waiting page reloads
       // into the same failure without bound.
       try {
-        loadRound(fs.readFileSync(pending, "utf8"));
+        loadRound(fs.readFileSync(pending, "utf-8"));
       } catch {
         /* keep current round */
       }
@@ -1931,7 +1966,7 @@ const server = http.createServer((req, res) => {
       if (detachedKey) {
         try {
           const state = JSON.parse(
-            fs.readFileSync(stateFile(detachedKey), "utf8")
+            fs.readFileSync(stateFile(detachedKey), "utf-8")
           );
           state.claimedAt = server.lastClaimAt;
           fs.writeFileSync(stateFile(detachedKey), JSON.stringify(state));
@@ -1954,7 +1989,7 @@ const server = http.createServer((req, res) => {
         server.lastBeatWrite = now;
         try {
           const state = JSON.parse(
-            fs.readFileSync(stateFile(detachedKey), "utf8")
+            fs.readFileSync(stateFile(detachedKey), "utf-8")
           );
           state.lastBeat = now;
           fs.writeFileSync(stateFile(detachedKey), JSON.stringify(state));
@@ -2009,7 +2044,9 @@ const server = http.createServer((req, res) => {
       } catch {
         /* ignore */
       }
-      if (value !== "comp" && value !== "code") return;
+      if (value !== "comp" && value !== "code") {
+        return;
+      }
       const wasComp = liveBuildPath === "comp";
       liveBuildPath = value;
       // Only a flip TO comp needs the agent mid-round: comps must start
@@ -2018,7 +2055,7 @@ const server = http.createServer((req, res) => {
         fs.mkdirSync(QUESTION_DIR, { recursive: true });
         fs.writeFileSync(
           flipFile(detachedKey),
-          JSON.stringify({ buildPath: "comp" }) + "\n"
+          `${JSON.stringify({ buildPath: "comp" })}\n`
         );
       }
     });
@@ -2054,7 +2091,7 @@ const server = http.createServer((req, res) => {
           : {}),
         ...(followupOpen ? { followup: true } : {}),
         ...(chosen?.hero || chosen?.board
-          ? { hero: chosen.hero ?? null, board: chosen.board ?? null }
+          ? { board: chosen.board ?? null, hero: chosen.hero ?? null }
           : {}),
         ...((chosen?.comp ?? chosen?.sketch)
           ? { comp: chosen.comp ?? chosen.sketch }
@@ -2071,18 +2108,21 @@ const server = http.createServer((req, res) => {
       // page's disable must not restamp the allowance already inherited.
       const wasAwaiting = awaitingNext;
       awaitingNext = (isReroll || followupOpen) && Boolean(detachedKey);
-      if (awaitingNext && !wasAwaiting) awaitingNextSince = Date.now();
+      if (awaitingNext && !wasAwaiting) {
+        awaitingNextSince = Date.now();
+      }
       if (detachedKey) {
         fs.mkdirSync(QUESTION_DIR, { recursive: true });
-        fs.writeFileSync(answerFile(detachedKey), answer + "\n");
+        fs.writeFileSync(answerFile(detachedKey), `${answer}\n`);
       } else {
         printAnswer(answer);
       }
       // A re-roll or followup pick in detached mode keeps the table open: the
       // client shows a loading hand and reloads when --update delivers the
       // next round.
-      if (!((isReroll || followupOpen) && detachedKey))
+      if (!((isReroll || followupOpen) && detachedKey)) {
         setTimeout(() => process.exit(0), 150);
+      }
     });
     return;
   }

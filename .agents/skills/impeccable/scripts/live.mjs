@@ -21,15 +21,16 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { resolveTargetSelection } from "./context.mjs";
-import { resolveFiles } from "./live-inject.mjs";
 import { readLiveServerInfo } from "./lib/impeccable-paths.mjs";
 import { resolveSurfaceBrief } from "./lib/surface-briefs.mjs";
+import { resolveFiles } from "./live-inject.mjs";
 import { resolveLiveTarget } from "./live-target.mjs";
 import { bootInstructions } from "./live/instructions.mjs";
 import { resolveRoots, writeRootsManifest } from "./live/roots.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 
 async function liveCli() {
   const args = process.argv.slice(2);
@@ -93,10 +94,10 @@ The agent should then:
     console.log(
       JSON.stringify(
         {
-          ok: false,
           error: "target_selection_required",
-          targetCandidates: rootsResult.selection.candidates,
           hint: "Several apps with a dev-server config exist. Ask the user which one to use, then rerun with --target <path into that app>.",
+          ok: false,
+          targetCandidates: rootsResult.selection.candidates,
         },
         null,
         2
@@ -114,23 +115,27 @@ The agent should then:
   const product = safeRead(roots.productPath);
   const design = safeRead(roots.designPath);
   const missingContext = [];
-  if (!product) missingContext.push("PRODUCT.md");
-  if (!design) missingContext.push("DESIGN.md");
+  if (!product) {
+    missingContext.push("PRODUCT.md");
+  }
+  if (!design) {
+    missingContext.push("DESIGN.md");
+  }
   if (missingContext.length > 0) {
     console.log(
       JSON.stringify(
         {
-          ok: false,
+          designPath: relOrNull(liveTarget.originalCwd, roots.designPath),
           error: "context_missing",
           missing: missingContext,
           nextCommand: missingContext.includes("PRODUCT.md")
             ? "init"
             : "document",
-          targetPath: outputTargetPath,
+          ok: false,
+          productPath: relOrNull(liveTarget.originalCwd, roots.productPath),
           projectRoot: roots.appRoot,
           repoRoot: roots.repoRoot,
-          productPath: relOrNull(liveTarget.originalCwd, roots.productPath),
-          designPath: relOrNull(liveTarget.originalCwd, roots.designPath),
+          targetPath: outputTargetPath,
         },
         null,
         2
@@ -151,10 +156,10 @@ The agent should then:
   if (!checkResult || !checkResult.ok) {
     console.log(
       JSON.stringify({
-        ...(checkResult || { ok: false, error: "check_failed", raw: checkOut }),
-        targetPath: outputTargetPath,
+        ...(checkResult || { error: "check_failed", ok: false, raw: checkOut }),
         projectRoot: roots.appRoot,
         repoRoot: roots.repoRoot,
+        targetPath: outputTargetPath,
       })
     );
     process.exit(0);
@@ -163,7 +168,7 @@ The agent should then:
   // 2. Start server (or reuse existing)
   const serverInfo = ensureServerRunning(activeCwd);
   if (!serverInfo) {
-    console.log(JSON.stringify({ ok: false, error: "server_start_failed" }));
+    console.log(JSON.stringify({ error: "server_start_failed", ok: false }));
     process.exit(1);
   }
 
@@ -177,9 +182,9 @@ The agent should then:
   if (!injectResult || !injectResult.ok) {
     console.log(
       JSON.stringify({
-        ok: false,
-        error: "inject_failed",
         detail: injectResult || injectOut,
+        error: "inject_failed",
+        ok: false,
         serverPort: serverInfo.port,
       })
     );
@@ -214,7 +219,9 @@ The agent should then:
         briefRoot,
         liveTarget.absoluteTargetPath || null
       );
-      if (!resolvedBrief?.brief) continue;
+      if (!resolvedBrief?.brief) {
+        continue;
+      }
       surfaceBrief =
         resolvedBrief.brief.text ?? safeRead(resolvedBrief.brief.path);
       surfaceBriefPath = resolvedBrief.brief.path
@@ -228,26 +235,26 @@ The agent should then:
   console.log(
     JSON.stringify(
       {
-        ok: true,
-        serverPort: serverInfo.port,
-        serverToken: serverInfo.token,
-        pageFiles: resolvedFiles,
-        liveConfigPath: checkResult.path,
+        _instructions: bootInstructions({ scriptsPath: __dirname }),
         configDrift: drift,
-        targetPath: outputTargetPath,
+        design,
+        designPath: relOrNull(liveTarget.originalCwd, roots.designPath),
+        hasDesign: !!design,
+        hasProduct: !!product,
+        hasSurfaceBrief: !!surfaceBrief,
+        liveConfigPath: checkResult.path,
+        ok: true,
+        pageFiles: resolvedFiles,
+        product,
+        productPath: relOrNull(liveTarget.originalCwd, roots.productPath),
         projectRoot: roots.appRoot,
         repoRoot: roots.repoRoot,
         roots,
-        hasProduct: !!product,
-        product,
-        productPath: relOrNull(liveTarget.originalCwd, roots.productPath),
-        hasDesign: !!design,
-        design,
-        designPath: relOrNull(liveTarget.originalCwd, roots.designPath),
-        hasSurfaceBrief: !!surfaceBrief,
+        serverPort: serverInfo.port,
+        serverToken: serverInfo.token,
         surfaceBrief,
         surfaceBriefPath,
-        _instructions: bootInstructions({ scriptsPath: __dirname }),
+        targetPath: outputTargetPath,
       },
       null,
       2
@@ -256,7 +263,9 @@ The agent should then:
 }
 
 function safeRead(p) {
-  if (!p) return null;
+  if (!p) {
+    return null;
+  }
   try {
     return fs.readFileSync(p, "utf-8");
   } catch {
@@ -318,11 +327,17 @@ function scanForDrift(rootDir, resolvedFiles, config) {
     for (const e of entries) {
       const rel = relBase ? `${relBase}/${e.name}` : e.name;
       if (e.isDirectory()) {
-        if (IGNORE_DIRS.has(e.name) || e.name.startsWith(".")) continue;
+        if (IGNORE_DIRS.has(e.name) || e.name.startsWith(".")) {
+          continue;
+        }
         walk(path.join(dir, e.name), rel);
       } else if (e.isFile() && e.name.endsWith(".html")) {
-        if (resolvedSet.has(rel)) continue;
-        if (isUserExcluded(rel)) continue;
+        if (resolvedSet.has(rel)) {
+          continue;
+        }
+        if (isUserExcluded(rel)) {
+          continue;
+        }
         orphans.push(rel);
       }
     }
@@ -335,12 +350,14 @@ function scanForDrift(rootDir, resolvedFiles, config) {
     }
   }
 
-  if (orphans.length === 0) return null;
+  if (orphans.length === 0) {
+    return null;
+  }
   const capped = orphans.slice(0, 20);
   return {
-    orphans: capped,
-    orphanCount: orphans.length,
     hint: `${orphans.length} HTML file(s) exist but aren't in config.files. Consider adding them, or use a glob pattern like "public/**/*.html".`,
+    orphanCount: orphans.length,
+    orphans: capped,
   };
 }
 
@@ -371,14 +388,14 @@ function globToRegex(pattern) {
       re += "[^/]";
       i += 1;
     } else if (/[.+^${}()|[\]\\]/.test(c)) {
-      re += "\\" + c;
+      re += `\\${c}`;
       i += 1;
     } else {
       re += c;
       i += 1;
     }
   }
-  return new RegExp("^" + re + "$");
+  return new RegExp(`^${re}$`);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,13 +409,13 @@ function runScript(name, args, options = {}) {
     // let a `"` or `$(...)` in any future caller's arg escape into the shell
     // (issue #476).
     return execFileSync(process.execPath, [scriptPath, ...args], {
-      encoding: "utf-8",
       cwd: options.cwd || process.cwd(),
+      encoding: "utf-8",
       timeout: 15_000,
     });
-  } catch (err) {
+  } catch (error) {
     // execFileSync throws on non-zero exit; return stdout if any
-    return err.stdout || err.message || "";
+    return error.stdout || error.message || "";
   }
 }
 

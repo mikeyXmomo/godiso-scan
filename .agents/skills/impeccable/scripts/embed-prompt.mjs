@@ -25,19 +25,22 @@ const readMode = args.includes("--read");
 const scanMode = args.includes("--scan");
 const argOf = (name) => {
   const i = args.indexOf(name);
-  return i !== -1 ? args[i + 1] : null;
+  return i === -1 ? null : args[i + 1];
 };
 
 function promptOf(imagePath) {
   const b = fs.readFileSync(imagePath);
   let prompt = null;
-  if (b.length > 8 && b.readUInt32BE(0) === 0x89504e47) prompt = readPngText(b);
-  else if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8)
+  if (b.length > 8 && b.readUInt32BE(0) === 0x89_50_4e_47) {
+    prompt = readPngText(b);
+  } else if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8) {
     prompt = readJpegCom(b);
+  }
   if (prompt == null && fs.existsSync(`${imagePath}.json`)) {
     try {
       prompt =
-        JSON.parse(fs.readFileSync(`${imagePath}.json`, "utf8")).prompt ?? null;
+        JSON.parse(fs.readFileSync(`${imagePath}.json`, "utf-8")).prompt ??
+        null;
     } catch {
       /* stays null */
     }
@@ -59,9 +62,12 @@ if (scanMode) {
       const base = p.replace(/\/+$/, "").split("/").pop();
       // Skip installed deps and hidden dirs found during the walk, but honor a
       // hidden dir the caller passed explicitly (e.g. .impeccable/mocks).
-      if (!isRoot && (base === "node_modules" || base.startsWith("."))) return;
-      for (const entry of fs.readdirSync(p))
+      if (!isRoot && (base === "node_modules" || base.startsWith("."))) {
+        return;
+      }
+      for (const entry of fs.readdirSync(p)) {
         walk(`${p.replace(/\/+$/, "")}/${entry}`, false);
+      }
     } else if (RASTER.test(p)) {
       rasters.push(p);
     }
@@ -92,22 +98,26 @@ if (!file || !fs.existsSync(file)) {
 }
 
 const buf = fs.readFileSync(file);
-const isPng = buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47;
+const isPng = buf.length > 8 && buf.readUInt32BE(0) === 0x89_50_4e_47;
 const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8;
 
 const crcTable = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xed_b8_83_20 ^ (c >>> 1) : c >>> 1;
+    }
     t[n] = c >>> 0;
   }
   return t;
 })();
 const crc32 = (data) => {
-  let c = 0xffffffff;
-  for (const b of data) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  let c = 0xff_ff_ff_ff;
+  for (const b of data) {
+    c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xff_ff_ff_ff) >>> 0;
 };
 
 function pngChunk(type, data) {
@@ -131,8 +141,10 @@ function readPngText(b) {
       const data = b.subarray(off + 8, off + 8 + len);
       const nul = data.indexOf(0);
       if (nul !== -1 && data.toString("latin1", 0, nul) === KEYWORD) {
-        if (type === "tEXt") return data.toString("utf8", nul + 1);
-        return zlib.inflateSync(data.subarray(nul + 2)).toString("utf8");
+        if (type === "tEXt") {
+          return data.toString("utf-8", nul + 1);
+        }
+        return zlib.inflateSync(data.subarray(nul + 2)).toString("utf-8");
       }
     }
     off += 12 + len;
@@ -144,12 +156,15 @@ function readJpegCom(b) {
   let off = 2;
   while (off + 4 <= b.length && b[off] === 0xff) {
     const marker = b[off + 1];
-    if (marker === 0xda) break; // start of scan: no more segments
+    if (marker === 0xda) {
+      break;
+    } // start of scan: no more segments
     const len = b.readUInt16BE(off + 2);
     if (marker === 0xfe) {
-      const text = b.toString("utf8", off + 4, off + 2 + len);
-      if (text.startsWith(KEYWORD + "\0"))
+      const text = b.toString("utf-8", off + 4, off + 2 + len);
+      if (text.startsWith(`${KEYWORD}\0`)) {
         return text.slice(KEYWORD.length + 1);
+      }
     }
     off += 2 + len;
   }
@@ -159,11 +174,14 @@ function readJpegCom(b) {
 const sidecar = `${file}.json`;
 if (readMode) {
   let prompt = null;
-  if (isPng) prompt = readPngText(buf);
-  else if (isJpeg) prompt = readJpegCom(buf);
+  if (isPng) {
+    prompt = readPngText(buf);
+  } else if (isJpeg) {
+    prompt = readJpegCom(buf);
+  }
   if (prompt == null && fs.existsSync(sidecar)) {
     try {
-      prompt = JSON.parse(fs.readFileSync(sidecar, "utf8")).prompt ?? null;
+      prompt = JSON.parse(fs.readFileSync(sidecar, "utf-8")).prompt ?? null;
     } catch {
       /* fall through */
     }
@@ -179,7 +197,7 @@ if (readMode) {
 const prompt =
   argOf("--prompt") ??
   (argOf("--prompt-file")
-    ? fs.readFileSync(argOf("--prompt-file"), "utf8")
+    ? fs.readFileSync(argOf("--prompt-file"), "utf-8")
     : null);
 if (!prompt) {
   console.error("embed-prompt: --prompt or --prompt-file required");
@@ -196,7 +214,23 @@ if (isPng) {
   // Drop any existing chunk with our keyword to keep embedding idempotent.
   let body = buf.subarray(8, iend);
   const existing = readPngText(buf);
-  if (existing != null) {
+  if (existing == null) {
+    fs.writeFileSync(
+      file,
+      Buffer.concat([
+        buf.subarray(0, iend),
+        pngChunk(
+          "tEXt",
+          Buffer.concat([
+            Buffer.from(KEYWORD, "latin1"),
+            Buffer.from([0]),
+            Buffer.from(prompt, "utf-8"),
+          ])
+        ),
+        buf.subarray(iend),
+      ])
+    );
+  } else {
     const parts = [];
     let off = 8;
     while (off + 12 <= buf.length && off < iend + 12) {
@@ -209,7 +243,9 @@ if (isPng) {
         (type === "tEXt" || type === "zTXt") &&
         nul !== -1 &&
         data.toString("latin1", 0, nul) === KEYWORD;
-      if (!ours && type !== "IEND") parts.push(chunk);
+      if (!ours && type !== "IEND") {
+        parts.push(chunk);
+      }
       off += 12 + len;
     }
     body = Buffer.concat(parts).subarray(8 * 0); // parts exclude signature
@@ -223,33 +259,17 @@ if (isPng) {
           Buffer.concat([
             Buffer.from(KEYWORD, "latin1"),
             Buffer.from([0]),
-            Buffer.from(prompt, "utf8"),
+            Buffer.from(prompt, "utf-8"),
           ])
         ),
         pngChunk("IEND", Buffer.alloc(0)),
       ])
     );
-  } else {
-    fs.writeFileSync(
-      file,
-      Buffer.concat([
-        buf.subarray(0, iend),
-        pngChunk(
-          "tEXt",
-          Buffer.concat([
-            Buffer.from(KEYWORD, "latin1"),
-            Buffer.from([0]),
-            Buffer.from(prompt, "utf8"),
-          ])
-        ),
-        buf.subarray(iend),
-      ])
-    );
   }
   console.log(`EMBEDDED: ${file} (png tEXt, ${prompt.length} chars)`);
 } else if (isJpeg) {
-  const seg = Buffer.from(`${KEYWORD}\0${prompt}`, "utf8");
-  if (seg.length + 2 > 0xffff) {
+  const seg = Buffer.from(`${KEYWORD}\0${prompt}`, "utf-8");
+  if (seg.length + 2 > 0xff_ff) {
     console.error("embed-prompt: prompt too long for a JPEG segment");
     process.exit(1);
   }
@@ -266,7 +286,7 @@ if (isPng) {
 } else {
   fs.writeFileSync(
     sidecar,
-    JSON.stringify({ prompt, createdAt: new Date().toISOString() }, null, 2)
+    JSON.stringify({ createdAt: new Date().toISOString(), prompt }, null, 2)
   );
   console.log(`EMBEDDED: ${sidecar} (sidecar fallback for this format)`);
 }

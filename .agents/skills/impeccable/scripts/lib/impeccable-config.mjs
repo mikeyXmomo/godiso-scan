@@ -68,31 +68,33 @@ const DETECTOR_CONFIG_KEYS = new Set([
 ]);
 
 const DEFAULT_DETECTION_CONFIG = Object.freeze({
-  ignoreRules: [],
-  ignoreFiles: [],
-  ignoreValues: [],
   designSystem: { enabled: true },
+  ignoreFiles: [],
+  ignoreRules: [],
+  ignoreValues: [],
 });
 
 function cloneDetectionConfig() {
   return {
-    ignoreRules: [],
-    ignoreFiles: [],
-    ignoreValues: [],
     designSystem: { ...DEFAULT_DETECTION_CONFIG.designSystem },
+    ignoreFiles: [],
+    ignoreRules: [],
+    ignoreValues: [],
   };
 }
 
 function cloneRawDetectionConfig() {
   return {
-    ignoreRules: [],
     ignoreFiles: [],
+    ignoreRules: [],
     ignoreValues: [],
   };
 }
 
 function applyDetectionConfigSource(config, raw) {
-  if (!raw || typeof raw !== "object") return config;
+  if (!raw || typeof raw !== "object") {
+    return config;
+  }
   // Advisory rules are opt-in for the design hook; the CLI carries the setting
   // so config round-trips (e.g. `impeccable hooks ignore-value`) preserve it.
   if (raw.advisoryRules === "include" || raw.advisoryRules === "exclude") {
@@ -130,7 +132,7 @@ function applyDetectionConfigSource(config, raw) {
 }
 
 function uniqueStrings(values) {
-  return Array.from(new Set(values.map(String)));
+  return [...new Set(values.map(String))];
 }
 
 /**
@@ -162,12 +164,14 @@ export function readRawDetectionConfig(root, opts = {}) {
 
 export function writeDetectionConfig(root, detectorConfig, opts = {}) {
   const filePath = opts.local ? getLocalConfigPath(root) : getConfigPath(root);
-  if (opts.local) ensureConfigGitExclude(root);
+  if (opts.local) {
+    ensureConfigGitExclude(root);
+  }
   const existing = safeReadJson(filePath) || {};
   const existingHook = hookSection(existing);
   const nextHook = stripDetectorKeys(existingHook);
   const nextDetector = {
-    ...(detectorSection(existing) || {}),
+    ...detectorSection(existing),
     ...normalizeDetectionConfigForWrite(detectorConfig),
   };
   const next = {
@@ -220,10 +224,14 @@ function normalizeDetectionConfigForWrite(config) {
 }
 
 function stripDetectorKeys(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
   const out = {};
   for (const [key, value] of Object.entries(raw)) {
-    if (!DETECTOR_CONFIG_KEYS.has(key)) out[key] = value;
+    if (!DETECTOR_CONFIG_KEYS.has(key)) {
+      out[key] = value;
+    }
   }
   return out;
 }
@@ -231,9 +239,9 @@ function stripDetectorKeys(raw) {
 export function normalizeIgnoreValue(value) {
   return String(value || "")
     .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll(/^["']|["']$/g, "")
+    .replaceAll("+", " ")
+    .replaceAll(/\s+/g, " ")
     .toLowerCase();
 }
 
@@ -245,7 +253,9 @@ function normalizeIgnoreRule(rule) {
 
 function colorIgnoreKey(value) {
   const color = parseIgnoreColor(value);
-  if (!color) return "";
+  if (!color) {
+    return "";
+  }
   return `${color.r},${color.g},${color.b},${Math.round(color.a * 255)}`;
 }
 
@@ -253,15 +263,21 @@ function parseIgnoreColor(value) {
   const text = String(value || "")
     .trim()
     .toLowerCase();
-  if (!text) return null;
+  if (!text) {
+    return null;
+  }
 
   const hex = text.match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-  if (hex) return parseHexIgnoreColor(hex[1]);
+  if (hex) {
+    return parseHexIgnoreColor(hex[1]);
+  }
 
   const rgb = text.match(/^rgba?\((.*)\)$/i);
   if (rgb) {
     const parts = splitColorArgs(rgb[1]);
-    if (parts.length < 3 || parts.length > 4) return null;
+    if (parts.length < 3 || parts.length > 4) {
+      return null;
+    }
     const r = parseColorChannel(parts[0], COLOR_CHANNEL_FORMATS.rgb);
     const g = parseColorChannel(parts[1], COLOR_CHANNEL_FORMATS.rgb);
     const b = parseColorChannel(parts[2], COLOR_CHANNEL_FORMATS.rgb);
@@ -269,14 +285,18 @@ function parseIgnoreColor(value) {
       parts[3] === undefined
         ? 1
         : parseColorChannel(parts[3], COLOR_CHANNEL_FORMATS.alpha);
-    if ([r, g, b, a].some((v) => v === null)) return null;
-    return { r, g, b, a };
+    if ([r, g, b, a].some((v) => v === null)) {
+      return null;
+    }
+    return { a, b, g, r };
   }
 
   const hsl = text.match(/^hsla?\((.*)\)$/i);
   if (hsl) {
     const parts = splitColorArgs(hsl[1]);
-    if (parts.length < 3 || parts.length > 4) return null;
+    if (parts.length < 3 || parts.length > 4) {
+      return null;
+    }
     const h = parseColorChannel(parts[0], COLOR_CHANNEL_FORMATS.hue);
     const s = parseColorChannel(parts[1], COLOR_CHANNEL_FORMATS.percent);
     const l = parseColorChannel(parts[2], COLOR_CHANNEL_FORMATS.percent);
@@ -284,7 +304,9 @@ function parseIgnoreColor(value) {
       parts[3] === undefined
         ? 1
         : parseColorChannel(parts[3], COLOR_CHANNEL_FORMATS.alpha);
-    if ([h, s, l, a].some((v) => v === null)) return null;
+    if ([h, s, l, a].some((v) => v === null)) {
+      return null;
+    }
     return hslToRgb(h, s, l, a);
   }
 
@@ -297,18 +319,20 @@ function parseHexIgnoreColor(hex) {
   const [r, g, b, alpha = 255] = expanded
     .match(/../g)
     .map((channel) => Number.parseInt(channel, 16));
-  return { r, g, b, a: alpha / 255 };
+  return { a: alpha / 255, b, g, r };
 }
 
 function splitColorArgs(body) {
   const text = String(body || "").trim();
-  if (!text) return [];
+  if (!text) {
+    return [];
+  }
   if (text.includes(",")) {
     const parts = text
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
-    const last = parts[parts.length - 1];
+    const last = parts.at(-1);
     if (last && last.includes("/")) {
       const split = last
         .split("/")
@@ -319,7 +343,7 @@ function splitColorArgs(body) {
     return parts;
   }
   return text
-    .replace(/\s*\/\s*/g, " / ")
+    .replaceAll(/\s*\/\s*/g, " / ")
     .split(/\s+/)
     .filter((part) => part && part !== "/");
 }
@@ -327,27 +351,27 @@ function splitColorArgs(body) {
 const CSS_NUMBER_RE = /^(-?\d*\.?\d+)(%|deg|rad|turn|grad)?$/;
 const identity = (value) => value;
 const COLOR_CHANNEL_FORMATS = {
-  rgb: {
-    units: { "": identity, "%": (value) => value * 2.55 },
-    min: 0,
-    max: 255,
-    round: true,
-  },
   alpha: {
-    units: { "": identity, "%": (value) => value / 100 },
-    min: 0,
     max: 1,
+    min: 0,
+    units: { "": identity, "%": (value) => value / 100 },
   },
   hue: {
     units: {
       "": identity,
       deg: identity,
+      grad: (value) => value * 0.9,
       rad: (value) => value * (180 / Math.PI),
       turn: (value) => value * 360,
-      grad: (value) => value * 0.9,
     },
   },
-  percent: { units: { "%": (value) => value / 100 }, min: 0, max: 1 },
+  percent: { max: 1, min: 0, units: { "%": (value) => value / 100 } },
+  rgb: {
+    max: 255,
+    min: 0,
+    round: true,
+    units: { "": identity, "%": (value) => value * 2.55 },
+  },
 };
 
 function parseColorChannel(
@@ -356,13 +380,21 @@ function parseColorChannel(
 ) {
   const text = String(raw || "").trim();
   const match = text.match(CSS_NUMBER_RE);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const convert = units[match[2] || ""];
-  if (!convert) return null;
+  if (!convert) {
+    return null;
+  }
   const number = Number.parseFloat(match[1]);
-  if (!Number.isFinite(number)) return null;
+  if (!Number.isFinite(number)) {
+    return null;
+  }
   const value = convert(number);
-  if (value < min || value > max) return null;
+  if (value < min || value > max) {
+    return null;
+  }
   return round ? Math.round(value) : value;
 }
 
@@ -370,7 +402,7 @@ function hslToRgb(hue, saturation, lightness, alpha) {
   const h = (((hue % 360) + 360) % 360) / 360;
   if (saturation === 0) {
     const gray = clampByte(Math.round(lightness * 255));
-    return { r: gray, g: gray, b: gray, a: alpha };
+    return { a: alpha, b: gray, g: gray, r: gray };
   }
   const q =
     lightness < 0.5
@@ -379,18 +411,28 @@ function hslToRgb(hue, saturation, lightness, alpha) {
   const p = 2 * lightness - q;
   const toRgb = (t) => {
     let channel = t;
-    if (channel < 0) channel += 1;
-    if (channel > 1) channel -= 1;
-    if (channel < 1 / 6) return p + (q - p) * 6 * channel;
-    if (channel < 1 / 2) return q;
-    if (channel < 2 / 3) return p + (q - p) * (2 / 3 - channel) * 6;
+    if (channel < 0) {
+      channel += 1;
+    }
+    if (channel > 1) {
+      channel -= 1;
+    }
+    if (channel < 1 / 6) {
+      return p + (q - p) * 6 * channel;
+    }
+    if (channel < 1 / 2) {
+      return q;
+    }
+    if (channel < 2 / 3) {
+      return p + (q - p) * (2 / 3 - channel) * 6;
+    }
     return p;
   };
   return {
-    r: clampByte(Math.round(toRgb(h + 1 / 3) * 255)),
-    g: clampByte(Math.round(toRgb(h) * 255)),
-    b: clampByte(Math.round(toRgb(h - 1 / 3) * 255)),
     a: alpha,
+    b: clampByte(Math.round(toRgb(h - 1 / 3) * 255)),
+    g: clampByte(Math.round(toRgb(h) * 255)),
+    r: clampByte(Math.round(toRgb(h + 1 / 3) * 255)),
   };
 }
 
@@ -399,20 +441,30 @@ function clampByte(value) {
 }
 
 function ignoreValueMatches(rule, entryValue, findingValue) {
-  if (entryValue === findingValue) return true;
-  if (rule !== "design-system-color") return false;
+  if (entryValue === findingValue) {
+    return true;
+  }
+  if (rule !== "design-system-color") {
+    return false;
+  }
   const entryColor = colorIgnoreKey(entryValue);
   return Boolean(entryColor && entryColor === colorIgnoreKey(findingValue));
 }
 
 export function normalizeIgnoreValueEntries(entries) {
-  if (!Array.isArray(entries)) return [];
+  if (!Array.isArray(entries)) {
+    return [];
+  }
   const out = [];
   for (const entry of entries) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
     const rule = normalizeIgnoreRule(entry.rule);
     const value = normalizeIgnoreValue(entry.value);
-    if (!rule || !value) continue;
+    if (!rule || !value) {
+      continue;
+    }
     const normalized = { rule, value };
     const files = uniqueStrings([
       ...(typeof entry.file === "string" && entry.file.trim()
@@ -424,7 +476,9 @@ export function normalizeIgnoreValueEntries(entries) {
             .map((v) => v.trim())
         : []),
     ]);
-    if (files.length > 0) normalized.files = files;
+    if (files.length > 0) {
+      normalized.files = files;
+    }
     // Key order is rule, value, files, createdAt, reason and must stay that way:
     // normalizing runs on every write, so emitting a different order than the one
     // already on disk rewrites every untouched entry and churns the diff. Keep in
@@ -454,14 +508,14 @@ function mergeIgnoreValues(existing, incoming) {
       entry
     );
   }
-  return Array.from(map.values());
+  return [...map.values()];
 }
 
 function ignoreValueFilesKey(files) {
   // Sort before joining: a scope is a set, so an entry already on disk in another
   // order must compare equal rather than dedup as two distinct entries.
   return Array.isArray(files) && files.length > 0
-    ? [...files].sort().join("\x1f")
+    ? [...files].sort().join("\u001F")
     : "";
 }
 
@@ -475,7 +529,9 @@ function globToRegex(glob) {
       if (glob[i + 1] === "*") {
         re += ".*";
         i += 2;
-        if (glob[i] === "/") i += 1;
+        if (glob[i] === "/") {
+          i += 1;
+        }
       } else {
         re += "[^/]*";
         i += 1;
@@ -493,7 +549,7 @@ function globToRegex(glob) {
       const parts = glob
         .slice(i + 1, end)
         .split(",")
-        .map((p) => p.replace(/[.+^$()|[\]\\]/g, "\\$&"));
+        .map((p) => p.replaceAll(/[.+^$()|[\]\\]/g, "\\$&"));
       re += `(?:${parts.join("|")})`;
       i = end + 1;
     } else if (/[.+^$()|[\]\\]/.test(c)) {
@@ -509,16 +565,22 @@ function globToRegex(glob) {
 }
 
 export function matchesAnyGlob(filePath, globs) {
-  if (!Array.isArray(globs) || globs.length === 0) return false;
+  if (!Array.isArray(globs) || globs.length === 0) {
+    return false;
+  }
   const normalized = String(filePath || "")
     .split(sep)
     .join("/");
   for (const glob of globs) {
     try {
       const re = globToRegex(String(glob));
-      if (re.test(normalized)) return true;
+      if (re.test(normalized)) {
+        return true;
+      }
       const base = normalized.split("/").pop();
-      if (re.test(base)) return true;
+      if (re.test(base)) {
+        return true;
+      }
     } catch {
       /* malformed glob, skip */
     }
@@ -528,14 +590,22 @@ export function matchesAnyGlob(filePath, globs) {
 
 export function shouldIgnoreDetectionFile(filePath, root, config) {
   const globs = config?.ignoreFiles || [];
-  if (!Array.isArray(globs) || globs.length === 0) return false;
+  if (!Array.isArray(globs) || globs.length === 0) {
+    return false;
+  }
   const raw = String(filePath || "").trim();
-  if (!raw) return false;
-  if (matchesAnyGlob(raw, globs)) return true;
+  if (!raw) {
+    return false;
+  }
+  if (matchesAnyGlob(raw, globs)) {
+    return true;
+  }
 
   try {
     const abs = isAbsolute(raw) ? raw : resolve(root, raw);
-    if (matchesAnyGlob(abs, globs)) return true;
+    if (matchesAnyGlob(abs, globs)) {
+      return true;
+    }
     const rel = relative(root, abs);
     if (rel && !rel.startsWith("..") && !isAbsolute(rel)) {
       return matchesAnyGlob(rel, globs);
@@ -547,55 +617,79 @@ export function shouldIgnoreDetectionFile(filePath, root, config) {
 }
 
 export function filterDetectionFindings(findings, config) {
-  if (!Array.isArray(findings) || findings.length === 0) return [];
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return [];
+  }
   const ignoreRules = new Set(
     (config?.ignoreRules || []).map((rule) => normalizeIgnoreRule(rule))
   );
   const ignoreValues = normalizeIgnoreValueEntries(config?.ignoreValues || []);
   return findings.filter((finding) => {
-    if (!finding || typeof finding !== "object") return false;
-    if (ignoreRules.has(normalizeIgnoreRule(finding.antipattern))) return false;
-    if (isIgnoredFindingValue(finding, ignoreValues)) return false;
+    if (!finding || typeof finding !== "object") {
+      return false;
+    }
+    if (ignoreRules.has(normalizeIgnoreRule(finding.antipattern))) {
+      return false;
+    }
+    if (isIgnoredFindingValue(finding, ignoreValues)) {
+      return false;
+    }
     return true;
   });
 }
 
 function isIgnoredFindingValue(finding, ignoreValues) {
-  if (!Array.isArray(ignoreValues) || ignoreValues.length === 0) return false;
+  if (!Array.isArray(ignoreValues) || ignoreValues.length === 0) {
+    return false;
+  }
   const rule = normalizeIgnoreRule(finding.antipattern);
-  if (!rule) return false;
+  if (!rule) {
+    return false;
+  }
   // File-scoped wildcards suppress rules with no extractable value, such as side-tab.
   const value = extractFindingIgnoreValue(finding);
   return ignoreValues.some((entry) => {
-    if (entry.rule !== rule) return false;
+    if (entry.rule !== rule) {
+      return false;
+    }
     const wildcardValue = entry.value === "*";
     if (
       !wildcardValue &&
       (!value || !ignoreValueMatches(rule, entry.value, value))
-    )
+    ) {
       return false;
-    if (!Array.isArray(entry.files) || entry.files.length === 0)
+    }
+    if (!Array.isArray(entry.files) || entry.files.length === 0) {
       return !wildcardValue;
+    }
     return findingMatchesScopedIgnoreFile(finding, entry.files);
   });
 }
 
 function findingMatchesScopedIgnoreFile(finding, globs) {
   const filePath = String(finding?.file || "").trim();
-  if (!filePath) return false;
-  if (matchesAnyGlob(filePath, globs)) return true;
+  if (!filePath) {
+    return false;
+  }
+  if (matchesAnyGlob(filePath, globs)) {
+    return true;
+  }
 
   const normalized = filePath.split(sep).join("/");
   const parts = normalized.split("/").filter(Boolean);
   for (let i = 0; i < parts.length; i++) {
     const suffix = parts.slice(i).join("/");
-    if (matchesAnyGlob(suffix, globs)) return true;
+    if (matchesAnyGlob(suffix, globs)) {
+      return true;
+    }
   }
   return false;
 }
 
 export function extractFindingIgnoreValue(finding) {
-  if (!finding || typeof finding !== "object") return "";
+  if (!finding || typeof finding !== "object") {
+    return "";
+  }
   const rule = normalizeIgnoreRule(finding.antipattern);
   const directValueRules = new Set([
     "overused-font",
@@ -605,7 +699,9 @@ export function extractFindingIgnoreValue(finding) {
     "design-system-radius",
     "design-system-font-size",
   ]);
-  if (!directValueRules.has(rule)) return "";
+  if (!directValueRules.has(rule)) {
+    return "";
+  }
   return normalizeIgnoreValue(extractFindingIgnoreValueRaw(finding, rule));
 }
 
@@ -616,7 +712,9 @@ function extractFindingIgnoreValueRaw(
   const direct = cleanIgnoreValueDisplay(
     finding.ignoreValue || finding.value || ""
   );
-  if (direct) return direct;
+  if (direct) {
+    return direct;
+  }
 
   const candidates = [finding.detail, finding.snippet].filter(
     (v) => typeof v === "string" && v
@@ -624,18 +722,26 @@ function extractFindingIgnoreValueRaw(
   for (const text of candidates) {
     if (rule === "bounce-easing") {
       const motion = extractMotionIgnoreValue(text);
-      if (motion) return motion;
+      if (motion) {
+        return motion;
+      }
       continue;
     }
 
     const primary = text.match(/Primary font:\s*([^()\n;]+)/i);
-    if (primary) return cleanIgnoreValueDisplay(primary[1]);
+    if (primary) {
+      return cleanIgnoreValueDisplay(primary[1]);
+    }
 
     const googleLabel = text.match(/Google Fonts:\s*([^()\n;]+)/i);
-    if (googleLabel) return cleanIgnoreValueDisplay(googleLabel[1]);
+    if (googleLabel) {
+      return cleanIgnoreValueDisplay(googleLabel[1]);
+    }
 
     const family = text.match(/font-family\s*:\s*["']?([^'",;\n]+)/i);
-    if (family) return cleanIgnoreValueDisplay(family[1]);
+    if (family) {
+      return cleanIgnoreValueDisplay(family[1]);
+    }
 
     const google = text.match(/[?&]family=([^&:;\n]+)/i);
     if (google) {
@@ -652,17 +758,23 @@ function extractFindingIgnoreValueRaw(
 
 function extractMotionIgnoreValue(text) {
   const tailwind = text.match(/\banimate-bounce\b/i);
-  if (tailwind) return cleanIgnoreValueDisplay(tailwind[0]);
+  if (tailwind) {
+    return cleanIgnoreValueDisplay(tailwind[0]);
+  }
 
   const bezier = text.match(/cubic-bezier\([^)]+\)/i);
-  if (bezier) return cleanIgnoreValueDisplay(bezier[0]);
+  if (bezier) {
+    return cleanIgnoreValueDisplay(bezier[0]);
+  }
 
   const animation = text.match(/animation(?:-name)?\s*:\s*([^;\n]+)/i);
   if (animation) {
     const token = animation[1]
       .split(/[,\s]+/)
       .find((part) => /bounce|elastic|wobble|jiggle|spring/i.test(part));
-    if (token) return cleanIgnoreValueDisplay(token);
+    if (token) {
+      return cleanIgnoreValueDisplay(token);
+    }
   }
 
   return "";
@@ -671,9 +783,9 @@ function extractMotionIgnoreValue(text) {
 function cleanIgnoreValueDisplay(value) {
   return String(value || "")
     .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ");
+    .replaceAll(/^["']|["']$/g, "")
+    .replaceAll("+", " ")
+    .replaceAll(/\s+/g, " ");
 }
 
 /**
@@ -684,8 +796,9 @@ export function getHookConsent(root) {
   let consent;
   for (const filePath of [getConfigPath(root), getLocalConfigPath(root)]) {
     const hook = hookSection(safeReadJson(filePath));
-    if (hook && (hook.consent === "accepted" || hook.consent === "declined"))
+    if (hook && (hook.consent === "accepted" || hook.consent === "declined")) {
       consent = hook.consent;
+    }
   }
   return consent;
 }
@@ -717,7 +830,9 @@ const EXCLUDE_PATTERNS = [".impeccable/config.local.json"];
 export function ensureConfigGitExclude(root) {
   try {
     const gitDir = resolveGitDir(root);
-    if (!gitDir) return false;
+    if (!gitDir) {
+      return false;
+    }
     const target = join(gitDir, "info", "exclude");
     const existing = existsSync(target) ? readFileSync(target, "utf-8") : "";
     const block = [EXCLUDE_OPEN, ...EXCLUDE_PATTERNS, EXCLUDE_CLOSE].join("\n");
@@ -748,9 +863,13 @@ export function ensureConfigGitExclude(root) {
 
 function resolveGitDir(root) {
   const dotGit = join(root, ".git");
-  if (!existsSync(dotGit)) return null;
+  if (!existsSync(dotGit)) {
+    return null;
+  }
   try {
-    if (statSync(dotGit).isDirectory()) return dotGit;
+    if (statSync(dotGit).isDirectory()) {
+      return dotGit;
+    }
     // A `.git` file (worktree/submodule) points elsewhere: "gitdir: <path>".
     const match = readFileSync(dotGit, "utf-8").match(/gitdir:\s*(.+)/);
     if (match) {
@@ -764,5 +883,5 @@ function resolveGitDir(root) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

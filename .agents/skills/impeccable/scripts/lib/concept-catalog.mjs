@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
+
 import { WELL_TIERS } from "./roll-selection.mjs";
 
 export const CONCEPT_STATUSES = new Set(["approved", "rejected"]);
@@ -52,8 +53,8 @@ export function normalizeConceptForm(value) {
   return String(value || "")
     .normalize("NFKD")
     .toLowerCase()
-    .replace(/[’‘]/g, "'")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replaceAll(/[’‘]/g, "'")
+    .replaceAll(/[^a-z0-9]+/g, " ")
     .trim();
 }
 
@@ -236,8 +237,8 @@ export function conceptContentHash(concept) {
 }
 
 export function readConceptCatalog(catalogPath, reviewsPath) {
-  const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
-  const reviewData = JSON.parse(readFileSync(reviewsPath, "utf8"));
+  const catalog = JSON.parse(readFileSync(catalogPath, "utf-8"));
+  const reviewData = JSON.parse(readFileSync(reviewsPath, "utf-8"));
   const reviews = reviewData.reviews || {};
   const wellsById = new Map(
     (catalog.wells || []).map((well) => [well.id, well])
@@ -250,16 +251,16 @@ export function readConceptCatalog(catalogPath, reviewsPath) {
         ...concept,
         familyId: family.id,
         familyLabel: family.label,
+        review: reviews[concept.id] || null,
+        status: reviews[concept.id]?.status || "pending",
         wellId: family.well || null,
         wellLabel: wellsById.get(family.well)?.label || null,
         wellTier: wellsById.get(family.well)?.tier || null,
-        status: reviews[concept.id]?.status || "pending",
-        review: reviews[concept.id] || null,
       });
     }
   }
 
-  return { catalog, reviewData, reviews, concepts };
+  return { catalog, concepts, reviewData, reviews };
 }
 
 export function validateConceptCatalog(
@@ -361,12 +362,12 @@ export function validateConceptCatalog(
     if (typeof family.label !== "string" || !family.label.trim()) {
       errors.push(`family ${family.id || "(unknown)"} needs a label`);
     }
-    if (!wellIds.has(family.well)) {
+    if (wellIds.has(family.well)) {
+      populatedWells.add(family.well);
+    } else {
       errors.push(
         `family ${family.id || "(unknown)"} must belong to a declared well, got: ${String(family.well)}`
       );
-    } else {
-      populatedWells.add(family.well);
     }
     if (!Array.isArray(family.concepts) || family.concepts.length === 0) {
       errors.push(`family ${family.id || "(unknown)"} has no concepts`);
@@ -383,7 +384,9 @@ export function validateConceptCatalog(
       );
       conceptIds.add(concept.id);
       const normalized = normalizeConceptForm(concept.form);
-      if (normalized) normalizedForms.set(normalized, concept.id);
+      if (normalized) {
+        normalizedForms.set(normalized, concept.id);
+      }
       if (
         typeof concept.webLeverage === "string" &&
         !WEB_LEVERAGE_RE.test(concept.webLeverage)
@@ -420,10 +423,12 @@ export function validateConceptCatalog(
     concepts.map((concept) => [concept.id, concept])
   );
   for (const [id, review] of Object.entries(reviewData?.reviews || {})) {
-    if (!conceptIds.has(id))
+    if (!conceptIds.has(id)) {
       errors.push(`review references missing concept: ${id}`);
-    if (!CONCEPT_STATUSES.has(review?.status))
+    }
+    if (!CONCEPT_STATUSES.has(review?.status)) {
       errors.push(`invalid review status for ${id}: ${String(review?.status)}`);
+    }
     if (typeof review?.reviewedBy !== "string" || !review.reviewedBy.trim()) {
       errors.push(`review ${id} needs reviewedBy`);
     }
@@ -518,25 +523,26 @@ export function validateConceptCatalog(
       .map((family) => wellTierById.get(family.well))
       .filter((tier) => WELL_TIERS.includes(tier))
   );
-  if (requireApprovedMinimum && approved.length < 3)
+  if (requireApprovedMinimum && approved.length < 3) {
     errors.push("at least three concepts must be approved");
+  }
   if (requireApprovedMinimum && approvedTiers.size < WELL_TIERS.length) {
     errors.push("approved concepts must cover every challenger tier");
   }
 
   return {
     errors,
-    warnings,
     stats: {
-      wells: wellIds.size,
-      families: familyIds.size,
-      concepts: concepts.length,
       approved: approved.length,
+      concepts: concepts.length,
+      families: familyIds.size,
       pending: concepts.length - Object.keys(reviewData?.reviews || {}).length,
       rejected: Object.values(reviewData?.reviews || {}).filter(
         (review) => review?.status === "rejected"
       ).length,
+      wells: wellIds.size,
     },
+    warnings,
   };
 }
 

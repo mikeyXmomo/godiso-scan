@@ -3,7 +3,6 @@
  * Print durable recovery status for Impeccable live sessions.
  */
 
-import { createLiveSessionStore } from "./live/session-store.mjs";
 import { readLiveServerInfo } from "./lib/impeccable-paths.mjs";
 import {
   manualApplyResumeHint,
@@ -11,18 +10,23 @@ import {
   renderSummary,
 } from "./live-resume.mjs";
 import { enterLiveRoot } from "./live/roots.mjs";
+import { createLiveSessionStore } from "./live/session-store.mjs";
 
 function readServerInfo() {
   return readLiveServerInfo(process.cwd())?.info || null;
 }
 
 async function fetchServerStatus(info) {
-  if (!info) return null;
+  if (!info) {
+    return null;
+  }
   try {
     const res = await fetch(
       `http://localhost:${info.port}/status?token=${info.token}`
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return null;
+    }
     return await res.json();
   } catch {
     return null;
@@ -39,28 +43,32 @@ export async function statusCli() {
   const renderFailure =
     sessions.find((session) => session?.renderState === "failed") || null;
   const payload = {
+    activeSessions: sessions,
     liveServer: server
       ? {
-          status: server.status,
-          port: server.port,
-          connectedClients: server.connectedClients,
           agentPolling: server.agentPolling,
+          connectedClients: server.connectedClients,
           pendingEvents: server.pendingEvents,
+          port: server.port,
+          status: server.status,
         }
       : null,
-    activeSessions: sessions,
+    recoveryHint: recoveryHint({ manualApply, renderFailure, server }),
     render: sessions.map((session) => ({
       id: session?.id ?? null,
       ...renderSummary(session),
     })),
-    recoveryHint: recoveryHint({ server, manualApply, renderFailure }),
   };
   console.log(JSON.stringify(payload, null, 2));
 }
 
 function recoveryHint({ server, manualApply, renderFailure }) {
-  if (manualApply) return manualApplyResumeHint(manualApply);
-  if (renderFailure) return mountFailureAction(renderFailure);
+  if (manualApply) {
+    return manualApplyResumeHint(manualApply);
+  }
+  if (renderFailure) {
+    return mountFailureAction(renderFailure);
+  }
   if (server) {
     return "Run live-poll.mjs to continue pending work, or live-complete.mjs --id <session> after manual cleanup.";
   }
@@ -71,7 +79,9 @@ function findPendingManualApply(server, activeSessions) {
   const fromServer = server?.pendingEvents?.find(
     (event) => event?.type === "manual_edit_apply"
   );
-  if (fromServer) return fromServer;
+  if (fromServer) {
+    return fromServer;
+  }
   const fromSession = activeSessions
     ?.map((session) => session.pendingEvent)
     .find((event) => event?.type === "manual_edit_apply");

@@ -47,6 +47,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+
 import { extractPlatform, loadContext } from "./context.mjs";
 import { IMPECCABLE_COMMAND } from "./lib/provider.mjs";
 // `detector.extensions` (issue #316) is shared with Live's source search, which
@@ -60,8 +61,8 @@ import {
 
 export { matchConfiguredExtension };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = import.meta.filename;
+const __dirname = import.meta.dirname;
 
 export const ENVELOPE_PREFIX = "[impeccable@1]";
 
@@ -190,7 +191,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   // next to source and run 200KB+, while genuinely authored stylesheets in
   // this codebase top out under 90KB. A single file past the ceiling is a
   // bundle, and findings against a bundle are never actionable.
-  limits: { maxFindings: 5, maxChars: 8000, maxFileBytes: 131072 },
+  limits: { maxChars: 8000, maxFileBytes: 131_072, maxFindings: 5 },
 });
 
 export const HOOK_LOCAL_IGNORE_PATTERNS = Object.freeze([
@@ -209,10 +210,16 @@ export function truthy(value) {
 }
 
 function depthIsSet(value) {
-  if (value === undefined || value === null) return false;
+  if (value === undefined || value === null) {
+    return false;
+  }
   const text = String(value).trim();
-  if (!text) return false;
-  if (TRUTHY.test(text)) return true;
+  if (!text) {
+    return false;
+  }
+  if (TRUTHY.test(text)) {
+    return true;
+  }
   return /^\d+$/.test(text) && Number(text) > 0;
 }
 
@@ -272,9 +279,12 @@ export function resolveCacheCwd(primaryFile, sessionCwd) {
     !primaryFile ||
     typeof primaryFile !== "string" ||
     hasPathTraversal(primaryFile)
-  )
+  ) {
     return base;
-  if (looksLikeProjectRoot(base)) return base;
+  }
+  if (looksLikeProjectRoot(base)) {
+    return base;
+  }
   let dir;
   try {
     dir = path.dirname(path.resolve(primaryFile));
@@ -283,10 +293,16 @@ export function resolveCacheCwd(primaryFile, sessionCwd) {
   }
   const home = path.resolve(os.homedir());
   while (true) {
-    if (dir === home) return base;
-    if (looksLikeProjectRoot(dir)) return dir;
+    if (dir === home) {
+      return base;
+    }
+    if (looksLikeProjectRoot(dir)) {
+      return dir;
+    }
     const parent = path.dirname(dir);
-    if (parent === dir) return base;
+    if (parent === dir) {
+      return base;
+    }
     dir = parent;
   }
 }
@@ -328,14 +344,18 @@ export function readConfig(cwd) {
 
 // The hook settings subtree of a unified config.json / config.local.json.
 function hookSection(raw) {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
   return raw.hook && typeof raw.hook === "object" && !Array.isArray(raw.hook)
     ? raw.hook
     : null;
 }
 
 function detectorSection(raw) {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
   return raw.detector &&
     typeof raw.detector === "object" &&
     !Array.isArray(raw.detector)
@@ -350,17 +370,19 @@ function numberOr(value, fallback) {
 function cloneDefaultConfig() {
   return {
     ...DEFAULT_CONFIG,
-    ignoreRules: [],
-    ignoreFiles: [],
-    ignoreValues: [],
-    extensions: [],
     designSystem: { ...DEFAULT_CONFIG.designSystem },
+    extensions: [],
+    ignoreFiles: [],
+    ignoreRules: [],
+    ignoreValues: [],
     limits: { ...DEFAULT_CONFIG.limits },
   };
 }
 
 function applyDetectorConfigSource(config, raw) {
-  if (!raw || typeof raw !== "object") return config;
+  if (!raw || typeof raw !== "object") {
+    return config;
+  }
   // `detector.advisoryRules: "include"` opts the hook into advisory rules
   // (em-dash overuse, etc.). Any other value keeps the default "exclude".
   if (raw.advisoryRules === "include" || raw.advisoryRules === "exclude") {
@@ -401,11 +423,13 @@ function applyDetectorConfigSource(config, raw) {
 }
 
 function applyConfigSource(config, raw) {
-  if (!raw || typeof raw !== "object") return config;
-  if (Object.prototype.hasOwnProperty.call(raw, "enabled")) {
+  if (!raw || typeof raw !== "object") {
+    return config;
+  }
+  if (Object.hasOwn(raw, "enabled")) {
     config.enabled = raw.enabled === false ? false : true;
   }
-  if (Object.prototype.hasOwnProperty.call(raw, "quiet")) {
+  if (Object.hasOwn(raw, "quiet")) {
     config.quiet = raw.quiet === true;
   }
   if (raw.perEditRules === "all" || raw.perEditRules === "immediate") {
@@ -417,27 +441,27 @@ function applyConfigSource(config, raw) {
   applyDetectorConfigSource(config, raw);
   if (raw.limits && typeof raw.limits === "object") {
     config.limits = {
-      maxFindings: numberOr(raw.limits.maxFindings, config.limits.maxFindings),
       maxChars: numberOr(raw.limits.maxChars, config.limits.maxChars),
       maxFileBytes: numberOr(
         raw.limits.maxFileBytes,
         config.limits.maxFileBytes
       ),
+      maxFindings: numberOr(raw.limits.maxFindings, config.limits.maxFindings),
     };
   }
   return config;
 }
 
 function uniqueStrings(values) {
-  return Array.from(new Set(values.map(String)));
+  return [...new Set(values.map(String))];
 }
 
 export function normalizeIgnoreValue(value) {
   return String(value || "")
     .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll(/^["']|["']$/g, "")
+    .replaceAll("+", " ")
+    .replaceAll(/\s+/g, " ")
     .toLowerCase();
 }
 
@@ -449,7 +473,9 @@ function normalizeIgnoreRule(rule) {
 
 function colorIgnoreKey(value) {
   const color = parseIgnoreColor(value);
-  if (!color) return "";
+  if (!color) {
+    return "";
+  }
   return `${color.r},${color.g},${color.b},${Math.round(color.a * 255)}`;
 }
 
@@ -457,32 +483,44 @@ function parseIgnoreColor(value) {
   const text = String(value || "")
     .trim()
     .toLowerCase();
-  if (!text) return null;
+  if (!text) {
+    return null;
+  }
 
   const hex = text.match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-  if (hex) return parseHexIgnoreColor(hex[1]);
+  if (hex) {
+    return parseHexIgnoreColor(hex[1]);
+  }
 
   const rgb = text.match(/^rgba?\((.*)\)$/i);
   if (rgb) {
     const parts = splitColorArgs(rgb[1]);
-    if (parts.length < 3 || parts.length > 4) return null;
+    if (parts.length < 3 || parts.length > 4) {
+      return null;
+    }
     const r = parseRgbChannel(parts[0]);
     const g = parseRgbChannel(parts[1]);
     const b = parseRgbChannel(parts[2]);
     const a = parts[3] === undefined ? 1 : parseAlphaChannel(parts[3]);
-    if ([r, g, b, a].some((v) => v === null)) return null;
-    return { r, g, b, a };
+    if ([r, g, b, a].some((v) => v === null)) {
+      return null;
+    }
+    return { a, b, g, r };
   }
 
   const hsl = text.match(/^hsla?\((.*)\)$/i);
   if (hsl) {
     const parts = splitColorArgs(hsl[1]);
-    if (parts.length < 3 || parts.length > 4) return null;
+    if (parts.length < 3 || parts.length > 4) {
+      return null;
+    }
     const h = parseHueChannel(parts[0]);
     const s = parsePercentChannel(parts[1]);
     const l = parsePercentChannel(parts[2]);
     const a = parts[3] === undefined ? 1 : parseAlphaChannel(parts[3]);
-    if ([h, s, l, a].some((v) => v === null)) return null;
+    if ([h, s, l, a].some((v) => v === null)) {
+      return null;
+    }
     return hslToRgb(h, s, l, a);
   }
 
@@ -491,28 +529,30 @@ function parseIgnoreColor(value) {
 
 function parseHexIgnoreColor(hex) {
   if (hex.length === 3 || hex.length === 4) {
-    const r = parseInt(hex[0] + hex[0], 16);
-    const g = parseInt(hex[1] + hex[1], 16);
-    const b = parseInt(hex[2] + hex[2], 16);
-    const a = hex.length === 4 ? parseInt(hex[3] + hex[3], 16) / 255 : 1;
-    return { r, g, b, a };
+    const r = Number.parseInt(hex[0] + hex[0], 16);
+    const g = Number.parseInt(hex[1] + hex[1], 16);
+    const b = Number.parseInt(hex[2] + hex[2], 16);
+    const a = hex.length === 4 ? Number.parseInt(hex[3] + hex[3], 16) / 255 : 1;
+    return { a, b, g, r };
   }
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
-  return { r, g, b, a };
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  const a = hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) / 255 : 1;
+  return { a, b, g, r };
 }
 
 function splitColorArgs(body) {
   const text = String(body || "").trim();
-  if (!text) return [];
+  if (!text) {
+    return [];
+  }
   if (text.includes(",")) {
     const parts = text
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
-    const last = parts[parts.length - 1];
+    const last = parts.at(-1);
     if (last && last.includes("/")) {
       const split = last
         .split("/")
@@ -523,7 +563,7 @@ function splitColorArgs(body) {
     return parts;
   }
   return text
-    .replace(/\s*\/\s*/g, " / ")
+    .replaceAll(/\s*\/\s*/g, " / ")
     .split(/\s+/)
     .filter((part) => part && part !== "/");
 }
@@ -531,20 +571,30 @@ function splitColorArgs(body) {
 function parseRgbChannel(raw) {
   const text = String(raw || "").trim();
   const match = text.match(/^(-?\d*\.?\d+)(%)?$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const value = Number.parseFloat(match[1]);
-  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(value)) {
+    return null;
+  }
   const scaled = match[2] ? value * 2.55 : value;
-  if (scaled < 0 || scaled > 255) return null;
+  if (scaled < 0 || scaled > 255) {
+    return null;
+  }
   return Math.round(scaled);
 }
 
 function parseAlphaChannel(raw) {
   const text = String(raw || "").trim();
   const match = text.match(/^(-?\d*\.?\d+)(%)?$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const value = Number.parseFloat(match[1]);
-  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(value)) {
+    return null;
+  }
   const alpha = match[2] ? value / 100 : value;
   return alpha >= 0 && alpha <= 1 ? alpha : null;
 }
@@ -552,22 +602,36 @@ function parseAlphaChannel(raw) {
 function parseHueChannel(raw) {
   const text = String(raw || "").trim();
   const match = text.match(/^(-?\d*\.?\d+)(deg|rad|turn|grad)?$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const value = Number.parseFloat(match[1]);
-  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(value)) {
+    return null;
+  }
   const unit = match[2] || "deg";
-  if (unit === "turn") return value * 360;
-  if (unit === "rad") return value * (180 / Math.PI);
-  if (unit === "grad") return value * 0.9;
+  if (unit === "turn") {
+    return value * 360;
+  }
+  if (unit === "rad") {
+    return value * (180 / Math.PI);
+  }
+  if (unit === "grad") {
+    return value * 0.9;
+  }
   return value;
 }
 
 function parsePercentChannel(raw) {
   const text = String(raw || "").trim();
   const match = text.match(/^(-?\d*\.?\d+)%$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const value = Number.parseFloat(match[1]);
-  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(value)) {
+    return null;
+  }
   return value >= 0 && value <= 100 ? value / 100 : null;
 }
 
@@ -575,7 +639,7 @@ function hslToRgb(hue, saturation, lightness, alpha) {
   const h = (((hue % 360) + 360) % 360) / 360;
   if (saturation === 0) {
     const gray = clampByte(Math.round(lightness * 255));
-    return { r: gray, g: gray, b: gray, a: alpha };
+    return { a: alpha, b: gray, g: gray, r: gray };
   }
   const q =
     lightness < 0.5
@@ -584,18 +648,28 @@ function hslToRgb(hue, saturation, lightness, alpha) {
   const p = 2 * lightness - q;
   const toRgb = (t) => {
     let channel = t;
-    if (channel < 0) channel += 1;
-    if (channel > 1) channel -= 1;
-    if (channel < 1 / 6) return p + (q - p) * 6 * channel;
-    if (channel < 1 / 2) return q;
-    if (channel < 2 / 3) return p + (q - p) * (2 / 3 - channel) * 6;
+    if (channel < 0) {
+      channel += 1;
+    }
+    if (channel > 1) {
+      channel -= 1;
+    }
+    if (channel < 1 / 6) {
+      return p + (q - p) * 6 * channel;
+    }
+    if (channel < 1 / 2) {
+      return q;
+    }
+    if (channel < 2 / 3) {
+      return p + (q - p) * (2 / 3 - channel) * 6;
+    }
     return p;
   };
   return {
-    r: clampByte(Math.round(toRgb(h + 1 / 3) * 255)),
-    g: clampByte(Math.round(toRgb(h) * 255)),
-    b: clampByte(Math.round(toRgb(h - 1 / 3) * 255)),
     a: alpha,
+    b: clampByte(Math.round(toRgb(h - 1 / 3) * 255)),
+    g: clampByte(Math.round(toRgb(h) * 255)),
+    r: clampByte(Math.round(toRgb(h + 1 / 3) * 255)),
   };
 }
 
@@ -604,20 +678,30 @@ function clampByte(value) {
 }
 
 function ignoreValueMatches(rule, entryValue, findingValue) {
-  if (entryValue === findingValue) return true;
-  if (rule !== "design-system-color") return false;
+  if (entryValue === findingValue) {
+    return true;
+  }
+  if (rule !== "design-system-color") {
+    return false;
+  }
   const entryColor = colorIgnoreKey(entryValue);
   return Boolean(entryColor && entryColor === colorIgnoreKey(findingValue));
 }
 
 export function normalizeIgnoreValueEntries(entries) {
-  if (!Array.isArray(entries)) return [];
+  if (!Array.isArray(entries)) {
+    return [];
+  }
   const out = [];
   for (const entry of entries) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
     const rule = normalizeIgnoreRule(entry.rule);
     const value = normalizeIgnoreValue(entry.value);
-    if (!rule || !value) continue;
+    if (!rule || !value) {
+      continue;
+    }
     const normalized = { rule, value };
     const files = uniqueStrings([
       ...(typeof entry.file === "string" && entry.file.trim()
@@ -629,7 +713,9 @@ export function normalizeIgnoreValueEntries(entries) {
             .map((v) => v.trim())
         : []),
     ]);
-    if (files.length > 0) normalized.files = files;
+    if (files.length > 0) {
+      normalized.files = files;
+    }
     // Key order is rule, value, files, createdAt, reason and must stay that way:
     // normalizing runs on every write, so emitting a different order than the one
     // already on disk rewrites every untouched entry and churns the diff.
@@ -658,26 +744,26 @@ function mergeIgnoreValues(existing, incoming) {
       entry
     );
   }
-  return Array.from(map.values());
+  return [...map.values()];
 }
 
 function ignoreValueFilesKey(files) {
   // Sort before joining: a scope is a set, so an entry already on disk in another
   // order must compare equal rather than dedup as two distinct entries.
   return Array.isArray(files) && files.length > 0
-    ? [...files].sort().join("\x1f")
+    ? [...files].sort().join("\u001F")
     : "";
 }
 
 export function readCache(cwd) {
   const raw = safeReadJson(getCachePath(cwd));
   if (!raw || typeof raw !== "object" || raw.version !== 1) {
-    return { version: 1, sessions: {} };
+    return { sessions: {}, version: 1 };
   }
   return {
-    version: 1,
     sessions:
       raw.sessions && typeof raw.sessions === "object" ? raw.sessions : {},
+    version: 1,
   };
 }
 
@@ -691,7 +777,9 @@ export function persistCache(cwd, cache) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, CACHE_MAX_SESSIONS);
     const next = {};
-    for (const [id] of ordered) next[id] = sessions[id];
+    for (const [id] of ordered) {
+      next[id] = sessions[id];
+    }
     cache = { ...cache, sessions: next };
   }
   const target = getCachePath(cwd);
@@ -710,8 +798,8 @@ export function ensureHookGitExcludes(cwd = process.cwd()) {
     const target = resolveHookGitExcludeTarget(cwd);
     if (!target) {
       return {
-        mode: "none",
         changed: false,
+        mode: "none",
         patterns: [...HOOK_LOCAL_IGNORE_PATTERNS],
       };
     }
@@ -751,18 +839,18 @@ export function ensureHookGitExcludes(cwd = process.cwd()) {
     }
 
     return {
-      mode: "git-info-exclude",
+      changed: updated !== existing,
       file: path
         .relative(path.resolve(cwd), target.path)
         .split(path.sep)
         .join("/"),
-      changed: updated !== existing,
+      mode: "git-info-exclude",
       patterns,
     };
   } catch {
     return {
-      mode: "error",
       changed: false,
+      mode: "error",
       patterns: [...HOOK_LOCAL_IGNORE_PATTERNS],
     };
   }
@@ -775,7 +863,9 @@ function resolveHookGitExcludeTarget(cwd) {
     const dotGit = path.join(dir, ".git");
     if (fs.existsSync(dotGit)) {
       const gitDir = resolveGitDir(dotGit, dir);
-      if (!gitDir) return null;
+      if (!gitDir) {
+        return null;
+      }
       const relPrefix = path.relative(dir, start).split(path.sep).join("/");
       return {
         path: path.join(gitDir, "info", "exclude"),
@@ -783,31 +873,39 @@ function resolveHookGitExcludeTarget(cwd) {
       };
     }
     const parent = path.dirname(dir);
-    if (parent === dir) return null;
+    if (parent === dir) {
+      return null;
+    }
     dir = parent;
   }
 }
 
 function resolveGitDir(dotGit, worktreeDir) {
   const stat = fs.statSync(dotGit);
-  if (stat.isDirectory()) return dotGit;
-  if (!stat.isFile()) return null;
+  if (stat.isDirectory()) {
+    return dotGit;
+  }
+  if (!stat.isFile()) {
+    return null;
+  }
 
   const body = fs.readFileSync(dotGit, "utf-8").trim();
   const match = body.match(/^gitdir:\s*(.+)$/i);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   return path.isAbsolute(match[1])
     ? match[1]
     : path.resolve(worktreeDir, match[1]);
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function ensureSession(cache, sessionId) {
   if (!cache.sessions[sessionId]) {
-    cache.sessions[sessionId] = { updatedAt: Date.now(), files: {} };
+    cache.sessions[sessionId] = { files: {}, updatedAt: Date.now() };
   }
   return cache.sessions[sessionId];
 }
@@ -849,7 +947,9 @@ function globToRegex(glob) {
       if (glob[i + 1] === "*") {
         re += ".*";
         i += 2;
-        if (glob[i] === "/") i += 1;
+        if (glob[i] === "/") {
+          i += 1;
+        }
       } else {
         re += "[^/]*";
         i += 1;
@@ -867,7 +967,7 @@ function globToRegex(glob) {
       const parts = glob
         .slice(i + 1, end)
         .split(",")
-        .map((p) => p.replace(/[.+^$()|[\]\\]/g, "\\$&"));
+        .map((p) => p.replaceAll(/[.+^$()|[\]\\]/g, "\\$&"));
       re += `(?:${parts.join("|")})`;
       i = end + 1;
     } else if (/[.+^$()|[\]\\]/.test(c)) {
@@ -883,16 +983,22 @@ function globToRegex(glob) {
 }
 
 export function matchesAnyGlob(filePath, globs) {
-  if (!Array.isArray(globs) || globs.length === 0) return false;
+  if (!Array.isArray(globs) || globs.length === 0) {
+    return false;
+  }
   const normalized = filePath.split(path.sep).join("/");
   for (const glob of globs) {
     try {
       const re = globToRegex(String(glob));
-      if (re.test(normalized)) return true;
+      if (re.test(normalized)) {
+        return true;
+      }
       // Match against basename too for convenience: `*.generated.tsx` should
       // catch `src/foo.generated.tsx` without requiring `**/`.
       const base = normalized.split("/").pop();
-      if (re.test(base)) return true;
+      if (re.test(base)) {
+        return true;
+      }
     } catch {
       /* malformed glob, skip */
     }
@@ -901,7 +1007,9 @@ export function matchesAnyGlob(filePath, globs) {
 }
 
 export function filterFindings(findings, _content, _ext, config) {
-  if (!Array.isArray(findings) || findings.length === 0) return [];
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return [];
+  }
   const ignoreRules = new Set(
     (config.ignoreRules || []).map((rule) => normalizeIgnoreRule(rule))
   );
@@ -911,10 +1019,18 @@ export function filterFindings(findings, _content, _ext, config) {
   const includeAdvisory =
     (config?.advisoryRules || DEFAULT_CONFIG.advisoryRules) === "include";
   return findings.filter((f) => {
-    if (!f || typeof f !== "object") return false;
-    if (!includeAdvisory && isAdvisoryFinding(f)) return false;
-    if (ignoreRules.has(normalizeIgnoreRule(f.antipattern))) return false;
-    if (isIgnoredFindingValue(f, ignoreValues)) return false;
+    if (!f || typeof f !== "object") {
+      return false;
+    }
+    if (!includeAdvisory && isAdvisoryFinding(f)) {
+      return false;
+    }
+    if (ignoreRules.has(normalizeIgnoreRule(f.antipattern))) {
+      return false;
+    }
+    if (isIgnoredFindingValue(f, ignoreValues)) {
+      return false;
+    }
     return true;
   });
 }
@@ -932,7 +1048,7 @@ export function splitFindingsByTier(findings) {
       deferred.push(f);
     }
   }
-  return { immediate, deferred };
+  return { deferred, immediate };
 }
 
 // Whether the per-edit pass for this harness should defer non-immediate
@@ -940,46 +1056,64 @@ export function splitFindingsByTier(findings) {
 // our Stop hook; Cursor and GitHub Copilot have no deep pass wired, so
 // deferring for them would silently drop the non-immediate rules entirely.
 export function perEditTieringActive(config, harness) {
-  if (harness === "cursor" || harness === "github") return false;
+  if (harness === "cursor" || harness === "github") {
+    return false;
+  }
   return (config?.perEditRules || DEFAULT_CONFIG.perEditRules) !== "all";
 }
 
 function isIgnoredFindingValue(finding, ignoreValues) {
-  if (!Array.isArray(ignoreValues) || ignoreValues.length === 0) return false;
+  if (!Array.isArray(ignoreValues) || ignoreValues.length === 0) {
+    return false;
+  }
   const rule = normalizeIgnoreRule(finding.antipattern);
-  if (!rule) return false;
+  if (!rule) {
+    return false;
+  }
   // File-scoped wildcards suppress rules with no extractable value, such as side-tab.
   const value = extractFindingIgnoreValue(finding);
   return ignoreValues.some((entry) => {
-    if (entry.rule !== rule) return false;
+    if (entry.rule !== rule) {
+      return false;
+    }
     const wildcardValue = entry.value === "*";
     if (
       !wildcardValue &&
       (!value || !ignoreValueMatches(rule, entry.value, value))
-    )
+    ) {
       return false;
-    if (!Array.isArray(entry.files) || entry.files.length === 0)
+    }
+    if (!Array.isArray(entry.files) || entry.files.length === 0) {
       return !wildcardValue;
+    }
     return findingMatchesScopedIgnoreFile(finding, entry.files);
   });
 }
 
 function findingMatchesScopedIgnoreFile(finding, globs) {
   const filePath = String(finding?.file || "").trim();
-  if (!filePath) return false;
-  if (matchesAnyGlob(filePath, globs)) return true;
+  if (!filePath) {
+    return false;
+  }
+  if (matchesAnyGlob(filePath, globs)) {
+    return true;
+  }
 
   const normalized = filePath.split(path.sep).join("/");
   const parts = normalized.split("/").filter(Boolean);
   for (let i = 0; i < parts.length; i++) {
     const suffix = parts.slice(i).join("/");
-    if (matchesAnyGlob(suffix, globs)) return true;
+    if (matchesAnyGlob(suffix, globs)) {
+      return true;
+    }
   }
   return false;
 }
 
 export function extractFindingIgnoreValue(finding) {
-  if (!finding || typeof finding !== "object") return "";
+  if (!finding || typeof finding !== "object") {
+    return "";
+  }
   const rule = normalizeIgnoreRule(finding.antipattern);
   const directValueRules = new Set([
     "overused-font",
@@ -989,7 +1123,9 @@ export function extractFindingIgnoreValue(finding) {
     "design-system-radius",
     "design-system-font-size",
   ]);
-  if (!directValueRules.has(rule)) return "";
+  if (!directValueRules.has(rule)) {
+    return "";
+  }
   return normalizeIgnoreValue(extractFindingIgnoreValueRaw(finding, rule));
 }
 
@@ -1000,7 +1136,9 @@ function extractFindingIgnoreValueRaw(
   const direct = cleanIgnoreValueDisplay(
     finding.ignoreValue || finding.value || ""
   );
-  if (direct) return direct;
+  if (direct) {
+    return direct;
+  }
 
   const candidates = [finding.detail, finding.snippet].filter(
     (v) => typeof v === "string" && v
@@ -1008,18 +1146,26 @@ function extractFindingIgnoreValueRaw(
   for (const text of candidates) {
     if (rule === "bounce-easing") {
       const motion = extractMotionIgnoreValue(text);
-      if (motion) return motion;
+      if (motion) {
+        return motion;
+      }
       continue;
     }
 
     const primary = text.match(/Primary font:\s*([^()\n;]+)/i);
-    if (primary) return cleanIgnoreValueDisplay(primary[1]);
+    if (primary) {
+      return cleanIgnoreValueDisplay(primary[1]);
+    }
 
     const googleLabel = text.match(/Google Fonts:\s*([^()\n;]+)/i);
-    if (googleLabel) return cleanIgnoreValueDisplay(googleLabel[1]);
+    if (googleLabel) {
+      return cleanIgnoreValueDisplay(googleLabel[1]);
+    }
 
     const family = text.match(/font-family\s*:\s*["']?([^'",;\n]+)/i);
-    if (family) return cleanIgnoreValueDisplay(family[1]);
+    if (family) {
+      return cleanIgnoreValueDisplay(family[1]);
+    }
 
     const google = text.match(/[?&]family=([^&:;\n]+)/i);
     if (google) {
@@ -1036,17 +1182,23 @@ function extractFindingIgnoreValueRaw(
 
 function extractMotionIgnoreValue(text) {
   const tailwind = text.match(/\banimate-bounce\b/i);
-  if (tailwind) return cleanIgnoreValueDisplay(tailwind[0]);
+  if (tailwind) {
+    return cleanIgnoreValueDisplay(tailwind[0]);
+  }
 
   const bezier = text.match(/cubic-bezier\([^)]+\)/i);
-  if (bezier) return cleanIgnoreValueDisplay(bezier[0]);
+  if (bezier) {
+    return cleanIgnoreValueDisplay(bezier[0]);
+  }
 
   const animation = text.match(/animation(?:-name)?\s*:\s*([^;\n]+)/i);
   if (animation) {
     const token = animation[1]
       .split(/[,\s]+/)
       .find((part) => /bounce|elastic|wobble|jiggle|spring/i.test(part));
-    if (token) return cleanIgnoreValueDisplay(token);
+    if (token) {
+      return cleanIgnoreValueDisplay(token);
+    }
   }
 
   return "";
@@ -1055,19 +1207,23 @@ function extractMotionIgnoreValue(text) {
 function cleanIgnoreValueDisplay(value) {
   return String(value || "")
     .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ");
+    .replaceAll(/^["']|["']$/g, "")
+    .replaceAll("+", " ")
+    .replaceAll(/\s+/g, " ");
 }
 
 export function dedupeAgainstCache(findings, cache, sessionId, filePath) {
-  if (!Array.isArray(findings) || findings.length === 0) return [];
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return [];
+  }
   const fileEntry = ensureFile(cache, sessionId, filePath);
   const known = new Set(fileEntry.findings || []);
   const fresh = [];
   for (const f of findings) {
     const key = findingCacheKey(f);
-    if (known.has(key)) continue;
+    if (known.has(key)) {
+      continue;
+    }
     known.add(key);
     fresh.push(f);
   }
@@ -1087,16 +1243,22 @@ export function dedupeAgainstCache(findings, cache, sessionId, filePath) {
 export function rememberFindings(cache, sessionId, filePath, findings) {
   const fileEntry = ensureFile(cache, sessionId, filePath);
   const keys = new Set((findings || []).map((f) => findingCacheKey(f)));
-  fileEntry.findings = Array.from(keys);
+  fileEntry.findings = [...keys];
   ensureSession(cache, sessionId).updatedAt = Date.now();
 }
 
 function findingCacheKey(finding) {
   const line = finding?.line || 0;
   const value = extractFindingIgnoreValue(finding);
-  if (line > 0 && value) return `${finding.antipattern}:${line}:${value}`;
-  if (line > 0) return `${finding.antipattern}:${line}`;
-  if (value) return `${finding.antipattern}:0:${value}`;
+  if (line > 0 && value) {
+    return `${finding.antipattern}:${line}:${value}`;
+  }
+  if (line > 0) {
+    return `${finding.antipattern}:${line}`;
+  }
+  if (value) {
+    return `${finding.antipattern}:0:${value}`;
+  }
   const snippet = String(finding?.snippet || "")
     .trim()
     .slice(0, 80);
@@ -1106,7 +1268,9 @@ function findingCacheKey(finding) {
 }
 
 export function renderTemplate(findings, filePath, config, opts = {}) {
-  if (!Array.isArray(findings) || findings.length === 0) return "";
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return "";
+  }
   const limits = config?.limits || DEFAULT_CONFIG.limits;
   const cap = Math.max(
     1,
@@ -1138,9 +1302,10 @@ export function renderTemplate(findings, filePath, config, opts = {}) {
   const footer = directiveFooter({ mode: opts.footer });
 
   const blocks = [header, ...lines];
-  if (more) blocks.push(more);
-  blocks.push("");
-  blocks.push(footer);
+  if (more) {
+    blocks.push(more);
+  }
+  blocks.push("", footer);
   let text = blocks.join("\n");
 
   if (text.length > maxChars) {
@@ -1153,7 +1318,9 @@ function renderGroupedTemplate(groups, config, opts = {}) {
   const realGroups = groups.filter(
     (group) => Array.isArray(group.findings) && group.findings.length > 0
   );
-  if (realGroups.length === 0) return "";
+  if (realGroups.length === 0) {
+    return "";
+  }
   if (realGroups.length === 1) {
     const [group] = realGroups;
     return renderTemplate(group.findings, group.filePath, config, opts);
@@ -1228,7 +1395,7 @@ function clampGroupedToBudget(header, lines, footer, maxChars) {
     ].join("\n");
 
   for (const footerText of footerFallbacks(footer)) {
-    let working = lines.slice();
+    const working = [...lines];
     let omitted = false;
     let assembled = assemble(working, omitted, footerText);
     while (assembled.length > maxChars && working.length > 1) {
@@ -1236,8 +1403,9 @@ function clampGroupedToBudget(header, lines, footer, maxChars) {
       omitted = true;
       assembled = assemble(working, omitted, footerText);
     }
-    if (assembled.length <= maxChars && working.some(isFindingLine))
+    if (assembled.length <= maxChars && working.some(isFindingLine)) {
       return assembled;
+    }
   }
   return clampLastLine(
     (linesArr, footerText) => assemble(linesArr, true, footerText),
@@ -1249,15 +1417,16 @@ function clampGroupedToBudget(header, lines, footer, maxChars) {
 function clampToBudget(header, lines, more, footer, maxChars) {
   const assemble = (linesArr, moreText, footerText) => {
     const blocks = [header, ...linesArr];
-    if (moreText) blocks.push(moreText);
-    blocks.push("");
-    blocks.push(footerText);
+    if (moreText) {
+      blocks.push(moreText);
+    }
+    blocks.push("", footerText);
     return blocks.join("\n");
   };
 
   let lastMore = more;
   for (const footerText of footerFallbacks(footer)) {
-    let working = lines.slice();
+    const working = [...lines];
     let moreText = more;
     let assembled = assemble(working, moreText, footerText);
     while (assembled.length > maxChars && working.length > 1) {
@@ -1266,7 +1435,9 @@ function clampToBudget(header, lines, more, footer, maxChars) {
       assembled = assemble(working, moreText, footerText);
     }
     lastMore = moreText;
-    if (assembled.length <= maxChars) return assembled;
+    if (assembled.length <= maxChars) {
+      return assembled;
+    }
   }
   return clampLastLine(
     (linesArr, footerText) => assemble(linesArr, lastMore, footerText),
@@ -1293,7 +1464,9 @@ function clampLastLine(build, line, maxChars) {
   // Drop the line, and if the bare header + policy still overflow, clip the
   // head. Never tail-slice: the footer sits at the end, so a tail slice is
   // exactly the footer cut this renderer exists to prevent.
-  if (bare.length <= maxChars) return bare;
+  if (bare.length <= maxChars) {
+    return bare;
+  }
   const head = bare.slice(0, Math.max(0, maxChars - footerText.length - 4));
   return `${head}…\n\n${footerText}`;
 }
@@ -1312,7 +1485,7 @@ function formatFindingLine(f, opts = {}) {
   const ignoreHint = formatFindingIgnoreHint(f);
   const ignoreSegment = ignoreHint ? ` If intentional: \`${ignoreHint}\`.` : "";
   return `${prefix} [${f.antipattern}] ${nameSegment} ${desc}${ignoreSegment}`
-    .replace(/\s+/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 
@@ -1323,7 +1496,9 @@ function formatFindingLine(f, opts = {}) {
 function formatDedupedFindingLine(finding, seenRules) {
   const rule = normalizeIgnoreRule(finding?.antipattern);
   const compact = rule ? seenRules.has(rule) : false;
-  if (rule) seenRules.add(rule);
+  if (rule) {
+    seenRules.add(rule);
+  }
   return formatFindingLine(finding, { compact });
 }
 
@@ -1332,18 +1507,26 @@ function formatDedupedFindingLine(finding, seenRules) {
 // contract, and the disclosure rule live in the directive footer, stated once
 // instead of per line.
 function formatFindingIgnoreHint(finding) {
-  if (!finding || typeof finding !== "object") return "";
+  if (!finding || typeof finding !== "object") {
+    return "";
+  }
   const rule = normalizeIgnoreRule(finding.antipattern);
-  if (!rule) return "";
+  if (!rule) {
+    return "";
+  }
   const normalizedValue = extractFindingIgnoreValue(finding);
-  if (!normalizedValue) return "";
+  if (!normalizedValue) {
+    return "";
+  }
   const valueArg = quoteCommandArg(extractFindingIgnoreValueRaw(finding));
   return `ignore-value ${rule} ${valueArg}`;
 }
 
 function quoteCommandArg(value) {
   const text = String(value || "").trim();
-  if (/^[A-Za-z0-9._:-]+$/.test(text)) return text;
+  if (/^[A-Za-z0-9._:-]+$/.test(text)) {
+    return text;
+  }
   // The suggestion is meant to be run on this same machine, so quote for its
   // shell. POSIX /bin/sh still expands $(...), backticks, and ${} inside
   // double quotes, and these values come from scanned file content (a
@@ -1354,15 +1537,17 @@ function quoteCommandArg(value) {
   // stay double-quoted there (Greptile #533). Keep the pre-existing
   // double-quote escaping on Windows so that path's behavior is unchanged.
   if (process.platform === "win32") {
-    return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    return `"${text.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
   }
-  return `'${text.replace(/'/g, `'\\''`)}'`;
+  return `'${text.replaceAll("'", `'\\''`)}'`;
 }
 
 function relativize(filePath, cwd) {
   try {
     const rel = path.relative(cwd, filePath);
-    if (!rel || rel.startsWith("..")) return filePath;
+    if (!rel || rel.startsWith("..")) {
+      return filePath;
+    }
     return rel.split(path.sep).join("/");
   } catch {
     return filePath;
@@ -1376,12 +1561,18 @@ function relativize(filePath, cwd) {
 const APPLY_PATCH_FILE_RE = /^\*\*\* (?:Update|Add) File: (.+)$/gm;
 
 export function parseApplyPatchPaths(command, projectCwd) {
-  if (!command || typeof command !== "string") return [];
+  if (!command || typeof command !== "string") {
+    return [];
+  }
   const out = [];
   for (const m of command.matchAll(APPLY_PATCH_FILE_RE)) {
     let p = (m[1] || "").trim();
-    if (!p) continue;
-    if (!path.isAbsolute(p)) p = path.resolve(projectCwd, p);
+    if (!p) {
+      continue;
+    }
+    if (!path.isAbsolute(p)) {
+      p = path.resolve(projectCwd, p);
+    }
     out.push(p);
   }
   return out;
@@ -1391,8 +1582,12 @@ export function resolveTargetFiles(event, projectCwd) {
   const ti = event?.tool_input;
   const out = [];
   const add = (filePath) => {
-    if (typeof filePath !== "string" || !filePath) return;
-    if (!out.includes(filePath)) out.push(filePath);
+    if (typeof filePath !== "string" || !filePath) {
+      return;
+    }
+    if (!out.includes(filePath)) {
+      out.push(filePath);
+    }
   };
 
   if (
@@ -1400,8 +1595,9 @@ export function resolveTargetFiles(event, projectCwd) {
     ti &&
     typeof ti.command === "string"
   ) {
-    for (const filePath of parseApplyPatchPaths(ti.command, projectCwd))
+    for (const filePath of parseApplyPatchPaths(ti.command, projectCwd)) {
       add(filePath);
+    }
   }
   if (ti && typeof ti.file_path === "string" && ti.file_path) {
     add(ti.file_path);
@@ -1418,17 +1614,29 @@ export function resolveTargetFiles(event, projectCwd) {
 
 export function resolveHarness(env = {}, event = null) {
   const explicit = env?.IMPECCABLE_HOOK_HARNESS;
-  if (explicit === "cursor") return "cursor";
-  if (explicit === "github") return "github";
-  if (explicit === "grok") return "grok";
-  if (explicit === "claude") return "claude";
-  if (explicit === "codex") return "codex";
+  if (explicit === "cursor") {
+    return "cursor";
+  }
+  if (explicit === "github") {
+    return "github";
+  }
+  if (explicit === "grok") {
+    return "grok";
+  }
+  if (explicit === "claude") {
+    return "claude";
+  }
+  if (explicit === "codex") {
+    return "codex";
+  }
   // Grok Build sends camelCase `toolName`/`toolInput`/`hookEventName` and no
   // snake_case pair. GitHub Copilot sends camelCase `toolName`/`toolArgs`.
   // Check Grok first: the old GitHub heuristic (`toolName` and no
   // `tool_input`) also matches Grok, which is how live PostToolUse was
   // classified as Copilot and then skipped with no-file-path (#646).
-  if (looksLikeGrokEnvelope(event)) return "grok";
+  if (looksLikeGrokEnvelope(event)) {
+    return "grok";
+  }
   if (
     event &&
     typeof event === "object" &&
@@ -1438,18 +1646,23 @@ export function resolveHarness(env = {}, event = null) {
   ) {
     return "github";
   }
-  if (typeof event?.conversation_id === "string" && event.conversation_id)
+  if (typeof event?.conversation_id === "string" && event.conversation_id) {
     return "cursor";
+  }
   // Codex turn-scoped events carry `turn_id`. Claude Code does not. Detecting
   // it here means an already-installed Codex hook emits the Codex Stop
   // contract without rewriting the hook command to set IMPECCABLE_HOOK_HARNESS.
   // https://developers.openai.com/codex/hooks#stop
-  if (typeof event?.turn_id === "string" && event.turn_id) return "codex";
+  if (typeof event?.turn_id === "string" && event.turn_id) {
+    return "codex";
+  }
   return "claude";
 }
 
 function looksLikeGrokEnvelope(event) {
-  if (!event || typeof event !== "object") return false;
+  if (!event || typeof event !== "object") {
+    return false;
+  }
   if (
     event.hook_event_name !== undefined ||
     event.tool_name !== undefined ||
@@ -1457,8 +1670,12 @@ function looksLikeGrokEnvelope(event) {
   ) {
     return false;
   }
-  if (event.toolArgs !== undefined) return false;
-  if (typeof event.hookEventName === "string") return true;
+  if (event.toolArgs !== undefined) {
+    return false;
+  }
+  if (typeof event.hookEventName === "string") {
+    return true;
+  }
   return typeof event.toolName === "string" && event.toolInput !== undefined;
 }
 
@@ -1466,7 +1683,9 @@ function looksLikeGrokEnvelope(event) {
 // `hookEventName: "stop"`. hook.mjs routes on the raw stdin, before any
 // normalize, so both casings must match here.
 export function isStopEvent(event) {
-  if (!event || typeof event !== "object") return false;
+  if (!event || typeof event !== "object") {
+    return false;
+  }
   const name = event.hook_event_name || event.hookEventName;
   return typeof name === "string" && name.toLowerCase() === "stop";
 }
@@ -1481,8 +1700,9 @@ export function isStopEvent(event) {
 // normalizeGitHubEvent). The detector reads the file from disk after the tool
 // ran, so only the path (not the proposed content) is needed here.
 export function parseGitHubToolArgs(toolArgs) {
-  if (toolArgs && typeof toolArgs === "object" && !Array.isArray(toolArgs))
+  if (toolArgs && typeof toolArgs === "object" && !Array.isArray(toolArgs)) {
     return toolArgs;
+  }
   if (typeof toolArgs === "string" && toolArgs.trim()) {
     try {
       const parsed = JSON.parse(toolArgs);
@@ -1508,8 +1728,9 @@ const APPLY_PATCH_MARKER =
   /\*\*\* (?:Begin Patch|Add File:|Update File:|Delete File:)/;
 
 function looksLikeApplyPatch(rawArgs) {
-  if (typeof rawArgs !== "string" || !APPLY_PATCH_MARKER.test(rawArgs))
+  if (typeof rawArgs !== "string" || !APPLY_PATCH_MARKER.test(rawArgs)) {
     return false;
+  }
   // Guard against an edit/create payload whose edited *content* happens to
   // contain patch markers: that payload is a JSON object string, whereas a real
   // apply_patch payload is a raw patch string that does not parse as JSON. Only
@@ -1517,7 +1738,9 @@ function looksLikeApplyPatch(rawArgs) {
   // `path` extracted.
   try {
     const parsed = JSON.parse(rawArgs);
-    if (parsed && typeof parsed === "object") return false;
+    if (parsed && typeof parsed === "object") {
+      return false;
+    }
   } catch {
     /* not JSON → genuine raw patch */
   }
@@ -1526,7 +1749,9 @@ function looksLikeApplyPatch(rawArgs) {
 
 function applyPatchText(rawArgs) {
   if (typeof rawArgs === "string") {
-    if (APPLY_PATCH_MARKER.test(rawArgs)) return rawArgs;
+    if (APPLY_PATCH_MARKER.test(rawArgs)) {
+      return rawArgs;
+    }
     // Defensive: a future Copilot build might JSON-wrap the patch.
     const parsed = parseGitHubToolArgs(rawArgs);
     return parsed.patch || parsed.input || parsed.command || "";
@@ -1561,16 +1786,17 @@ function normalizeGitHubEvent(event, projectCwd) {
     const args = parseGitHubToolArgs(rawArgs);
     const filePath =
       args.path || args.file_path || args.filePath || args.target_file;
-    if (typeof filePath === "string" && filePath)
+    if (typeof filePath === "string" && filePath) {
       toolInput.file_path = filePath;
+    }
   }
 
   return {
     ...event,
     cwd,
     session_id: sessionId,
-    tool_name: normalizedToolName,
     tool_input: toolInput,
+    tool_name: normalizedToolName,
   };
 }
 
@@ -1593,8 +1819,8 @@ function normalizeGrokEvent(event, projectCwd) {
     ...event,
     cwd,
     session_id: sessionId,
-    tool_name: event.toolName || event.tool_name || null,
     tool_input: toolInput,
+    tool_name: event.toolName || event.tool_name || null,
   };
   if (
     event.stopHookActive !== undefined &&
@@ -1606,10 +1832,18 @@ function normalizeGrokEvent(event, projectCwd) {
 }
 
 export function normalizeHookEvent(event, projectCwd, harness = "claude") {
-  if (!event || typeof event !== "object") return event;
-  if (harness === "github") return normalizeGitHubEvent(event, projectCwd);
-  if (harness === "grok") return normalizeGrokEvent(event, projectCwd);
-  if (harness !== "cursor") return event;
+  if (!event || typeof event !== "object") {
+    return event;
+  }
+  if (harness === "github") {
+    return normalizeGitHubEvent(event, projectCwd);
+  }
+  if (harness === "grok") {
+    return normalizeGrokEvent(event, projectCwd);
+  }
+  if (harness !== "cursor") {
+    return event;
+  }
 
   const cwd =
     event.cwd ||
@@ -1678,7 +1912,9 @@ function hasPathTraversal(filePath) {
 }
 
 function isInsideProject(filePath, projectCwd) {
-  if (!filePath || !projectCwd || hasPathTraversal(filePath)) return false;
+  if (!filePath || !projectCwd || hasPathTraversal(filePath)) {
+    return false;
+  }
   try {
     const rel = path.relative(projectCwd, filePath);
     return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
@@ -1700,7 +1936,9 @@ const CANONICAL_PATH_CACHE_MAX = 1024;
 
 function canonicalPath(p) {
   const resolved = path.resolve(p);
-  if (canonicalPathCache.has(resolved)) return canonicalPathCache.get(resolved);
+  if (canonicalPathCache.has(resolved)) {
+    return canonicalPathCache.get(resolved);
+  }
   let canonical = resolved;
   let dir = resolved;
   const tail = [];
@@ -1714,12 +1952,15 @@ function canonicalPath(p) {
       /* keep climbing */
     }
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     tail.unshift(path.basename(dir));
     dir = parent;
   }
-  if (canonicalPathCache.size >= CANONICAL_PATH_CACHE_MAX)
+  if (canonicalPathCache.size >= CANONICAL_PATH_CACHE_MAX) {
     canonicalPathCache.clear();
+  }
   canonicalPathCache.set(resolved, canonical);
   return canonical;
 }
@@ -1733,20 +1974,31 @@ function canonicalPath(p) {
 // first so a symlinked root (macOS /tmp -> /private/tmp) doesn't split the
 // comparison.
 export function isScanTargetInsideProject(filePath, projectCwd) {
-  if (!filePath || !projectCwd) return false;
+  if (!filePath || !projectCwd) {
+    return false;
+  }
   return isInsideProject(canonicalPath(filePath), canonicalPath(projectCwd));
 }
 
 export function parseStaticStyleImports(content, fromFile, projectCwd) {
-  if (!content || typeof content !== "string") return [];
+  if (!content || typeof content !== "string") {
+    return [];
+  }
   const dir = path.dirname(fromFile);
   const out = [];
   for (const m of content.matchAll(STATIC_STYLE_IMPORT_RE)) {
     let p = (m[1] || "").trim();
-    if (!p) continue;
-    if (p.startsWith(".")) p = path.resolve(dir, p);
-    else if (!path.isAbsolute(p)) p = path.resolve(projectCwd, p);
-    if (!isInsideProject(p, projectCwd)) continue;
+    if (!p) {
+      continue;
+    }
+    if (p.startsWith(".")) {
+      p = path.resolve(dir, p);
+    } else if (!path.isAbsolute(p)) {
+      p = path.resolve(projectCwd, p);
+    }
+    if (!isInsideProject(p, projectCwd)) {
+      continue;
+    }
     out.push(p);
   }
   return out;
@@ -1772,55 +2024,79 @@ export function coLocatedStylesheets(filePath) {
 }
 
 export function normalizeScanTargets(primaryTargets, projectCwd) {
-  if (!Array.isArray(primaryTargets) || primaryTargets.length === 0) return [];
+  if (!Array.isArray(primaryTargets) || primaryTargets.length === 0) {
+    return [];
+  }
   const ordered = [];
   const seen = new Set();
   const baseCwd = projectCwd || process.cwd();
   const normalizeTarget = (p) => {
     // Preserve literal `..` segments so downstream sensitive-path checks
     // still fire. path.resolve would collapse `/foo/../etc/passwd`.
-    if (hasPathTraversal(p)) return p;
+    if (hasPathTraversal(p)) {
+      return p;
+    }
     return path.isAbsolute(p) ? p : path.resolve(baseCwd, p);
   };
   const add = (p) => {
-    if (ordered.length >= MAX_SCAN_TARGETS) return;
+    if (ordered.length >= MAX_SCAN_TARGETS) {
+      return;
+    }
     const abs = normalizeTarget(p);
-    if (seen.has(abs)) return;
+    if (seen.has(abs)) {
+      return;
+    }
     seen.add(abs);
     ordered.push(abs);
     return abs;
   };
 
-  for (const p of primaryTargets) add(p);
+  for (const p of primaryTargets) {
+    add(p);
+  }
   return ordered;
 }
 
 export function expandScanTargets(primaryTargets, projectCwd) {
   const ordered = normalizeScanTargets(primaryTargets, projectCwd);
-  if (ordered.length === 0) return [];
+  if (ordered.length === 0) {
+    return [];
+  }
   const seen = new Set(ordered);
   const baseCwd = projectCwd || process.cwd();
   const add = (p) => {
-    if (ordered.length >= MAX_SCAN_TARGETS) return;
+    if (ordered.length >= MAX_SCAN_TARGETS) {
+      return;
+    }
     const abs = hasPathTraversal(p)
       ? p
       : path.isAbsolute(p)
         ? p
         : path.resolve(baseCwd, p);
-    if (seen.has(abs)) return;
+    if (seen.has(abs)) {
+      return;
+    }
     seen.add(abs);
     ordered.push(abs);
     return abs;
   };
 
   const normalizedPrimaries = [];
-  for (const p of ordered) normalizedPrimaries.push(p);
+  for (const p of ordered) {
+    normalizedPrimaries.push(p);
+  }
 
   for (const p of normalizedPrimaries) {
-    if (ordered.length >= MAX_SCAN_TARGETS) break;
-    if (!isInsideProject(p, baseCwd)) continue;
+    if (ordered.length >= MAX_SCAN_TARGETS) {
+      break;
+    }
+    if (!isInsideProject(p, baseCwd)) {
+      continue;
+    }
     const ext = path.extname(p).toLowerCase();
-    if (STYLE_EXTS.has(ext) || !UI_CODE_EXTS.has(ext)) continue;
+    if (STYLE_EXTS.has(ext) || !UI_CODE_EXTS.has(ext)) {
+      continue;
+    }
 
     let content = "";
     try {
@@ -1831,11 +2107,15 @@ export function expandScanTargets(primaryTargets, projectCwd) {
 
     for (const imp of parseStaticStyleImports(content, p, projectCwd)) {
       add(imp);
-      if (ordered.length >= MAX_SCAN_TARGETS) break;
+      if (ordered.length >= MAX_SCAN_TARGETS) {
+        break;
+      }
     }
     for (const col of coLocatedStylesheets(p)) {
       add(col);
-      if (ordered.length >= MAX_SCAN_TARGETS) break;
+      if (ordered.length >= MAX_SCAN_TARGETS) {
+        break;
+      }
     }
   }
 
@@ -1857,7 +2137,9 @@ export function writeAuditLog(env, entry, cwd = process.cwd()) {
       target = null;
     }
   }
-  if (!target || typeof target !== "string") return false;
+  if (!target || typeof target !== "string") {
+    return false;
+  }
   try {
     let expanded;
     if (target.startsWith("~/")) {
@@ -1871,8 +2153,7 @@ export function writeAuditLog(env, entry, cwd = process.cwd()) {
       expanded = path.resolve(baseCwd, target);
     }
     fs.mkdirSync(path.dirname(expanded), { recursive: true });
-    const line =
-      JSON.stringify({ ts: new Date().toISOString(), ...entry }) + "\n";
+    const line = `${JSON.stringify({ ts: new Date().toISOString(), ...entry })}\n`;
     fs.appendFileSync(expanded, line);
     return true;
   } catch {
@@ -1896,13 +2177,17 @@ const DETECTOR_CANDIDATES = [
 
 let detectorCache = null;
 export async function loadDetector(candidates = DETECTOR_CANDIDATES) {
-  if (detectorCache) return detectorCache;
+  if (detectorCache) {
+    return detectorCache;
+  }
   const found = candidates.find((c) => fs.existsSync(c));
-  if (!found) return null;
+  if (!found) {
+    return null;
+  }
   const mod = await import(pathToFileURL(found));
   detectorCache = {
-    detectText: mod.detectText,
     detectHtml: mod.detectHtml,
+    detectText: mod.detectText,
     loadDesignSystemForCwd: mod.loadDesignSystemForCwd,
   };
   return detectorCache;
@@ -1959,8 +2244,9 @@ export function renderPendingAck(filePath, knownFindings, opts = {}) {
 }
 
 export function shouldEmitAckForFile(filePath, config = null) {
-  if (ACK_EXTS.has(path.extname(String(filePath || "")).toLowerCase()))
+  if (ACK_EXTS.has(path.extname(String(filePath || "")).toLowerCase())) {
     return true;
+  }
   // Configured html-engine extensions are declared UI markup, so they get the
   // clean/pending acks; text-engine ones stay quiet like plain .ts/.js.
   const configured = matchConfiguredExtension(filePath, config?.extensions);
@@ -1968,9 +2254,12 @@ export function shouldEmitAckForFile(filePath, config = null) {
 }
 
 export function designSystemOptions(config, detector, projectCwd) {
-  if (config?.designSystem?.enabled === false) return {};
-  if (!detector || typeof detector.loadDesignSystemForCwd !== "function")
+  if (config?.designSystem?.enabled === false) {
     return {};
+  }
+  if (!detector || typeof detector.loadDesignSystemForCwd !== "function") {
+    return {};
+  }
   try {
     const designSystem = detector.loadDesignSystemForCwd(projectCwd);
     return designSystem ? { designSystem } : {};
@@ -1982,7 +2271,9 @@ export function designSystemOptions(config, detector, projectCwd) {
 const DESIGN_STALE_NOTE = `${ENVELOPE_PREFIX} DESIGN.md is newer than .impeccable/design.json. Run ${IMPECCABLE_COMMAND} document to refresh the design-system sidecar.`;
 
 export function appendDesignSystemNote(text, scanOptions) {
-  if (!text || !scanOptions?.designSystem?.mdNewerThanJson) return text;
+  if (!text || !scanOptions?.designSystem?.mdNewerThanJson) {
+    return text;
+  }
   return `${text}\n\n${DESIGN_STALE_NOTE}`;
 }
 
@@ -1993,7 +2284,9 @@ export function appendDesignSystemNote(text, scanOptions) {
 // to say nothing new. Callers must persist the cache for the flag to stick.
 function consumeSessionNoticeFlag(cache, sessionId, flag) {
   const session = ensureSession(cache, sessionId);
-  if (session[flag]) return false;
+  if (session[flag]) {
+    return false;
+  }
   session[flag] = true;
   session.updatedAt = Date.now();
   return true;
@@ -2013,14 +2306,19 @@ export function appendDesignSystemNoteOnce(
   sessionId,
   config
 ) {
-  if (!text || !scanOptions?.designSystem?.mdNewerThanJson) return text;
+  if (!text || !scanOptions?.designSystem?.mdNewerThanJson) {
+    return text;
+  }
   const maxChars = Math.max(
     500,
     config?.limits?.maxChars || DEFAULT_CONFIG.limits.maxChars
   );
-  if (text.length + DESIGN_STALE_NOTE.length + 2 > maxChars) return text;
-  if (!consumeSessionNoticeFlag(cache, sessionId, "designNoteShown"))
+  if (text.length + DESIGN_STALE_NOTE.length + 2 > maxChars) {
     return text;
+  }
+  if (!consumeSessionNoticeFlag(cache, sessionId, "designNoteShown")) {
+    return text;
+  }
   return appendDesignSystemNote(text, scanOptions);
 }
 
@@ -2030,8 +2328,12 @@ export function appendDesignSystemNoteOnce(
 // reservation, a session whose every emission fills the budget would defer
 // the note forever.
 export function designNoteReserve(scanOptions, cache, sessionId) {
-  if (!scanOptions?.designSystem?.mdNewerThanJson) return 0;
-  if (ensureSession(cache, sessionId).designNoteShown) return 0;
+  if (!scanOptions?.designSystem?.mdNewerThanJson) {
+    return 0;
+  }
+  if (ensureSession(cache, sessionId).designNoteShown) {
+    return 0;
+  }
   return DESIGN_STALE_NOTE.length + 2;
 }
 
@@ -2047,9 +2349,13 @@ export function footerModeForSession(cache, sessionId) {
 }
 
 export function commitFooterShown(cache, sessionId, text) {
-  if (!text || !text.includes(directiveFooter())) return;
+  if (!text || !text.includes(directiveFooter())) {
+    return;
+  }
   const session = ensureSession(cache, sessionId);
-  if (session.footerShown) return;
+  if (session.footerShown) {
+    return;
+  }
   session.footerShown = true;
   session.updatedAt = Date.now();
 }
@@ -2104,11 +2410,11 @@ export async function runHook({
   now = Date.now,
   detector,
 } = {}) {
-  const audit = { ts: new Date(now()).toISOString(), event: "PostToolUse" };
+  const audit = { event: "PostToolUse", ts: new Date(now()).toISOString() };
   const result = (extra) => ({
+    audit: { ...audit, ...extra },
     exitCode: 0,
     stdout: "",
-    audit: { ...audit, ...extra },
   });
 
   try {
@@ -2117,11 +2423,11 @@ export async function runHook({
       depthIsSet(env.IMPECCABLE_HOOK_DEPTH) ||
       depthIsSet(env.CLAUDE_HOOK_DEPTH)
     ) {
-      return result({ reentrant: true, durationMs: 0 });
+      return result({ durationMs: 0, reentrant: true });
     }
 
     if (truthy(env.IMPECCABLE_HOOK_DISABLED)) {
-      return result({ skipped: "env-disabled", durationMs: 0 });
+      return result({ durationMs: 0, skipped: "env-disabled" });
     }
 
     const started = Date.now();
@@ -2131,14 +2437,14 @@ export async function runHook({
       event = typeof stdinJson === "string" ? JSON.parse(stdinJson) : stdinJson;
     } catch {
       return result({
-        skipped: "stdin-malformed",
         durationMs: Date.now() - started,
+        skipped: "stdin-malformed",
       });
     }
     if (!event || typeof event !== "object") {
       return result({
-        skipped: "stdin-empty",
         durationMs: Date.now() - started,
+        skipped: "stdin-empty",
       });
     }
 
@@ -2156,29 +2462,31 @@ export async function runHook({
     const primaryFileSet = new Set(primaryFiles);
     const targetFiles = expandScanTargets(primaryFiles, projectCwd);
     audit.session = event.session_id || null;
-    if (event.tool_name) audit.tool = event.tool_name;
+    if (event.tool_name) {
+      audit.tool = event.tool_name;
+    }
 
     if (targetFiles.length === 0) {
       return result({
-        skipped: "no-file-path",
         durationMs: Date.now() - started,
+        skipped: "no-file-path",
       });
     }
 
     const config = readConfig(projectCwd);
     if (config.enabled === false) {
       return result({
-        skipped: "config-disabled",
         durationMs: Date.now() - started,
+        skipped: "config-disabled",
       });
     }
 
     const platform = resolveProjectPlatform(projectCwd);
     if (isNativePlatform(platform)) {
       return result({
-        skipped: "native-platform",
-        platform,
         durationMs: Date.now() - started,
+        platform,
+        skipped: "native-platform",
       });
     }
 
@@ -2188,8 +2496,8 @@ export async function runHook({
     if (!det || typeof det.detectText !== "function") {
       // Cache is not mutated yet at this point; nothing to persist.
       return result({
-        skipped: "detector-missing",
         durationMs: Date.now() - started,
+        skipped: "detector-missing",
       });
     }
     const scanOptions = designSystemOptions(config, det, projectCwd);
@@ -2309,7 +2617,7 @@ export async function runHook({
       // knows to re-scan it.
       const { immediate, deferred } = tiered
         ? splitFindingsByTier(filtered)
-        : { immediate: filtered, deferred: [] };
+        : { deferred: [], immediate: filtered };
       if (deferred.length > 0) {
         touchFile(cache, sessionId, filePath);
         cacheDirty = true;
@@ -2318,7 +2626,9 @@ export async function runHook({
       const fresh = dedupeAgainstCache(immediate, cache, sessionId, filePath);
       audit.findings = (findings || []).length;
       audit.freshFindings = fresh.length;
-      if (deferredTotal > 0) audit.deferred = deferredTotal;
+      if (deferredTotal > 0) {
+        audit.deferred = deferredTotal;
+      }
 
       // A detector failure tells us nothing about the file, so leave whatever
       // was remembered alone rather than recording an empty scan as truth.
@@ -2399,23 +2709,23 @@ export async function runHook({
       persistCache(projectCwd, cache);
       const allFindings = freshGroups.flatMap((group) => group.findings);
       return {
-        exitCode: 0,
-        stdout: payload(text, "PostToolUse", harness),
+        audit: {
+          ...audit,
+          chars: text.length,
+          durationMs: Date.now() - started,
+          emitted: true,
+          file: firstGroup.filePath,
+          freshFiles: freshGroups.length,
+          freshFindings: allFindings.length,
+        },
         emission: {
-          kind: "fresh",
           file: firstGroup.filePath,
           findings: firstGroup.findings,
           groups: freshGroups,
+          kind: "fresh",
         },
-        audit: {
-          ...audit,
-          file: firstGroup.filePath,
-          emitted: true,
-          freshFiles: freshGroups.length,
-          freshFindings: allFindings.length,
-          chars: text.length,
-          durationMs: Date.now() - started,
-        },
+        exitCode: 0,
+        stdout: payload(text, "PostToolUse", harness),
       };
     }
 
@@ -2475,39 +2785,39 @@ export async function runHook({
 
     if (detectorThrewAny && !pendingWinner && !cleanWinner) {
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         error: "detector-threw",
-        durationMs: Date.now() - started,
       });
     }
 
     if (quietMode) {
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         quiet: true,
-        durationMs: Date.now() - started,
       });
     }
 
     if (ack?.kind === "pending") {
-      const text = ack.text;
+      const { text } = ack;
       return {
-        exitCode: 0,
-        stdout: payload(text, "PostToolUse", harness),
-        emission: {
-          kind: "pending",
-          file: pendingWinner.filePath,
-          known: pendingWinner.known,
-        },
         audit: {
           ...audit,
-          file: pendingWinner.filePath,
-          emitted: true,
-          kind: "pending",
-          pending: pendingWinner.known.length,
           chars: text.length,
           durationMs: Date.now() - started,
+          emitted: true,
+          file: pendingWinner.filePath,
+          kind: "pending",
+          pending: pendingWinner.known.length,
         },
+        emission: {
+          file: pendingWinner.filePath,
+          kind: "pending",
+          known: pendingWinner.known,
+        },
+        exitCode: 0,
+        stdout: payload(text, "PostToolUse", harness),
       };
     }
 
@@ -2516,41 +2826,41 @@ export async function runHook({
         relativize(suppressionWinner.filePath, projectCwd)
       );
       return {
-        exitCode: 0,
-        stdout: payload(text, "PostToolUse", harness),
-        emission: { kind: "suppression", file: suppressionWinner.filePath },
         audit: {
           ...audit,
+          durationMs: Date.now() - started,
+          emitted: true,
           file: suppressionWinner.filePath,
           suppressed: true,
-          emitted: true,
-          durationMs: Date.now() - started,
         },
+        emission: { file: suppressionWinner.filePath, kind: "suppression" },
+        exitCode: 0,
+        stdout: payload(text, "PostToolUse", harness),
       };
     }
 
     if (ack?.kind === "clean") {
-      const text = ack.text;
+      const { text } = ack;
       return {
-        exitCode: 0,
-        stdout: payload(text, "PostToolUse", harness),
-        emission: { kind: "clean", file: cleanWinner.filePath },
         audit: {
           ...audit,
-          file: cleanWinner.filePath,
-          emitted: true,
-          kind: "clean",
           chars: text.length,
           durationMs: Date.now() - started,
+          emitted: true,
+          file: cleanWinner.filePath,
+          kind: "clean",
         },
+        emission: { file: cleanWinner.filePath, kind: "clean" },
+        exitCode: 0,
+        stdout: payload(text, "PostToolUse", harness),
       };
     }
 
     if (pendingWinner) {
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         skipped: "non-ui-ack",
-        durationMs: Date.now() - started,
       });
     }
 
@@ -2558,25 +2868,25 @@ export async function runHook({
     // purpose rather than a file the hook could not classify.
     if (cleanWinner) {
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         skipped: "non-ui-ack",
-        durationMs: Date.now() - started,
       });
     }
 
     if (cleanAckDeduped) {
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         skipped: "clean-ack-deduped",
-        durationMs: Date.now() - started,
       });
     }
 
     if (suppressedHit) {
       return result({
-        suppressed: true,
-        emitted: false,
         durationMs: Date.now() - started,
+        emitted: false,
+        suppressed: true,
       });
     }
 
@@ -2585,14 +2895,14 @@ export async function runHook({
       ...(lastSkip === "too-large" ? { bytes: skippedBytes } : {}),
       durationMs: Date.now() - started,
     });
-  } catch (err) {
+  } catch (error) {
     return {
-      exitCode: 0,
-      stdout: "",
       audit: {
         ...audit,
-        error: String(err && err.message ? err.message : err),
+        error: String(error && error.message ? error.message : error),
       },
+      exitCode: 0,
+      stdout: "",
     };
   }
 }
@@ -2622,11 +2932,11 @@ export async function runStopHook({
   now = Date.now,
   detector,
 } = {}) {
-  const audit = { ts: new Date(now()).toISOString(), event: "Stop" };
+  const audit = { event: "Stop", ts: new Date(now()).toISOString() };
   const result = (extra) => ({
+    audit: { ...audit, ...extra },
     exitCode: 0,
     stdout: "",
-    audit: { ...audit, ...extra },
   });
 
   try {
@@ -2635,10 +2945,10 @@ export async function runStopHook({
       depthIsSet(env.IMPECCABLE_HOOK_DEPTH) ||
       depthIsSet(env.CLAUDE_HOOK_DEPTH)
     ) {
-      return result({ reentrant: true, durationMs: 0 });
+      return result({ durationMs: 0, reentrant: true });
     }
     if (truthy(env.IMPECCABLE_HOOK_DISABLED)) {
-      return result({ skipped: "env-disabled", durationMs: 0 });
+      return result({ durationMs: 0, skipped: "env-disabled" });
     }
 
     const started = Date.now();
@@ -2648,14 +2958,14 @@ export async function runStopHook({
       event = typeof stdinJson === "string" ? JSON.parse(stdinJson) : stdinJson;
     } catch {
       return result({
-        skipped: "stdin-malformed",
         durationMs: Date.now() - started,
+        skipped: "stdin-malformed",
       });
     }
     if (!event || typeof event !== "object") {
       return result({
-        skipped: "stdin-empty",
         durationMs: Date.now() - started,
+        skipped: "stdin-empty",
       });
     }
 
@@ -2680,8 +2990,8 @@ export async function runStopHook({
     // findingCacheKey).
     if (event.stop_hook_active === true) {
       return result({
-        skipped: "stop-hook-active",
         durationMs: Date.now() - started,
+        skipped: "stop-hook-active",
       });
     }
 
@@ -2695,9 +3005,9 @@ export async function runStopHook({
       event.reason !== "end_turn"
     ) {
       return result({
-        skipped: "stop-reason",
-        reason: event.reason,
         durationMs: Date.now() - started,
+        reason: event.reason,
+        skipped: "stop-reason",
       });
     }
 
@@ -2713,8 +3023,8 @@ export async function runStopHook({
     const config = readConfig(projectCwd);
     if (config.enabled === false) {
       return result({
-        skipped: "config-disabled",
         durationMs: Date.now() - started,
+        skipped: "config-disabled",
       });
     }
 
@@ -2722,25 +3032,25 @@ export async function runStopHook({
     const touched = Object.keys(cache.sessions?.[sessionId]?.files || {});
     if (touched.length === 0) {
       return result({
-        skipped: "no-touched-files",
         durationMs: Date.now() - started,
+        skipped: "no-touched-files",
       });
     }
 
     const platform = resolveProjectPlatform(projectCwd);
     if (isNativePlatform(platform)) {
       return result({
-        skipped: "native-platform",
-        platform,
         durationMs: Date.now() - started,
+        platform,
+        skipped: "native-platform",
       });
     }
 
     const det = detector || (await loadDetector());
     if (!det || typeof det.detectText !== "function") {
       return result({
-        skipped: "detector-missing",
         durationMs: Date.now() - started,
+        skipped: "detector-missing",
       });
     }
     const scanOptions = designSystemOptions(config, det, projectCwd);
@@ -2749,26 +3059,39 @@ export async function runStopHook({
     let scanned = 0;
     let cacheDirty = false;
     for (const filePath of touched) {
-      if (scanned >= STOP_MAX_FILES) break;
-      if (hasPathTraversal(filePath) || SENSITIVE_PATH.test(filePath)) continue;
-      if (GENERATED_PATH.test(filePath)) continue;
+      if (scanned >= STOP_MAX_FILES) {
+        break;
+      }
+      if (hasPathTraversal(filePath) || SENSITIVE_PATH.test(filePath)) {
+        continue;
+      }
+      if (GENERATED_PATH.test(filePath)) {
+        continue;
+      }
       const ext = path.extname(filePath).toLowerCase();
       const configuredExt = matchConfiguredExtension(
         filePath,
         config.extensions
       );
-      if (!ALLOWED_EXTS.has(ext) && !configuredExt) continue;
+      if (!ALLOWED_EXTS.has(ext) && !configuredExt) {
+        continue;
+      }
       const relForMatch = relativize(filePath, projectCwd);
       if (
         matchesAnyGlob(relForMatch, config.ignoreFiles) ||
         matchesAnyGlob(filePath, config.ignoreFiles)
-      )
+      ) {
         continue;
-      if (!fs.existsSync(filePath)) continue;
+      }
+      if (!fs.existsSync(filePath)) {
+        continue;
+      }
       // Caches written before this gate existed can still hold out-of-project
       // paths, so the Stop pass re-checks containment rather than trusting
       // the per-edit pass to have filtered them.
-      if (!isScanTargetInsideProject(filePath, projectCwd)) continue;
+      if (!isScanTargetInsideProject(filePath, projectCwd)) {
+        continue;
+      }
 
       scanned += 1;
       let content = "";
@@ -2802,7 +3125,9 @@ export async function runStopHook({
 
       // A detector failure tells us nothing about the file. Leave whatever
       // was remembered alone rather than recording an empty scan as truth.
-      if (detectorThrew) continue;
+      if (detectorThrew) {
+        continue;
+      }
 
       // Full rule set: no tier split here. Config/inline ignores still apply,
       // and the session dedupe drops everything the per-edit pass (or an
@@ -2821,11 +3146,13 @@ export async function runStopHook({
     audit.scannedFiles = scanned;
 
     if (freshGroups.length === 0) {
-      if (cacheDirty) persistCache(projectCwd, cache);
+      if (cacheDirty) {
+        persistCache(projectCwd, cache);
+      }
       return result({
+        durationMs: Date.now() - started,
         emitted: false,
         skipped: "stop-clean",
-        durationMs: Date.now() - started,
       });
     }
 
@@ -2849,32 +3176,32 @@ export async function runStopHook({
     // new issues appear; the notice flags ride along.
     persistCache(projectCwd, cache);
     return {
-      exitCode: 0,
-      stdout: payload(text, "Stop", harness),
-      emission: {
-        kind: "stop-deep-pass",
-        groups: freshGroups,
-      },
       audit: {
         ...audit,
+        chars: text.length,
+        durationMs: Date.now() - started,
         emitted: true,
         freshFiles: freshGroups.length,
         freshFindings: freshGroups.reduce(
           (sum, group) => sum + group.findings.length,
           0
         ),
-        chars: text.length,
-        durationMs: Date.now() - started,
       },
-    };
-  } catch (err) {
-    return {
+      emission: {
+        groups: freshGroups,
+        kind: "stop-deep-pass",
+      },
       exitCode: 0,
-      stdout: "",
+      stdout: payload(text, "Stop", harness),
+    };
+  } catch (error) {
+    return {
       audit: {
         ...audit,
-        error: String(err && err.message ? err.message : err),
+        error: String(error && error.message ? error.message : error),
       },
+      exitCode: 0,
+      stdout: "",
     };
   }
 }
@@ -2894,10 +3221,12 @@ export function payload(text, eventName = "PostToolUse", harness = "claude") {
   // https://developers.openai.com/codex/hooks#stop (schema of record:
   // codex-rs/hooks/src/schema.rs, StopCommandOutputWire)
   if (harness === "codex" && eventName === "Stop") {
-    if (!String(text ?? "").trim()) return "";
+    if (!String(text ?? "").trim()) {
+      return "";
+    }
     return JSON.stringify({ decision: "block", reason: text });
   }
   return JSON.stringify({
-    hookSpecificOutput: { hookEventName: eventName, additionalContext: text },
+    hookSpecificOutput: { additionalContext: text, hookEventName: eventName },
   });
 }

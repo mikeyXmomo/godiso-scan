@@ -12,6 +12,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
 import { getLiveDir } from "../lib/impeccable-paths.mjs";
 
 const BUFFER_VERSION = 1;
@@ -39,17 +40,20 @@ function readBufferInternal(cwd, { strict }) {
       typeof parsed !== "object" ||
       !Array.isArray(parsed.entries)
     ) {
-      if (strict) throw new Error("manual_edit_buffer_invalid_schema");
-      return { version: BUFFER_VERSION, entries: [] };
+      if (strict) {
+        throw new Error("manual_edit_buffer_invalid_schema");
+      }
+      return { entries: [], version: BUFFER_VERSION };
     }
-    return { version: BUFFER_VERSION, entries: parsed.entries };
-  } catch (err) {
-    if (strict && err?.code !== "ENOENT") {
+    return { entries: parsed.entries, version: BUFFER_VERSION };
+  } catch (error) {
+    if (strict && error?.code !== "ENOENT") {
       throw new Error(
-        "manual_edit_buffer_unreadable: " + (err.message || String(err))
+        `manual_edit_buffer_unreadable: ${error.message || String(error)}`,
+        { cause: error }
       );
     }
-    return { version: BUFFER_VERSION, entries: [] };
+    return { entries: [], version: BUFFER_VERSION };
   }
 }
 
@@ -59,7 +63,7 @@ export function writeBuffer(cwd, buffer) {
   fs.writeFileSync(
     filePath,
     JSON.stringify(
-      { version: BUFFER_VERSION, entries: buffer.entries },
+      { entries: buffer.entries, version: BUFFER_VERSION },
       null,
       2
     )
@@ -76,39 +80,45 @@ export function writeBuffer(cwd, buffer) {
  */
 export function stageEntry(cwd, newEntry) {
   const buf = readBufferStrict(cwd);
-  const pageUrl = newEntry.pageUrl;
+  const { pageUrl } = newEntry;
   for (const newOp of newEntry.ops) {
     let mergedIntoExisting = false;
     for (const existing of buf.entries) {
-      if (existing.pageUrl !== pageUrl) continue;
+      if (existing.pageUrl !== pageUrl) {
+        continue;
+      }
       const existingOpIdx = existing.ops.findIndex(
         (op) => op.ref === newOp.ref
       );
-      if (existingOpIdx >= 0) {
+      if (existingOpIdx !== -1) {
         // Keep the original source text but refresh the latest DOM/source evidence.
         existing.ops[existingOpIdx] = {
           ...newOp,
-          originalText: existing.ops[existingOpIdx].originalText,
-          newText: newOp.newText,
           deleted: newOp.deleted || false,
+          newText: newOp.newText,
+          originalText: existing.ops[existingOpIdx].originalText,
         };
-        if (newEntry.element) existing.element = newEntry.element;
+        if (newEntry.element) {
+          existing.element = newEntry.element;
+        }
         existing.stagedAt = new Date().toISOString();
         mergedIntoExisting = true;
         break;
       }
     }
-    if (mergedIntoExisting) continue;
+    if (mergedIntoExisting) {
+      continue;
+    }
     // No existing op for this (pageUrl, ref). Find or create an entry to hold it.
     let entry = buf.entries.find(
       (e) => e.pageUrl === pageUrl && e.id === newEntry.id
     );
     if (!entry) {
       entry = {
-        id: newEntry.id,
-        pageUrl,
         element: newEntry.element,
+        id: newEntry.id,
         ops: [],
+        pageUrl,
         stagedAt: new Date().toISOString(),
       };
       buf.entries.push(entry);
@@ -153,7 +163,7 @@ export function countByPage(cwd = process.cwd()) {
     perPage[entry.pageUrl] = (perPage[entry.pageUrl] || 0) + n;
     totalCount += n;
   }
-  return { totalCount, perPage };
+  return { perPage, totalCount };
 }
 
 /**
@@ -163,7 +173,9 @@ export function countByPage(cwd = process.cwd()) {
 export function truncateBuffer(cwd) {
   const buf = readBuffer(cwd);
   let removed = 0;
-  for (const entry of buf.entries) removed += entry.ops.length;
-  writeBuffer(cwd, { version: BUFFER_VERSION, entries: [] });
+  for (const entry of buf.entries) {
+    removed += entry.ops.length;
+  }
+  writeBuffer(cwd, { entries: [], version: BUFFER_VERSION });
   return removed;
 }

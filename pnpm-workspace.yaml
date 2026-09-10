@@ -2,20 +2,20 @@ packages:
   - .
 
 allowBuilds:
-  lefthook: set this to true or false
+  lefthook: false
 
 minimumReleaseAgeExclude:
   - ultracite@7.10.7 || 7.11.1
-  - '@types/node@26.4.0'
-  - '@tanstack/history@1.162.3'
-  - '@tanstack/react-router@1.170.34'
-  - '@tanstack/router-core@1.171.29'
-  - '@types/react-dom@19.3.0'
-  - '@types/react@19.3.0'
+  - "@types/node@26.4.0"
+  - "@tanstack/history@1.162.3"
+  - "@tanstack/react-router@1.170.34"
+  - "@tanstack/router-core@1.171.29"
+  - "@types/react-dom@19.3.0"
+  - "@types/react@19.3.0"
   - react-dom@19.3.0
   - react@19.3.0
   - scheduler@0.28.0
 
 overrides:
-  '@tanstack/router-plugin': 1.168.35
-  '@tanstack/router-devtools': 1.167.1
+  "@tanstack/router-plugin": 1.168.35
+  "@tanstack/router-devtools": 1.167.1

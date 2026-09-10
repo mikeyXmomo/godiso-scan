@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+
 import { Field, FieldLabel } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ export function SettingField({
       <div className="flex w-full items-center justify-between gap-4">
         <FieldLabel>{label}</FieldLabel>
         {preview !== undefined && preview !== null ? (
-          <div className="text-base text-muted-foreground tabular-nums">
+          <div className="text-muted-foreground text-base tabular-nums">
             {preview}
           </div>
         ) : null}

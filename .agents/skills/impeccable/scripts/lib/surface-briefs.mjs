@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import { slugFromTarget } from "./target-slug.mjs";
 
 export const SURFACE_BRIEF_VERSION = 1;
@@ -9,11 +10,13 @@ export function getSurfaceBriefDir(projectRoot) {
 }
 
 function normalizeRouteTarget(route) {
-  if (!route.startsWith("/") || route.includes("..")) return null;
+  if (!route.startsWith("/") || route.includes("..")) {
+    return null;
+  }
   const normalized =
     route
       .split(/[?#]/, 1)[0]
-      .replace(/\/{2,}/g, "/")
+      .replaceAll(/\/{2,}/g, "/")
       .replace(/\/$/, "") || "/";
   return `route:${normalized}`;
 }
@@ -22,7 +25,9 @@ export function normalizeSurfaceTarget(
   target,
   { projectRoot = process.cwd() } = {}
 ) {
-  if (!target || typeof target !== "string" || !target.trim()) return null;
+  if (!target || typeof target !== "string" || !target.trim()) {
+    return null;
+  }
   const trimmed = target.trim();
   if (/^https?:\/\//i.test(trimmed)) {
     try {
@@ -34,9 +39,12 @@ export function normalizeSurfaceTarget(
       return null;
     }
   }
-  if (/^route:/i.test(trimmed))
+  if (/^route:/i.test(trimmed)) {
     return normalizeRouteTarget(trimmed.slice(trimmed.indexOf(":") + 1).trim());
-  if (trimmed === "/") return normalizeRouteTarget(trimmed);
+  }
+  if (trimmed === "/") {
+    return normalizeRouteTarget(trimmed);
+  }
   if (trimmed.startsWith("/")) {
     const absolute = path.resolve(trimmed);
     const relativeToProject = path.relative(projectRoot, absolute);
@@ -44,15 +52,17 @@ export function normalizeSurfaceTarget(
       relativeToProject &&
       !relativeToProject.startsWith("..") &&
       !path.isAbsolute(relativeToProject);
-    if (!isProjectFile && !fs.existsSync(absolute))
+    if (!isProjectFile && !fs.existsSync(absolute)) {
       return normalizeRouteTarget(trimmed);
+    }
   }
   const abs = path.isAbsolute(trimmed)
     ? trimmed
     : path.resolve(projectRoot, trimmed);
   const rel = path.relative(projectRoot, abs);
-  if (!rel || rel === "." || rel.startsWith("..") || path.isAbsolute(rel))
+  if (!rel || rel === "." || rel.startsWith("..") || path.isAbsolute(rel)) {
     return null;
+  }
   return rel.split(path.sep).join("/");
 }
 
@@ -61,7 +71,9 @@ export function surfaceBriefPathForTarget(
   { projectRoot = process.cwd() } = {}
 ) {
   const normalized = normalizeSurfaceTarget(target, { projectRoot });
-  if (!normalized) return null;
+  if (!normalized) {
+    return null;
+  }
   const slugInput = normalized.startsWith("route:")
     ? `route${normalized.slice("route:".length)}`
     : normalized;
@@ -77,12 +89,16 @@ export function parseSurfaceBrief(text, filePath = null) {
   if (match) {
     for (const line of match[1].split(/\r?\n/)) {
       const colon = line.indexOf(":");
-      if (colon < 0) continue;
+      if (colon === -1) {
+        continue;
+      }
       const key = line.slice(0, colon).trim();
       const raw = line.slice(colon + 1).trim();
-      if (!key) continue;
+      if (!key) {
+        continue;
+      }
       if (
-        /^(?:\[|\{|\")/.test(raw) ||
+        /^(?:\[|\{|")/.test(raw) ||
         /^(?:true|false|null|-?\d+(?:\.\d+)?)$/.test(raw)
       ) {
         try {
@@ -92,7 +108,7 @@ export function parseSurfaceBrief(text, filePath = null) {
           /* keep string */
         }
       }
-      meta[key] = raw.replace(/^['"]|['"]$/g, "");
+      meta[key] = raw.replaceAll(/^['"]|['"]$/g, "");
     }
   }
   const primaryTarget =
@@ -101,23 +117,23 @@ export function parseSurfaceBrief(text, filePath = null) {
     ? meta.related_targets.filter((value) => typeof value === "string")
     : [];
   return {
-    path: filePath,
-    text: String(text || ""),
     body: match
       ? String(text || "")
           .slice(match[0].length)
           .trim()
       : String(text || "").trim(),
     meta,
+    path: filePath,
+    primaryTarget,
+    relatedTargets,
     slug:
       typeof meta.slug === "string"
         ? meta.slug
         : filePath
           ? path.basename(filePath, ".md")
           : null,
-    primaryTarget,
-    relatedTargets,
     targets: [primaryTarget, ...relatedTargets].filter(Boolean),
+    text: String(text || ""),
   };
 }
 
@@ -161,15 +177,18 @@ export function resolveSurfaceBrief(
   }
 
   const normalized = normalizeSurfaceTarget(target, { projectRoot });
-  if (!normalized)
+  if (!normalized) {
     return { brief: null, candidates: briefs, reason: "invalid-target" };
+  }
   const exactPath = surfaceBriefPathForTarget(normalized, { projectRoot });
   const exact = briefs.find(
     (brief) =>
       brief.path === exactPath &&
       (!brief.targets.length || brief.targets.includes(normalized))
   );
-  if (exact) return { brief: exact, candidates: briefs, reason: "slug" };
+  if (exact) {
+    return { brief: exact, candidates: briefs, reason: "slug" };
+  }
   const mapped = briefs.filter((brief) => brief.targets.includes(normalized));
   return {
     brief: mapped.length === 1 ? mapped[0] : null,
@@ -192,10 +211,11 @@ export function writeSurfaceBrief({
   const normalizedPrimary = normalizeSurfaceTarget(primaryTarget, {
     projectRoot,
   });
-  if (!normalizedPrimary)
+  if (!normalizedPrimary) {
     throw new Error(
       "surface brief requires a concrete project-relative primary target or URL"
     );
+  }
   const normalizedRelated = [
     ...new Set(
       relatedTargets

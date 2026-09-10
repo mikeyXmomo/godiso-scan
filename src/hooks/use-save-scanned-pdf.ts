@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+
 import { buildPDF } from "@/utils/pdf-builder/build-pdf";
 import type { ImageInfo } from "@/utils/pdf-builder/types";
 import { PDF } from "@/utils/pdf-renderer/pdf";
@@ -12,7 +13,7 @@ export function useSaveScannedPDF() {
   const [saving, setSaving] = useState(false);
   const [finishedPages, setFinishedPages] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [scannedPDF, setScannedPDF] = useState<File | undefined>(undefined);
+  const [scannedPDF, setScannedPDF] = useState<File | undefined>();
 
   const progress = totalPages === 0 ? 0 : finishedPages / totalPages;
 

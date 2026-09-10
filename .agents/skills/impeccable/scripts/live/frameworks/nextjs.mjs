@@ -37,29 +37,34 @@ const ROUTER_ENTRY_CANDIDATES = [
 
 export function detectNextProject(cwd = process.cwd()) {
   const configFile = findConfigFile(cwd, NEXT_CONFIG_RE);
-  if (configFile) return { configFile, via: "config" };
-  if (hasAnyDependency(cwd, ["next"]))
+  if (configFile) {
+    return { configFile, via: "config" };
+  }
+  if (hasAnyDependency(cwd, ["next"])) {
     return { configFile: null, via: "package" };
+  }
   // Next's file conventions are distinctive enough to stand alone: a root
   // `app/layout.*` or `pages/_app.*` is not a shape other bundlers produce.
   const entry = ROUTER_ENTRY_CANDIDATES.find((rel) => fileExists(cwd, rel));
-  if (entry) return { configFile: null, via: "router-entry", entry };
+  if (entry) {
+    return { configFile: null, entry, via: "router-entry" };
+  }
   return null;
 }
 
 export const nextjs = {
-  name: "nextjs",
-
   detect(cwd) {
     return detectNextProject(cwd);
   },
 
   inject: { kind: "tag" },
 
+  name: "nextjs",
+
   source: {
+    commentSyntax: "jsx",
     extensions: [".tsx", ".jsx"],
     preview: "source",
     styleMode: "scoped",
-    commentSyntax: "jsx",
   },
 };

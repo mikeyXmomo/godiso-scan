@@ -26,6 +26,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { resolveLiveConfigPath } from "./lib/impeccable-paths.mjs";
 import {
   describeInjectArtifacts,
@@ -38,6 +39,7 @@ import {
   healInjectJournal,
   recordInjection,
 } from "./live/frameworks/journal.mjs";
+import { buildLiveScriptSrc } from "./live/frameworks/script-src.mjs";
 import {
   buildTagBlock,
   insertTag,
@@ -45,10 +47,9 @@ import {
   removeTag,
   revertCspMeta,
 } from "./live/frameworks/tag-strategy.mjs";
-import { buildLiveScriptSrc } from "./live/frameworks/script-src.mjs";
 import { enterLiveRoot } from "./live/roots.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 // Resolved lazily so the enterLiveRoot() chdir in the CLI guard below takes
 // effect first; module scope runs before the guard.
 let CONFIG_PATH_CACHED = null;
@@ -129,8 +130,8 @@ Output (JSON):
     if (!fs.existsSync(CONFIG_PATH_GET())) {
       console.log(
         JSON.stringify({
-          ok: false,
           error: "config_missing",
+          ok: false,
           path: CONFIG_PATH_GET(),
         })
       );
@@ -139,12 +140,12 @@ Output (JSON):
     let cfg;
     try {
       cfg = JSON.parse(fs.readFileSync(CONFIG_PATH_GET(), "utf-8"));
-    } catch (err) {
+    } catch (error) {
       console.log(
         JSON.stringify({
-          ok: false,
           error: "config_invalid",
-          message: err.message,
+          message: error.message,
+          ok: false,
           path: CONFIG_PATH_GET(),
         })
       );
@@ -152,19 +153,19 @@ Output (JSON):
     }
     try {
       validateConfig(cfg);
-    } catch (err) {
+    } catch (error) {
       console.log(
         JSON.stringify({
-          ok: false,
           error: "config_invalid",
-          message: err.message,
+          message: error.message,
+          ok: false,
           path: CONFIG_PATH_GET(),
         })
       );
       return;
     }
     console.log(
-      JSON.stringify({ ok: true, config: cfg, path: CONFIG_PATH_GET() })
+      JSON.stringify({ config: cfg, ok: true, path: CONFIG_PATH_GET() })
     );
     return;
   }
@@ -173,8 +174,8 @@ Output (JSON):
   if (!fs.existsSync(CONFIG_PATH_GET())) {
     console.error(
       JSON.stringify({
-        ok: false,
         error: "config_missing",
+        ok: false,
         path: CONFIG_PATH_GET(),
       })
     );
@@ -191,8 +192,8 @@ Output (JSON):
   if (args.includes("--remove")) {
     if (isAdapter) {
       const adapterResult = resolved.framework.inject.remove({
-        cwd,
         config,
+        cwd,
         project: resolved.project,
       });
       const ok = !(adapterResult && adapterResult.error);
@@ -202,38 +203,42 @@ Output (JSON):
       clearInjectJournal(cwd);
       console.log(
         JSON.stringify({
-          ok,
           adapter: resolved.framework.name,
-          results: [adapterResult],
           healed: healed.length ? healed : undefined,
+          ok,
+          results: [adapterResult],
         })
       );
-      if (!ok) process.exitCode = 1;
+      if (!ok) {
+        process.exitCode = 1;
+      }
       return;
     }
     const results = resolvedFiles.map((relFile) => {
       const absFile = path.resolve(cwd, relFile);
-      if (!fs.existsSync(absFile))
-        return { file: relFile, error: "file_not_found" };
+      if (!fs.existsSync(absFile)) {
+        return { error: "file_not_found", file: relFile };
+      }
       const content = fs.readFileSync(absFile, "utf-8");
       const detagged = removeTag(content, config.commentSyntax);
       const updated = revertCspMeta(detagged);
-      if (updated === content)
-        return { file: relFile, removed: false, note: "no tag present" };
+      if (updated === content) {
+        return { file: relFile, note: "no tag present", removed: false };
+      }
       fs.writeFileSync(absFile, updated, "utf-8");
       return {
+        cspReverted: updated !== detagged,
         file: relFile,
         removed: detagged !== content,
-        cspReverted: updated !== detagged,
       };
     });
     const { healed } = healInjectJournal(cwd);
     clearInjectJournal(cwd);
     console.log(
       JSON.stringify({
+        healed: healed.length ? healed : undefined,
         ok: true,
         results,
-        healed: healed.length ? healed : undefined,
       })
     );
     return;
@@ -241,9 +246,10 @@ Output (JSON):
 
   // Insert mode — need --port
   const portIdx = args.indexOf("--port");
-  const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : NaN;
+  const port =
+    portIdx === -1 ? Number.NaN : Number.parseInt(args[portIdx + 1], 10);
   if (!Number.isFinite(port)) {
-    console.error(JSON.stringify({ ok: false, error: "missing_port" }));
+    console.error(JSON.stringify({ error: "missing_port", ok: false }));
     process.exit(1);
   }
   // Optional server token: appended to the /live.js src so the token-gated
@@ -251,7 +257,7 @@ Output (JSON):
   // it; a manual `--port`-only invocation reads the running helper's token
   // from server.json instead of writing an unauthenticated URL that 401s.
   const tokenIdx = args.indexOf("--token");
-  let token = tokenIdx !== -1 ? args[tokenIdx + 1] : undefined;
+  let token = tokenIdx === -1 ? undefined : args[tokenIdx + 1];
   if (!token) {
     try {
       const info = JSON.parse(
@@ -262,7 +268,9 @@ Output (JSON):
       );
       // A record for a DIFFERENT port is a stale or foreign helper; its token
       // would 401 just the same, so only adopt a matching one.
-      if (info?.token && Number(info.port) === port) token = info.token;
+      if (info?.token && Number(info.port) === port) {
+        token = info.token;
+      }
     } catch {
       /* no running helper recorded; keep legacy tokenless behavior */
     }
@@ -305,37 +313,41 @@ Output (JSON):
 
   if (isAdapter) {
     const adapterResult = resolved.framework.inject.apply({
+      config,
       cwd,
       port,
-      token,
-      config,
       project: resolved.project,
+      token,
     });
     const ok = !(adapterResult && adapterResult.error);
-    if (ok)
+    if (ok) {
       recordInjection(cwd, {
+        artifacts: plannedArtifacts,
         framework: resolved.framework.name,
         port,
-        artifacts: plannedArtifacts,
       });
+    }
     console.log(
       JSON.stringify({
-        ok,
-        port,
         adapter: resolved.framework.name,
         gitIgnore,
-        results: [adapterResult],
         healed: healed.length ? healed : undefined,
+        ok,
+        port,
+        results: [adapterResult],
       })
     );
-    if (!ok) process.exitCode = 1;
+    if (!ok) {
+      process.exitCode = 1;
+    }
     return;
   }
 
   const results = resolvedFiles.map((relFile) => {
     const absFile = path.resolve(cwd, relFile);
-    if (!fs.existsSync(absFile))
-      return { file: relFile, error: "file_not_found" };
+    if (!fs.existsSync(absFile)) {
+      return { error: "file_not_found", file: relFile };
+    }
     const content = fs.readFileSync(absFile, "utf-8");
     const withoutOld = revertCspMeta(removeTag(content, config.commentSyntax));
     // Per-file, not per-project: a Vite app can hold an .astro partial, and a
@@ -344,17 +356,17 @@ Output (JSON):
     const withTag = insertTag(withoutOld, config, port, token, scriptAttrs);
     if (withTag === withoutOld) {
       return {
-        file: relFile,
-        error: "insertion_point_not_found",
         anchor: config.insertBefore || config.insertAfter,
+        error: "insertion_point_not_found",
+        file: relFile,
       };
     }
     const updated = patchCspMeta(withTag, port);
     fs.writeFileSync(absFile, updated, "utf-8");
     return {
+      cspPatched: updated !== withTag,
       file: relFile,
       inserted: true,
-      cspPatched: updated !== withTag,
     };
   });
   const anyInserted = results.some((r) => r.inserted);
@@ -362,20 +374,22 @@ Output (JSON):
     results.filter((r) => r.inserted).map((r) => r.file)
   );
   recordInjection(cwd, {
+    artifacts: plannedArtifacts.filter((a) => writtenFiles.has(a.path)),
     framework: resolved?.framework.name,
     port,
-    artifacts: plannedArtifacts.filter((a) => writtenFiles.has(a.path)),
   });
   console.log(
     JSON.stringify({
+      gitIgnore,
+      healed: healed.length ? healed : undefined,
       ok: anyInserted,
       port,
-      gitIgnore,
       results,
-      healed: healed.length ? healed : undefined,
     })
   );
-  if (!anyInserted) process.exit(1);
+  if (!anyInserted) {
+    process.exit(1);
+  }
 }
 
 export function ensureLiveGitIgnores(cwd = process.cwd(), extraPatterns = []) {
@@ -401,7 +415,7 @@ export function ensureLiveGitIgnores(cwd = process.cwd(), extraPatterns = []) {
         ? ""
         : existing.endsWith("\n")
           ? existing
-          : existing + "\n";
+          : `${existing}\n`;
     updated = `${prefix}${prefix.endsWith("\n\n") || prefix === "" ? "" : "\n"}${block}\n`;
   }
 
@@ -411,9 +425,9 @@ export function ensureLiveGitIgnores(cwd = process.cwd(), extraPatterns = []) {
   }
 
   return {
+    changed: updated !== existing,
     file: path.relative(cwd, target.path).split(path.sep).join("/"),
     mode: target.mode,
-    changed: updated !== existing,
     patterns: [...new Set([...LIVE_IGNORE_PATTERNS, ...extraPatterns])],
   };
 }
@@ -421,22 +435,30 @@ export function ensureLiveGitIgnores(cwd = process.cwd(), extraPatterns = []) {
 function resolveIgnoreTarget(cwd) {
   const gitExcludePath = resolveGitInfoExcludePath(cwd);
   if (gitExcludePath) {
-    return { path: gitExcludePath, mode: "git-info-exclude" };
+    return { mode: "git-info-exclude", path: gitExcludePath };
   }
-  return { path: path.join(cwd, ".gitignore"), mode: "gitignore" };
+  return { mode: "gitignore", path: path.join(cwd, ".gitignore") };
 }
 
 function resolveGitInfoExcludePath(cwd) {
   const dotGit = path.join(cwd, ".git");
-  if (!fs.existsSync(dotGit)) return null;
+  if (!fs.existsSync(dotGit)) {
+    return null;
+  }
 
   const stat = fs.statSync(dotGit);
-  if (stat.isDirectory()) return path.join(dotGit, "info", "exclude");
-  if (!stat.isFile()) return null;
+  if (stat.isDirectory()) {
+    return path.join(dotGit, "info", "exclude");
+  }
+  if (!stat.isFile()) {
+    return null;
+  }
 
   const body = fs.readFileSync(dotGit, "utf-8").trim();
   const match = body.match(/^gitdir:\s*(.+)$/i);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const gitDir = path.isAbsolute(match[1])
     ? match[1]
     : path.resolve(cwd, match[1]);
@@ -444,7 +466,7 @@ function resolveGitInfoExcludePath(cwd) {
 }
 
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -483,11 +505,17 @@ export function resolveFiles(rootDir, config) {
       continue;
     }
     for (const ent of matches) {
-      if (!ent.isFile || !ent.isFile()) continue;
+      if (!ent.isFile || !ent.isFile()) {
+        continue;
+      }
       const abs = path.join(ent.parentPath || ent.path || rootDir, ent.name);
       const rel = path.relative(rootDir, abs).split(path.sep).join("/");
-      if (isExcluded(rel)) continue;
-      if (seen.has(rel)) continue;
+      if (isExcluded(rel)) {
+        continue;
+      }
+      if (seen.has(rel)) {
+        continue;
+      }
       seen.add(rel);
       out.push(rel);
     }
@@ -526,14 +554,14 @@ function globToRegex(pattern) {
       re += "[^/]";
       i += 1;
     } else if (/[.+^${}()|[\]\\]/.test(c)) {
-      re += "\\" + c;
+      re += `\\${c}`;
       i += 1;
     } else {
       re += c;
       i += 1;
     }
   }
-  return new RegExp("^" + re + "$");
+  return new RegExp(`^${re}$`);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,8 +569,9 @@ function globToRegex(pattern) {
 // ---------------------------------------------------------------------------
 
 function validateConfig(cfg) {
-  if (!cfg || typeof cfg !== "object")
+  if (!cfg || typeof cfg !== "object") {
     throw new Error("config.json must be an object");
+  }
   if (!Array.isArray(cfg.files) || cfg.files.length === 0) {
     throw new Error("config.files (non-empty string array) required");
   }
@@ -551,7 +580,7 @@ function validateConfig(cfg) {
   }
   if (cfg.exclude !== undefined) {
     if (!Array.isArray(cfg.exclude)) {
-      throw new Error("config.exclude, if present, must be a string array");
+      throw new TypeError("config.exclude, if present, must be a string array");
     }
     if (!cfg.exclude.every((f) => typeof f === "string" && f.length > 0)) {
       throw new Error("config.exclude must contain only non-empty strings");
@@ -561,7 +590,7 @@ function validateConfig(cfg) {
     typeof cfg.insertBefore !== "string" &&
     typeof cfg.insertAfter !== "string"
   ) {
-    throw new Error(
+    throw new TypeError(
       "config.insertBefore or config.insertAfter (string) required"
     );
   }

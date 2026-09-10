@@ -36,8 +36,12 @@ export function isGeneratedFile(filePath, options = {}) {
     ? filePath
     : path.resolve(cwd, filePath);
 
-  if (isGitIgnored(absPath, cwd)) return true;
-  if (hasGeneratedHeader(absPath)) return true;
+  if (isGitIgnored(absPath, cwd)) {
+    return true;
+  }
+  if (hasGeneratedHeader(absPath)) {
+    return true;
+  }
   return false;
 }
 
@@ -51,7 +55,7 @@ function isGitIgnored(absPath, cwd) {
       stdio: "ignore",
     });
     return true; // exit 0 = ignored
-  } catch (err) {
+  } catch {
     // Exit code 1 = not ignored. Exit code 128 = not a git repo or other error.
     // In both cases, treat as "not known to be ignored."
     return false;

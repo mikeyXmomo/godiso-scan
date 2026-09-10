@@ -12,17 +12,18 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { readLiveServerInfo } from "./lib/impeccable-paths.mjs";
 import {
   completionAckForAcceptResult,
   completionTypeForAcceptResult,
 } from "./live/completion.mjs";
-import { readLiveServerInfo } from "./lib/impeccable-paths.mjs";
-import { enterLiveRoot } from "./live/roots.mjs";
 import { instructionsForEvent } from "./live/instructions.mjs";
+import { enterLiveRoot } from "./live/roots.mjs";
 
 // Absolute path to a sibling script in this skill's scripts dir, so runtime
 // error hints print a directly-runnable command instead of a placeholder.
-const SELF_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SELF_DIR = import.meta.dirname;
 const scriptCmd = (name) => `node "${path.join(SELF_DIR, name)}"`;
 
 // Node's built-in fetch (undici under the hood) enforces a 300s headers
@@ -55,19 +56,17 @@ export function buildPollReplyPayload(
   token,
   { id, type, message, file, data, sourceEventType }
 ) {
-  return { token, id, type, message, file, data, sourceEventType };
+  return { data, file, id, message, sourceEventType, token, type };
 }
 
 export function manualApplyPollBanner(event = {}) {
   const id = event.id || "EVENT_ID";
-  return (
-    [
-      `Manual Apply action required: edit source, then reply with \`live-poll.mjs --reply ${id} done --data '<json>'\`.`,
-      "The JSON data must include status, appliedEntryIds, failed, files, and notes; summary counters are only a recovery fallback.",
-      "Do not run live-commit-manual-edits.mjs for this leased event.",
-      "Do not poll again before replying.",
-    ].join("\n") + "\n"
-  );
+  return `${[
+    `Manual Apply action required: edit source, then reply with \`live-poll.mjs --reply ${id} done --data '<json>'\`.`,
+    "The JSON data must include status, appliedEntryIds, failed, files, and notes; summary counters are only a recovery fallback.",
+    "Do not run live-commit-manual-edits.mjs for this leased event.",
+    "Do not poll again before replying.",
+  ].join("\n")}\n`;
 }
 
 /**
@@ -78,7 +77,9 @@ export function manualApplyPollBanner(event = {}) {
  */
 export function parseReplyArgs(args) {
   const replyIdx = args.indexOf("--reply");
-  if (replyIdx === -1) return null;
+  if (replyIdx === -1) {
+    return null;
+  }
   const id = args[replyIdx + 1];
   const status = args[replyIdx + 2];
   validateReplyArgs({ id, status });
@@ -90,8 +91,8 @@ export function parseReplyArgs(args) {
   if (dataIdx !== -1 && dataIdx + 1 < args.length) {
     try {
       data = JSON.parse(args[dataIdx + 1]);
-    } catch (err) {
-      const wrapped = new Error("--data must be valid JSON: " + err.message);
+    } catch (error) {
+      const wrapped = new Error(`--data must be valid JSON: ${error.message}`);
       wrapped.code = "INVALID_DATA_JSON";
       throw wrapped;
     }
@@ -104,7 +105,7 @@ export function parseReplyArgs(args) {
         i !== fileIdx + 1 &&
         i !== dataIdx + 1
     ) || undefined;
-  return { id, type: status, message, file, data };
+  return { data, file, id, message, type: status };
 }
 
 function validateReplyArgs({ id, status }) {
@@ -136,9 +137,9 @@ export function requiresAgentReply(event) {
 
 export async function postReply(base, token, reply) {
   const res = await fetch(`${base}/poll`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(buildPollReplyPayload(token, reply)),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -146,7 +147,7 @@ export async function postReply(base, token, reply) {
       ? body.failures
           .map(
             (f) =>
-              `  ${f.file}${f.line != null ? `:${f.line}` : ""} ${f.message}`
+              `  ${f.file}${f.line == null ? "" : `:${f.line}`} ${f.message}`
           )
           .join("\n")
       : null;
@@ -189,7 +190,9 @@ export async function waitForEventAck(
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     const status = await fetchServerStatus(base, token);
-    if (!isEventPending(status, eventId)) return true;
+    if (!isEventPending(status, eventId)) {
+      return true;
+    }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
   return false;
@@ -217,15 +220,16 @@ export async function fetchNextEvent(
       : PER_REQUEST_TIMEOUT_MS;
     const slice = Math.min(Math.max(remaining, 1000), perRequestTimeoutMs);
     const query = new URLSearchParams({
-      token,
-      timeout: String(slice),
       leaseMs: String(leaseMs),
+      timeout: String(slice),
+      token,
     });
     const normalizedTypes = normalizePollTypes(
       resolveTypes ? await resolveTypes() : types
     );
-    if (normalizedTypes.length > 0)
+    if (normalizedTypes.length > 0) {
       query.set("types", normalizedTypes.join(","));
+    }
     const res = await fetch(`${base}/poll?${query}`, { signal });
 
     if (res.status === 401) {
@@ -242,8 +246,12 @@ export async function fetchNextEvent(
 
     const next = await res.json();
     if (next?.type === "timeout") {
-      if (totalDeadline && Date.now() < totalDeadline) continue;
-      if (!totalDeadline) continue;
+      if (totalDeadline && Date.now() < totalDeadline) {
+        continue;
+      }
+      if (!totalDeadline) {
+        continue;
+      }
       return next;
     }
     return next;
@@ -251,21 +259,27 @@ export async function fetchNextEvent(
 }
 
 export async function augmentEventWithAcceptHandling(event, base, token) {
-  if (event.type !== "accept" && event.type !== "discard") return event;
+  if (event.type !== "accept" && event.type !== "discard") {
+    return event;
+  }
 
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const __dirname = import.meta.dirname;
   const acceptScript = path.join(__dirname, "live-accept.mjs");
   const scriptArgs = buildAcceptScriptArgs(event);
 
   try {
     const out = execFileSync("node", [acceptScript, ...scriptArgs], {
-      encoding: "utf-8",
       cwd: process.cwd(),
+      encoding: "utf-8",
       timeout: 30_000,
     });
     event._acceptResult = JSON.parse(out.trim());
-  } catch (err) {
-    event._acceptResult = { handled: false, mode: "error", error: err.message };
+  } catch (error) {
+    event._acceptResult = {
+      error: error.message,
+      handled: false,
+      mode: "error",
+    };
   }
 
   await completeAcceptHandling(event, base, token);
@@ -279,18 +293,18 @@ export async function completeAcceptHandling(event, base, token) {
   );
   try {
     await postReply(base, token, {
-      id: event.id,
-      type: completionType,
-      sourceEventType: event.type,
-      message: event._acceptResult?.error,
-      file: event._acceptResult?.file,
       data:
         event._acceptResult?.carbonize === true
           ? { carbonize: true }
           : undefined,
+      file: event._acceptResult?.file,
+      id: event.id,
+      message: event._acceptResult?.error,
+      sourceEventType: event.type,
+      type: completionType,
     });
-  } catch (err) {
-    event._completionAck = { ok: false, error: err.message };
+  } catch (error) {
+    event._completionAck = { error: error.message, ok: false };
     return event;
   }
   event._completionAck = completionAckForAcceptResult(
@@ -306,7 +320,9 @@ export function buildAcceptScriptArgs(event) {
     event.type === "discard"
       ? ["--id", String(event.id), "--discard"]
       : ["--id", String(event.id), "--variant", String(event.variantId)];
-  if (event.pageUrl) scriptArgs.push("--page-url", String(event.pageUrl));
+  if (event.pageUrl) {
+    scriptArgs.push("--page-url", String(event.pageUrl));
+  }
   if (
     event.type === "accept" &&
     event.paramValues &&
@@ -319,13 +335,13 @@ export function buildAcceptScriptArgs(event) {
 
 export function writeCarbonizeBanner(event) {
   if (event.type === "manual_edit_apply") {
-    process.stderr.write("\n" + manualApplyPollBanner(event) + "\n");
+    process.stderr.write(`\n${manualApplyPollBanner(event)}\n`);
   }
   if (event._acceptResult?.carbonize === true) {
     process.stderr.write(
-      "\n⚠ Carbonize cleanup REQUIRED before next poll. After cleanup, run live-complete.mjs --id " +
-        event.id +
-        '. See reference/live.md "Required after accept".\n\n'
+      `\n⚠ Carbonize cleanup REQUIRED before next poll. After cleanup, run live-complete.mjs --id ${
+        event.id
+      }. See reference/live.md "Required after accept".\n\n`
     );
   }
 }
@@ -337,8 +353,11 @@ export function printPollEvent(event) {
   // A wire-supplied value must never win over the locally generated one.
   if (event && typeof event === "object") {
     const instructions = instructionsForEvent(event, { scriptsPath: SELF_DIR });
-    if (instructions) event._instructions = instructions;
-    else delete event._instructions;
+    if (instructions) {
+      event._instructions = instructions;
+    } else {
+      delete event._instructions;
+    }
   }
   console.log(JSON.stringify(event));
 }
@@ -350,10 +369,10 @@ export async function runPollOnce(
 ) {
   const deadline = Date.now() + totalTimeout;
   const event = await fetchNextEvent(base, token, {
+    perRequestTimeoutMs,
+    resolveTypes,
     totalDeadline: deadline,
     types,
-    resolveTypes,
-    perRequestTimeoutMs,
   });
   await augmentEventWithAcceptHandling(event, base, token);
   writeCarbonizeBanner(event);
@@ -379,20 +398,22 @@ export async function runPollStream(
 
   while (shouldContinue()) {
     const event = await fetchNextEvent(base, token, {
-      types,
-      resolveTypes,
       perRequestTimeoutMs,
+      resolveTypes,
+      types,
     });
     await augmentEventWithAcceptHandling(event, base, token);
     writeCarbonizeBanner(event);
     printPollEvent(event);
 
-    if (event.type === "exit") return event;
+    if (event.type === "exit") {
+      return event;
+    }
 
     if (requiresAgentReply(event)) {
       const acked = await waitForEventAck(base, token, event.id, {
-        pollIntervalMs: ackPollIntervalMs,
         maxWaitMs: ackTimeoutMs,
+        pollIntervalMs: ackPollIntervalMs,
       });
       if (!acked) {
         const err = new Error(
@@ -470,20 +491,20 @@ Harness note:
     let reply;
     try {
       reply = parseReplyArgs(args);
-    } catch (err) {
-      console.error(err.message);
+    } catch (error) {
+      console.error(error.message);
       process.exit(1);
     }
 
     try {
       await postReply(base, info.token, reply);
-    } catch (err) {
-      if (err.cause?.code === "ECONNREFUSED") {
+    } catch (error) {
+      if (error.cause?.code === "ECONNREFUSED") {
         console.error(
           `Live server not running. Start one with: ${scriptCmd("live.mjs")}`
         );
       } else {
-        console.error("Reply failed:", err.message);
+        console.error("Reply failed:", error.message);
       }
       process.exit(1);
     }
@@ -497,7 +518,7 @@ Harness note:
   );
   const ackTimeoutArg = args.find((a) => a.startsWith("--ack-timeout="));
   const ackTimeoutMs = ackTimeoutArg
-    ? parseInt(ackTimeoutArg.split("=")[1], 10)
+    ? Number.parseInt(ackTimeoutArg.split("=")[1], 10)
     : 600_000;
 
   try {
@@ -508,11 +529,11 @@ Harness note:
 
     const timeoutArg = args.find((a) => a.startsWith("--timeout="));
     const totalTimeout = timeoutArg
-      ? parseInt(timeoutArg.split("=")[1], 10)
+      ? Number.parseInt(timeoutArg.split("=")[1], 10)
       : 600_000;
     await runPollOnce(base, info.token, { totalTimeout, types });
-  } catch (err) {
-    handlePollError(err);
+  } catch (error) {
+    handlePollError(error);
   }
 }
 

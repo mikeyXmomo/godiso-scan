@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+
 import { Card, CardPanel } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -12,11 +13,8 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useScannerStore } from "@/lib/scanner-store";
-import {
-  type FontFamily,
-  fontFamilies,
-  type Watermark,
-} from "@/utils/scan-renderer/config.types";
+import { fontFamilies } from "@/utils/scan-renderer/config.types";
+import type { FontFamily, Watermark } from "@/utils/scan-renderer/config.types";
 
 const FONT_LABELS: Record<FontFamily, string> = {
   cursive: "Kursif",
@@ -185,7 +183,7 @@ export function WatermarkSettingsCard() {
           <FieldLabel>Warna teks</FieldLabel>
           <input
             aria-label="Warna watermark"
-            className="h-9 w-16 cursor-pointer rounded border border-input bg-background p-0"
+            className="border-input bg-background h-9 w-16 cursor-pointer rounded border p-0"
             onChange={handleColorChange}
             type="color"
             value={watermark.color}

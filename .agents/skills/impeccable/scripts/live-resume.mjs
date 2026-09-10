@@ -3,8 +3,8 @@
  * Recover the next agent action from the durable live-session journal.
  */
 
-import { createLiveSessionStore } from "./live/session-store.mjs";
 import { enterLiveRoot } from "./live/roots.mjs";
+import { createLiveSessionStore } from "./live/session-store.mjs";
 
 function manualApplyReplyCommand(eventOrId = "EVENT_ID") {
   const id =
@@ -15,16 +15,23 @@ function manualApplyReplyCommand(eventOrId = "EVENT_ID") {
 export function manualApplyResumeHint(event = {}) {
   const summary = event.manualApplySummary || summarizeManualApplyEvent(event);
   const parts = [];
-  if (summary.pageUrl) parts.push(`page ${summary.pageUrl}`);
-  if (summary.chunk)
+  if (summary.pageUrl) {
+    parts.push(`page ${summary.pageUrl}`);
+  }
+  if (summary.chunk) {
     parts.push(`chunk ${summary.chunk.index}/${summary.chunk.total}`);
-  if (Number.isFinite(summary.opCount)) parts.push(`${summary.opCount} op(s)`);
-  if (Number.isFinite(summary.entryCount))
+  }
+  if (Number.isFinite(summary.opCount)) {
+    parts.push(`${summary.opCount} op(s)`);
+  }
+  if (Number.isFinite(summary.entryCount)) {
     parts.push(
       `${summary.entryCount} entr${summary.entryCount === 1 ? "y" : "ies"}`
     );
-  if (summary.files?.length)
+  }
+  if (summary.files?.length) {
     parts.push(`likely files: ${summary.files.join(", ")}`);
+  }
   const scope = parts.length ? ` (${parts.join(", ")})` : "";
   return `Manual Apply pending${scope}. If you have not already leased it, run live-poll.mjs. Apply the source edits from the manual_edit_apply batch, then reply with ${manualApplyReplyCommand(event.id)}. Polling only leases this work item; it does not commit source edits. Do not run live-commit-manual-edits.mjs for this leased event. Do not poll again before replying.`;
 }
@@ -38,26 +45,35 @@ function summarizeManualApplyEvent(event = {}) {
     0
   );
   return {
-    pageUrl: event.pageUrl || null,
     chunk: event.chunk || null,
     entryCount: entries.length,
-    opCount,
     files: collectManualApplyFiles(event.batch),
+    opCount,
+    pageUrl: event.pageUrl || null,
   };
 }
 
 function collectManualApplyFiles(batch) {
   const files = [];
   for (const entry of batch?.entries || []) {
-    for (const op of entry.ops || []) files.push(op.sourceHint?.file);
+    for (const op of entry.ops || []) {
+      files.push(op.sourceHint?.file);
+    }
   }
   for (const candidate of batch?.candidates || []) {
     files.push(candidate.sourceHint?.relativeFile, candidate.sourceHint?.file);
-    for (const item of candidate.textMatches || []) files.push(item.file);
-    for (const item of candidate.objectKeyMatches || []) files.push(item.file);
-    for (const item of candidate.locatorMatches || []) files.push(item.file);
-    for (const item of candidate.contextTextMatches || [])
+    for (const item of candidate.textMatches || []) {
       files.push(item.file);
+    }
+    for (const item of candidate.objectKeyMatches || []) {
+      files.push(item.file);
+    }
+    for (const item of candidate.locatorMatches || []) {
+      files.push(item.file);
+    }
+    for (const item of candidate.contextTextMatches || []) {
+      files.push(item.file);
+    }
   }
   return [
     ...new Set(
@@ -73,13 +89,13 @@ function collectManualApplyFiles(batch) {
  */
 export function renderSummary(snapshot = {}) {
   return {
-    renderState: snapshot.renderState ?? null,
-    mountedVariants: Array.isArray(snapshot.mountedVariants)
-      ? snapshot.mountedVariants
-      : [],
     mountFailures: Array.isArray(snapshot.mountFailures)
       ? snapshot.mountFailures
       : [],
+    mountedVariants: Array.isArray(snapshot.mountedVariants)
+      ? snapshot.mountedVariants
+      : [],
+    renderState: snapshot.renderState ?? null,
   };
 }
 
@@ -87,8 +103,10 @@ export function mountFailureAction(snapshot = {}) {
   const failures = Array.isArray(snapshot.mountFailures)
     ? snapshot.mountFailures
     : [];
-  const latest = failures[failures.length - 1];
-  if (!latest) return null;
+  const latest = failures.at(-1);
+  if (!latest) {
+    return null;
+  }
   const where = latest.url ? ` from ${latest.url}` : "";
   const why = latest.error ? ` (${latest.error})` : "";
   return `The browser failed to mount variant ${latest.variant}${where}${why}; nothing is on screen. Fix the variant files, then reply with live-poll.mjs --reply ${snapshot?.pendingEvent?.id || snapshot?.id || "SESSION_ID"} done --file <manifest or source path> for the queued variant_mount_failed event (or republish) so the browser retries.`;
@@ -98,9 +116,13 @@ function parseArgs(argv) {
   const out = { id: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--id") out.id = argv[++i];
-    else if (arg.startsWith("--id=")) out.id = arg.slice("--id=".length);
-    else if (arg === "--help" || arg === "-h") out.help = true;
+    if (arg === "--id") {
+      out.id = argv[++i];
+    } else if (arg.startsWith("--id=")) {
+      out.id = arg.slice("--id=".length);
+    } else if (arg === "--help" || arg === "-h") {
+      out.help = true;
+    }
   }
   return out;
 }
@@ -153,7 +175,7 @@ export async function resumeCli() {
 
   console.log(
     JSON.stringify(
-      { active: true, snapshot, pendingEvent: pending, render, nextAction },
+      { active: true, nextAction, pendingEvent: pending, render, snapshot },
       null,
       2
     )

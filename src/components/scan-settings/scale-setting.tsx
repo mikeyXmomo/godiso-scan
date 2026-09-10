@@ -1,5 +1,7 @@
 import { useCallback } from "react";
+
 import { useScannerStore } from "@/lib/scanner-store";
+
 import { SliderSetting } from "./slider-setting";
 
 const formatValue = (value: number): string => `${value.toFixed(1)}x`;

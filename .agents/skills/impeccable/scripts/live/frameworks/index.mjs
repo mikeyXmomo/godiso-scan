@@ -38,14 +38,14 @@
 
 import path from "node:path";
 
-import { sveltekit } from "./sveltekit.mjs";
-import { nuxt } from "./nuxt.mjs";
-import { tanstackStart } from "./tanstack-start.mjs";
 import { astro } from "./astro.mjs";
 import { nextjs } from "./nextjs.mjs";
-import { viteGeneric } from "./vite-generic.mjs";
+import { nuxt } from "./nuxt.mjs";
 import { staticHtml } from "./static-html.mjs";
+import { sveltekit } from "./sveltekit.mjs";
 import { TAG_PATCH_MARKERS, unpatchTagFile } from "./tag-strategy.mjs";
+import { tanstackStart } from "./tanstack-start.mjs";
+import { viteGeneric } from "./vite-generic.mjs";
 
 /** Priority order. Do not reorder without re-reading rule 1 above. */
 export const FRAMEWORKS = Object.freeze([
@@ -64,11 +64,11 @@ export const COMMENT_SYNTAXES = Object.freeze(["html", "jsx"]);
 export const INJECT_KINDS = Object.freeze(["adapter", "tag"]);
 
 export const SOURCE_TRAIT_DEFAULTS = Object.freeze({
+  commentSyntax: "html",
+  injectScriptAttrs: "",
   preview: "source",
   styleMode: "scoped",
   styleTag: '<style data-impeccable-css="SESSION_ID">',
-  commentSyntax: "html",
-  injectScriptAttrs: "",
 });
 
 /** The patch kind the generic tag strategy records in the journal. */
@@ -93,7 +93,9 @@ export const PATCH_UNDOERS = Object.freeze(
 export function resolveFramework(cwd = process.cwd(), config = null) {
   for (const framework of FRAMEWORKS) {
     const project = framework.detect(cwd, config);
-    if (project) return { framework, project };
+    if (project) {
+      return { framework, project };
+    }
   }
   // Unreachable while static-html stays terminal, but a caller that reorders
   // the array should get a diagnosable null rather than a silent tag inject.
@@ -107,8 +109,10 @@ export function resolveFramework(cwd = process.cwd(), config = null) {
 export function resolveSourceTraits(filePath) {
   const ext = path.extname(String(filePath || "")).toLowerCase();
   for (const framework of FRAMEWORKS) {
-    const source = framework.source;
-    if (!source || !source.extensions.includes(ext)) continue;
+    const { source } = framework;
+    if (!source || !source.extensions.includes(ext)) {
+      continue;
+    }
     const { extensions, ...traits } = source;
     return { framework: framework.name, ...SOURCE_TRAIT_DEFAULTS, ...traits };
   }
@@ -134,7 +138,9 @@ export function describeInjectArtifacts(
   resolved,
   { cwd = process.cwd(), files = [] } = {}
 ) {
-  if (!resolved) return [];
+  if (!resolved) {
+    return [];
+  }
   const { framework, project } = resolved;
   if (framework.inject.kind === "adapter") {
     return (framework.inject.artifacts?.({ cwd, project }) || []).filter(
@@ -143,8 +149,8 @@ export function describeInjectArtifacts(
   }
   return files.map((file) => ({
     kind: "patched",
-    path: file,
-    patch: TAG_PATCH_KIND,
     markers: [...TAG_PATCH_MARKERS],
+    patch: TAG_PATCH_KIND,
+    path: file,
   }));
 }

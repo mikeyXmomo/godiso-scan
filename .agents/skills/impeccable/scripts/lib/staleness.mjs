@@ -91,25 +91,25 @@ const KNOWN_DETECTOR_KEYS = new Set([
 // Android references for the whole session.
 const NATIVE_EVIDENCE_PATHS = Object.freeze([
   {
-    rel: "pubspec.yaml",
     platform: "adaptive",
     reason: "a Flutter pubspec.yaml",
+    rel: "pubspec.yaml",
   },
-  { rel: "ios/Podfile", platform: "ios", reason: "an ios/Podfile" },
+  { platform: "ios", reason: "an ios/Podfile", rel: "ios/Podfile" },
   {
-    rel: "android/build.gradle",
     platform: "android",
     reason: "an android/build.gradle",
+    rel: "android/build.gradle",
   },
   {
-    rel: "android/build.gradle.kts",
     platform: "android",
     reason: "an android/build.gradle.kts",
+    rel: "android/build.gradle.kts",
   },
   {
-    rel: "ios/Runner.xcodeproj",
     platform: "ios",
     reason: "an ios/Runner.xcodeproj",
+    rel: "ios/Runner.xcodeproj",
   },
 ]);
 
@@ -128,7 +128,7 @@ const NATIVE_EVIDENCE_DEPENDENCIES = Object.freeze([
 ]);
 
 function finding({ id, artifact, filePath = null, severity, summary, fix }) {
-  return { id, artifact, path: filePath, severity, summary, fix };
+  return { artifact, fix, id, path: filePath, severity, summary };
 }
 
 /**
@@ -146,7 +146,9 @@ export function designSidecarCandidatesFor(
     path.join(projectRoot, "DESIGN.json"),
   ];
   const contextLegacy = path.join(contextDir || projectRoot, "DESIGN.json");
-  if (!candidates.includes(contextLegacy)) candidates.push(contextLegacy);
+  if (!candidates.includes(contextLegacy)) {
+    candidates.push(contextLegacy);
+  }
   return candidates;
 }
 
@@ -167,14 +169,16 @@ function mtimeMs(filePath) {
 }
 
 function hasSection(markdown, heading) {
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escaped = heading.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^##\\s+${escaped}\\s*$`, "im").test(
     String(markdown || "")
   );
 }
 
 function toRelative(filePath, root) {
-  if (!filePath) return null;
+  if (!filePath) {
+    return null;
+  }
   const rel = path.relative(root, filePath);
   return rel && !rel.startsWith("..") && !path.isAbsolute(rel)
     ? rel.split(path.sep).join("/")
@@ -188,21 +192,25 @@ function toRelative(filePath, root) {
  * reporting only.
  */
 export function checkProduct(product, productPath = "PRODUCT.md") {
-  if (!product) return [];
+  if (!product) {
+    return [];
+  }
   const findings = [];
 
   for (const [heading, reason] of Object.entries(PRODUCT_DEPRECATED_SECTIONS)) {
-    if (!hasSection(product, heading)) continue;
+    if (!hasSection(product, heading)) {
+      continue;
+    }
     findings.push(
       finding({
-        id: `product-deprecated-${heading.toLowerCase()}`,
         artifact: "PRODUCT.md",
         filePath: productPath,
-        severity: "mention",
-        summary: `PRODUCT.md still carries a \`## ${heading}\` section. ${reason}`,
         fix:
           `Treat \`## ${heading}\` as absent for every decision this session. ` +
           "Offer to delete the section; do not let its value influence the work either way.",
+        id: `product-deprecated-${heading.toLowerCase()}`,
+        severity: "mention",
+        summary: `PRODUCT.md still carries a \`## ${heading}\` section. ${reason}`,
       })
     );
   }
@@ -214,27 +222,27 @@ export function checkProduct(product, productPath = "PRODUCT.md") {
   ) {
     findings.push(
       finding({
-        id: "product-schema-legacy",
         artifact: "PRODUCT.md",
         filePath: productPath,
+        fix:
+          "Offer `init`, which preserves confirmed answers and fills the gaps by interview. " +
+          "Do not rewrite the file from inference.",
+        id: "product-schema-legacy",
         severity: "route",
         summary:
           "PRODUCT.md has no schema stamp and none of the sections the current record adds " +
           `(${PRODUCT_V4_SECTIONS.join(", ")}), so it predates this version of the product record.`,
-        fix:
-          "Offer `init`, which preserves confirmed answers and fills the gaps by interview. " +
-          "Do not rewrite the file from inference.",
       })
     );
   } else if (stamped !== null && stamped < PRODUCT_SCHEMA_VERSION) {
     findings.push(
       finding({
-        id: "product-schema-outdated",
         artifact: "PRODUCT.md",
         filePath: productPath,
+        fix: "Offer `init` to bring the record current, preserving confirmed answers.",
+        id: "product-schema-outdated",
         severity: "route",
         summary: `PRODUCT.md is stamped product-schema ${stamped}; the current record is ${PRODUCT_SCHEMA_VERSION}.`,
-        fix: "Offer `init` to bring the record current, preserving confirmed answers.",
       })
     );
   }
@@ -252,26 +260,36 @@ export function checkNativePlatformEvidence({
   product,
   productPath,
 }) {
-  if (!projectRoot) return [];
+  if (!projectRoot) {
+    return [];
+  }
   // Only the web resolution is worth checking. An explicit native value is
   // already honored, and an unrecognized value already gets its own warning.
-  if (platform && platform !== "web") return [];
+  if (platform && platform !== "web") {
+    return [];
+  }
 
   const evidence = [];
   for (const entry of NATIVE_EVIDENCE_PATHS) {
-    if (fs.existsSync(path.join(projectRoot, entry.rel))) evidence.push(entry);
+    if (fs.existsSync(path.join(projectRoot, entry.rel))) {
+      evidence.push(entry);
+    }
   }
   const pkg = readJson(path.join(projectRoot, "package.json"));
   if (pkg) {
     const deps = {
-      ...(pkg.dependencies || {}),
-      ...(pkg.devDependencies || {}),
+      ...pkg.dependencies,
+      ...pkg.devDependencies,
     };
     for (const entry of NATIVE_EVIDENCE_DEPENDENCIES) {
-      if (deps[entry.name]) evidence.push(entry);
+      if (deps[entry.name]) {
+        evidence.push(entry);
+      }
     }
   }
-  if (!evidence.length) return [];
+  if (!evidence.length) {
+    return [];
+  }
 
   const platforms = new Set(evidence.map((entry) => entry.platform));
   const suggested =
@@ -287,16 +305,16 @@ export function checkNativePlatformEvidence({
 
   return [
     finding({
-      id: "platform-native-evidence",
       artifact: "PRODUCT.md",
       filePath: productPath || null,
+      fix:
+        `Ask the user whether \`## Platform\` should be \`${suggested}\`. ` +
+        "If it should, write the value and load the matching native reference before designing.",
+      id: "platform-native-evidence",
       severity: "mention",
       summary:
         `${declared}, but the project carries ${evidence.map((entry) => entry.reason).join(" and ")}. ` +
         "Web guidance is being applied to a native codebase, and the iOS and Android references never load.",
-      fix:
-        `Ask the user whether \`## Platform\` should be \`${suggested}\`. ` +
-        "If it should, write the value and load the matching native reference before designing.",
     }),
   ];
 }
@@ -320,21 +338,23 @@ export function checkDesignSidecar({
   const canonical = sidecarCandidates[0] || null;
   const present =
     sidecarCandidates.find((candidate) => fs.existsSync(candidate)) || null;
-  if (!present) return findings;
+  if (!present) {
+    return findings;
+  }
 
   const relPresent = toRelative(present, projectRoot);
 
   if (canonical && path.resolve(present) !== path.resolve(canonical)) {
     findings.push(
       finding({
-        id: "design-sidecar-legacy-path",
         artifact: "design.json",
         filePath: relPresent,
-        severity: "auto",
-        summary: `The design sidecar sits at ${relPresent}, a location kept only for backward compatibility.`,
         fix:
           `Move it to ${toRelative(canonical, projectRoot)} the next time the sidecar is written. ` +
           "No user decision is needed.",
+        id: "design-sidecar-legacy-path",
+        severity: "auto",
+        summary: `The design sidecar sits at ${relPresent}, a location kept only for backward compatibility.`,
       })
     );
   }
@@ -347,15 +367,15 @@ export function checkDesignSidecar({
   ) {
     findings.push(
       finding({
-        id: "design-sidecar-schema-outdated",
         artifact: "design.json",
         filePath: relPresent,
+        fix: "Offer `document` to regenerate the sidecar. It reads the existing DESIGN.md, so no interview is needed.",
+        id: "design-sidecar-schema-outdated",
         severity: "route",
         summary:
           `${relPresent} is schemaVersion ${schemaVersion === null ? "unset" : schemaVersion}; ` +
           `the current sidecar is ${DESIGN_SIDECAR_SCHEMA_VERSION}. Token primitives moved to the DESIGN.md ` +
           "frontmatter, so the old shape carries values that are now read from two places.",
-        fix: "Offer `document` to regenerate the sidecar. It reads the existing DESIGN.md, so no interview is needed.",
       })
     );
   }
@@ -370,14 +390,14 @@ export function checkDesignSidecar({
     ) {
       findings.push(
         finding({
-          id: "design-sidecar-stale",
           artifact: "design.json",
           filePath: relPresent,
+          fix: "Offer `document` to refresh the sidecar, preserving DESIGN.md.",
+          id: "design-sidecar-stale",
           severity: "mention",
           summary:
             `DESIGN.md was edited after ${relPresent} was generated, so the sidecar's ramps, ` +
             "shadows, motion tokens, and component snippets may contradict it.",
-          fix: "Offer `document` to refresh the sidecar, preserving DESIGN.md.",
         })
       );
     }
@@ -404,7 +424,9 @@ export function checkConfig({ projectRoot, repoRoot }) {
     for (const name of ["config.json", "config.local.json"]) {
       const filePath = path.join(root, ".impeccable", name);
       const raw = readJson(filePath);
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        continue;
+      }
       const rel = toRelative(filePath, projectRoot || root);
 
       const unknownTop = Object.keys(raw).filter(
@@ -413,39 +435,39 @@ export function checkConfig({ projectRoot, repoRoot }) {
       if (unknownTop.length) {
         findings.push(
           finding({
-            id: "config-unknown-keys",
             artifact: "config.json",
             filePath: rel,
+            fix: "Report the exact keys to the user. A near-miss of a real key is a setting that has never applied.",
+            id: "config-unknown-keys",
             severity: "mention",
             summary:
               `${rel} has top-level key(s) nothing reads: ${unknownTop.map((key) => `\`${key}\``).join(", ")}. ` +
               `Recognized keys are ${[...KNOWN_CONFIG_KEYS].map((key) => `\`${key}\``).join(", ")}.`,
-            fix: "Report the exact keys to the user. A near-miss of a real key is a setting that has never applied.",
           })
         );
       }
 
       if (
-        Object.prototype.hasOwnProperty.call(raw, "buildPath") &&
+        Object.hasOwn(raw, "buildPath") &&
         !BUILD_PATH_VALUES.includes(raw.buildPath)
       ) {
         findings.push(
           finding({
-            id: "config-invalid-build-path",
             artifact: "config.json",
             filePath: rel,
+            fix:
+              "Report the value. An unread `buildPath` does not fall back to the other path; " +
+              "it falls back to the default, so a project meaning `code` has been building comp-led.",
+            id: "config-invalid-build-path",
             severity: "mention",
             summary:
               `${rel} sets \`buildPath\` to ${JSON.stringify(raw.buildPath)}, which nothing reads. ` +
               `The values are ${BUILD_PATH_VALUES.map((value) => `\`${value}\``).join(" and ")}.`,
-            fix:
-              "Report the value. An unread `buildPath` does not fall back to the other path; " +
-              "it falls back to the default, so a project meaning `code` has been building comp-led.",
           })
         );
       }
 
-      const detector = raw.detector;
+      const { detector } = raw;
       if (
         detector &&
         typeof detector === "object" &&
@@ -457,14 +479,14 @@ export function checkConfig({ projectRoot, repoRoot }) {
         if (unknownDetector.length) {
           findings.push(
             finding({
-              id: "config-unknown-detector-keys",
               artifact: "config.json",
               filePath: rel,
+              fix: "Report the exact keys. `ignoreRule` for `ignoreRules` is the common one, and it silences nothing.",
+              id: "config-unknown-detector-keys",
               severity: "mention",
               summary:
                 `${rel} has \`detector\` key(s) nothing reads: ${unknownDetector.map((key) => `\`${key}\``).join(", ")}. ` +
                 `Recognized keys are ${[...KNOWN_DETECTOR_KEYS].map((key) => `\`${key}\``).join(", ")}.`,
-              fix: "Report the exact keys. `ignoreRule` for `ignoreRules` is the common one, and it silences nothing.",
             })
           );
         }
@@ -485,7 +507,9 @@ export function checkConfig({ projectRoot, repoRoot }) {
  * finding hands the question to the one reader that knows.
  */
 export function checkBuildPathUnset({ projectRoot, repoRoot, product }) {
-  if (!projectRoot || !product) return [];
+  if (!projectRoot || !product) {
+    return [];
+  }
   const roots = [
     ...new Set(
       [projectRoot, repoRoot].filter(Boolean).map((root) => path.resolve(root))
@@ -497,31 +521,34 @@ export function checkBuildPathUnset({ projectRoot, repoRoot, product }) {
       const raw = readJson(path.join(root, ".impeccable", name));
       // Any declared value ends this, valid or not: an invalid one already has
       // its own finding and two reports of one key is noise.
-      if (raw && Object.prototype.hasOwnProperty.call(raw, "buildPath"))
+      if (raw && Object.hasOwn(raw, "buildPath")) {
         return [];
+      }
     }
   }
 
   const evidence = DIRECTION_WORK_PATHS.filter((rel) =>
     fs.existsSync(path.join(projectRoot, rel))
   );
-  if (!evidence.length) return [];
+  if (!evidence.length) {
+    return [];
+  }
 
   return [
     finding({
-      id: "config-build-path-unset",
       artifact: "config.json",
       filePath: ".impeccable/config.json",
-      severity: "mention",
-      summary:
-        "This project has run visual direction work but records no `buildPath`, " +
-        "so every direction round takes the comp-first default without anyone having chosen it.",
       fix:
         "Only when image generation exists in your tool surface, offer the choice once: " +
         "**comp-first** (an image sets the bar before any code; bolder composition, slower) or " +
         "**code-first** (build directly; ambition carried by the direction contract; leaner, faster). " +
         'Write the answer to `.impeccable/config.json` as `"buildPath": "comp"` or `"buildPath": "code"`, ' +
         "merging with the keys already there. Without image generation there is no choice to record: stay silent.",
+      id: "config-build-path-unset",
+      severity: "mention",
+      summary:
+        "This project has run visual direction work but records no `buildPath`, " +
+        "so every direction round takes the comp-first default without anyone having chosen it.",
     }),
   ];
 }
@@ -534,31 +561,41 @@ export function checkBuildPathUnset({ projectRoot, repoRoot, product }) {
  * no file to check and are skipped.
  */
 export function checkSurfaceBriefs({ candidates = [], projectRoot }) {
-  if (!projectRoot) return [];
+  if (!projectRoot) {
+    return [];
+  }
   const orphaned = [];
   for (const brief of candidates) {
     const target = brief?.primaryTarget;
-    if (!target || typeof target !== "string") continue;
-    if (/^https?:\/\//i.test(target) || target.startsWith("route:")) continue;
-    if (!fs.existsSync(path.join(projectRoot, target))) orphaned.push(brief);
+    if (!target || typeof target !== "string") {
+      continue;
+    }
+    if (/^https?:\/\//i.test(target) || target.startsWith("route:")) {
+      continue;
+    }
+    if (!fs.existsSync(path.join(projectRoot, target))) {
+      orphaned.push(brief);
+    }
   }
-  if (!orphaned.length) return [];
+  if (!orphaned.length) {
+    return [];
+  }
   return [
     finding({
-      id: "surface-brief-orphaned",
       artifact: "surface brief",
       filePath:
         orphaned
           .map((brief) => brief.path)
           .filter(Boolean)
           .join(", ") || null,
+      fix:
+        "Ask whether the surface moved (repoint the brief) or was removed (delete the brief). " +
+        "Until then the brief is authority for a file that is gone.",
+      id: "surface-brief-orphaned",
       severity: "mention",
       summary:
         `${orphaned.length} persisted surface brief(s) name a primary target that no longer exists: ` +
         `${orphaned.map((brief) => `${brief.path} → ${brief.primaryTarget}`).join("; ")}.`,
-      fix:
-        "Ask whether the surface moved (repoint the brief) or was removed (delete the brief). " +
-        "Until then the brief is authority for a file that is gone.",
     }),
   ];
 }
@@ -581,17 +618,19 @@ export function checkProjectRoots({
   const positive = patterns.filter(
     (pattern) => pattern && !String(pattern).trim().startsWith("!")
   );
-  if (!positive.length || candidates.length) return [];
+  if (!positive.length || candidates.length) {
+    return [];
+  }
   return [
     finding({
-      id: "config-project-roots-match-nothing",
       artifact: "config.json",
       filePath: configuredIn,
+      fix: "Report the patterns and ask which directories they should name. A renamed workspace folder is the usual cause.",
+      id: "config-project-roots-match-nothing",
       severity: "mention",
       summary:
         `\`projectRoots\` declares ${positive.map((pattern) => `\`${pattern}\``).join(", ")}, ` +
         "but no directory matches any of them, so the repo root is being treated as the active project.",
-      fix: "Report the patterns and ask which directories they should name. A renamed workspace folder is the usual cause.",
     }),
   ];
 }
@@ -604,12 +643,12 @@ export function checkProjectRoots({
  */
 export function describeWorkspaceContext(candidates = []) {
   return candidates.map((candidate) => ({
+    designPath: candidate.designPath,
+    designStatus: candidate.designStatus,
     name: candidate.name,
     path: candidate.path,
-    productStatus: candidate.productStatus,
     productPath: candidate.productPath,
-    designStatus: candidate.designStatus,
-    designPath: candidate.designPath,
+    productStatus: candidate.productStatus,
   }));
 }
 
@@ -622,7 +661,9 @@ export function describeWorkspaceContext(candidates = []) {
  * nothing is recomputed here.
  */
 export function collectBootFindingGroups(ctx, extras = {}) {
-  if (!ctx) return {};
+  if (!ctx) {
+    return {};
+  }
   const projectRoot = ctx.projectRoot || process.cwd();
   const absDesignPath = extras.absDesignPath || null;
 
@@ -633,22 +674,22 @@ export function collectBootFindingGroups(ctx, extras = {}) {
     // directly; a second signal saying the same thing is noise.
     nativePlatform: ctx.product
       ? checkNativePlatformEvidence({
-          projectRoot,
           platform: ctx.platform,
           product: ctx.product,
           productPath: ctx.productPath,
+          projectRoot,
         })
       : [],
     designSidecar: checkDesignSidecar({
       designPath: absDesignPath,
-      sidecarCandidates: extras.sidecarCandidates || [],
       projectRoot,
+      sidecarCandidates: extras.sidecarCandidates || [],
     }),
     config: checkConfig({ projectRoot, repoRoot: ctx.repoRoot }),
     buildPath: checkBuildPathUnset({
+      product: ctx.product,
       projectRoot,
       repoRoot: ctx.repoRoot,
-      product: ctx.product,
     }),
     surfaceBriefs: checkSurfaceBriefs({
       candidates: ctx.surfaceBriefCandidates,
@@ -656,8 +697,8 @@ export function collectBootFindingGroups(ctx, extras = {}) {
     }),
     projectRoots: extras.projectRootPatterns
       ? checkProjectRoots({
-          patterns: extras.projectRootPatterns,
           candidates: extras.targetCandidates || [],
+          patterns: extras.projectRootPatterns,
         })
       : [],
   };
