@@ -1,0 +1,24 @@
+import { create } from "zustand";
+import {
+  defaultConfig,
+  type ScanConfig,
+} from "@/utils/scan-renderer/config.types";
+
+interface ScannerState {
+  config: ScanConfig;
+  pdf: File | undefined;
+  resetConfig: () => void;
+  setConfig: (updater: ScanConfig | ((prev: ScanConfig) => ScanConfig)) => void;
+  setPdf: (pdf: File | undefined) => void;
+}
+
+export const useScannerStore = create<ScannerState>((set) => ({
+  config: defaultConfig,
+  pdf: undefined,
+  resetConfig: () => set({ config: defaultConfig }),
+  setConfig: (updater) =>
+    set((state) => ({
+      config: typeof updater === "function" ? updater(state.config) : updater,
+    })),
+  setPdf: (pdf) => set({ pdf }),
+}));

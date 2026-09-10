@@ -10,14 +10,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: 18
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           version: 8
@@ -28,7 +28,7 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v6
         name: Setup pnpm cache
         with:
           path: ${{ env.STORE_PATH }}
