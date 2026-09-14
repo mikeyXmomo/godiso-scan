@@ -13,6 +13,45 @@ import { cn } from "@/lib/utils";
 const buttonClassNames =
   "relative flex size-(--cell-size) text-base sm:text-sm items-center justify-center rounded-lg text-foreground not-in-data-selected:hover:bg-accent disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
+interface CalendarChevronProps {
+  className?: string;
+  orientation?: "left" | "right" | "up" | "down";
+}
+
+function CalendarChevron({
+  className: chevronClassName,
+  orientation,
+  ...chevronProps
+}: CalendarChevronProps): React.ReactElement {
+  if (orientation === "left") {
+    return (
+      <ChevronLeftIcon
+        className={cn(chevronClassName, "rtl:rotate-180")}
+        {...chevronProps}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  if (orientation === "right") {
+    return (
+      <ChevronRightIcon
+        className={cn(chevronClassName, "rtl:rotate-180")}
+        {...chevronProps}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  return (
+    <ChevronsUpDownIcon
+      className={chevronClassName}
+      {...chevronProps}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function Calendar({
   className,
   classNames,
@@ -54,60 +93,19 @@ export function Calendar({
     weekday:
       "size-(--cell-size) p-0 text-xs font-medium text-muted-foreground/72",
   };
-  const mergedClassNames: typeof defaultClassNames = Object.keys(
+  const mergedClassNames = { ...defaultClassNames };
+  // SAFETY: Object.keys returns exactly the keys of the local default class-name map.
+  for (const key of Object.keys(
     defaultClassNames
-  ).reduce(
-    (acc, key) => {
-      const userClass = classNames?.[key as keyof typeof classNames];
-      const baseClass =
-        defaultClassNames[key as keyof typeof defaultClassNames];
-
-      acc[key as keyof typeof defaultClassNames] = userClass
-        ? cn(baseClass, userClass)
-        : baseClass;
-
-      return acc;
-    },
-    { ...defaultClassNames } as typeof defaultClassNames
-  );
+  ) as (keyof typeof defaultClassNames)[]) {
+    // SAFETY: DayPicker class-name keys overlap the local default class-name keys.
+    const userClass = classNames?.[key as keyof typeof classNames];
+    const baseClass = defaultClassNames[key];
+    mergedClassNames[key] = userClass ? cn(baseClass, userClass) : baseClass;
+  }
 
   const defaultComponents = {
-    Chevron: ({
-      className,
-      orientation,
-      ...props
-    }: {
-      className?: string;
-      orientation?: "left" | "right" | "up" | "down";
-    }): React.ReactElement => {
-      if (orientation === "left") {
-        return (
-          <ChevronLeftIcon
-            className={cn(className, "rtl:rotate-180")}
-            {...props}
-            aria-hidden="true"
-          />
-        );
-      }
-
-      if (orientation === "right") {
-        return (
-          <ChevronRightIcon
-            className={cn(className, "rtl:rotate-180")}
-            {...props}
-            aria-hidden="true"
-          />
-        );
-      }
-
-      return (
-        <ChevronsUpDownIcon
-          className={className}
-          {...props}
-          aria-hidden="true"
-        />
-      );
-    },
+    Chevron: CalendarChevron,
   };
 
   const mergedComponents = {
@@ -123,6 +121,7 @@ export function Calendar({
     classNames: mergedClassNames,
     components: mergedComponents,
     "data-slot": "calendar",
+    // SAFETY: DayPicker accepts formatMonthDropdown as a formatter override.
     formatters: {
       formatMonthDropdown: (date: Date) =>
         date.toLocaleString("default", { month: "short" }),
@@ -132,6 +131,7 @@ export function Calendar({
     ...props,
   };
 
+  // SAFETY: dayPickerProps is assembled from DayPicker props and local defaults.
   return (
     <DayPicker
       {...(dayPickerProps as React.ComponentProps<typeof DayPicker>)}

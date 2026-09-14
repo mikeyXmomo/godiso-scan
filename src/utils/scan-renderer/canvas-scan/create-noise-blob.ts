@@ -22,8 +22,10 @@ export async function createNoiseBlob(
   const noiseImg = new Image();
   noiseImg.src = noiseSVGURL;
 
+  // The image load event is the browser API's only completion signal.
+  // oxlint-disable-next-line promise/avoid-new
   await new Promise<void>((resolve) => {
-    noiseImg.onload = () => resolve();
+    noiseImg.addEventListener("load", resolve, { once: true });
   });
 
   ctx.drawImage(noiseImg, 0, 0, width, height);

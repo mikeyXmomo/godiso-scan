@@ -16,12 +16,23 @@ import { useScannerStore } from "@/lib/scanner-store";
 import { fontFamilies } from "@/utils/scan-renderer/config.types";
 import type { FontFamily, Watermark } from "@/utils/scan-renderer/config.types";
 
+// Base UI select and slider values are validated by the guards below.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof
+
 const FONT_LABELS: Record<FontFamily, string> = {
   cursive: "Kursif",
   monospace: "Monospace",
   "sans-serif": "Sans-serif",
   serif: "Serif",
 };
+
+function isFontFamily(value: string): value is FontFamily {
+  return fontFamilies.some((fontFamily) => fontFamily === value);
+}
+
+function getFontLabel(value: string): string {
+  return isFontFamily(value) ? FONT_LABELS[value] : value;
+}
 
 export function WatermarkSettingsCard() {
   const watermark = useScannerStore((s) => s.config.watermark);
@@ -45,8 +56,8 @@ export function WatermarkSettingsCard() {
 
   const handleFontChange = useCallback(
     (value: unknown) => {
-      if (typeof value === "string") {
-        updateWatermark({ font_family: value as FontFamily });
+      if (typeof value === "string" && isFontFamily(value)) {
+        updateWatermark({ font_family: value });
       }
     },
     [updateWatermark]
@@ -114,7 +125,7 @@ export function WatermarkSettingsCard() {
           >
             <SelectTrigger aria-label="Font watermark">
               <SelectValue>
-                {(value: string) => FONT_LABELS[value as FontFamily] ?? value}
+                {(value: string) => getFontLabel(value)}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup>

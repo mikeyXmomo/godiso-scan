@@ -90,22 +90,19 @@ export function PagePagination({
   const canGoPrevious = page > 1;
   const canGoNext = page < numPages;
 
-  const changePage = useCallback(
-    (nextPage: number) => {
-      if (nextPage < 1 || nextPage > numPages || nextPage === page) {
-        return;
-      }
-      onPageChange(nextPage);
-    },
-    [numPages, onPageChange, page]
-  );
+  const changePage = (nextPage: number): void => {
+    if (nextPage < 1 || nextPage > numPages || nextPage === page) {
+      return;
+    }
+    onPageChange(nextPage);
+  };
 
-  const handlePrevious = useCallback(() => {
+  const handlePrevious = (): void => {
     changePage(page - 1);
-  }, [changePage, page]);
-  const handleNext = useCallback(() => {
+  };
+  const handleNext = (): void => {
     changePage(page + 1);
-  }, [changePage, page]);
+  };
 
   return (
     <Pagination aria-label="Navigasi halaman PDF">

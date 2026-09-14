@@ -5,6 +5,9 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// The wrapper supports both native and Base UI input contracts.
+// oxlint-disable anti-slop/no-runtime-typeof
+
 export type InputProps = Omit<
   InputPrimitive.Props & React.RefAttributes<HTMLInputElement>,
   "size"

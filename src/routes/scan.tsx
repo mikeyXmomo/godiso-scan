@@ -121,6 +121,8 @@ function ScanView() {
 
   useEffect(() => {
     if (pdf) {
+      // Loading state mirrors the example PDF lifecycle.
+      // oxlint-disable-next-line react/set-state-in-effect
       setExampleLoading(false);
       setExampleError(undefined);
       setGenerateError(undefined);
@@ -142,10 +144,9 @@ function ScanView() {
             "PDF contoh gagal dimuat. Pilih file PDF secara manual untuk melanjutkan."
           );
         }
-      } finally {
-        if (!cancelled) {
-          setExampleLoading(false);
-        }
+      }
+      if (!cancelled) {
+        setExampleLoading(false);
       }
     };
 
@@ -179,13 +180,9 @@ function ScanView() {
           Kembali
         </Button>
         {exampleLoading ? (
-          <p
-            aria-live="polite"
-            className="text-muted-foreground text-sm"
-            role="status"
-          >
+          <output aria-live="polite" className="text-muted-foreground text-sm">
             Memuat PDF contoh…
-          </p>
+          </output>
         ) : null}
       </div>
 

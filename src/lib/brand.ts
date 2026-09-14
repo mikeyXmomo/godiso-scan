@@ -9,10 +9,12 @@
  * palette remains restrained rather than category-default.
  */
 
-export const BRAND_ACCENT_LIGHT = "oklch(0.72 0.13 65)"; // warm paper
+// Warm paper.
+export const BRAND_ACCENT_LIGHT = "oklch(0.72 0.13 65)";
 export const BRAND_ACCENT_DARK = "oklch(0.78 0.12 75)";
 
-export const BRAND_INK_LIGHT = "oklch(0.34 0.04 240)"; // deep ink for headings
+// Deep ink for headings.
+export const BRAND_INK_LIGHT = "oklch(0.34 0.04 240)";
 export const BRAND_INK_DARK = "oklch(0.92 0.02 80)";
 
 export const BRAND_GLOW_LIGHT =

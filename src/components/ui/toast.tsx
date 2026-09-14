@@ -89,9 +89,11 @@ function Toasts({
         data-slot="toast-viewport"
       >
         {toasts.map((toast) => {
+          // SAFETY: Base UI toast types are limited to the literal keys in TOAST_ICONS.
           const Icon = toast.type
             ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
             : null;
+          // SAFETY: Toast data is written by this app using the ToastData shape.
           const toastData = toast.data as ToastData | undefined;
 
           return (
@@ -198,9 +200,11 @@ function AnchoredToasts({
         data-slot="toast-viewport-anchored"
       >
         {toasts.map((toast) => {
+          // SAFETY: Base UI toast types are limited to the literal keys in TOAST_ICONS.
           const Icon = toast.type
             ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
             : null;
+          // SAFETY: Toast data is written by this app using the ToastData shape.
           const toastData = toast.data as ToastData | undefined;
           const tooltipStyle = toastData?.tooltipStyle ?? false;
           const { positionerProps } = toast;

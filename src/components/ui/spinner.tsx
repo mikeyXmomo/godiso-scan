@@ -3,6 +3,9 @@ import type React from "react";
 
 import { cn } from "@/lib/utils";
 
+// The SVG spinner uses status semantics to announce an in-progress operation.
+// oxlint-disable jsx-a11y/prefer-tag-over-role
+
 export function Spinner({
   className,
   ...props

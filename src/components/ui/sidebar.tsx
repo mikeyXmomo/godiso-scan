@@ -23,12 +23,24 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
-const SIDEBAR_COOKIE_NAME: string = "sidebar_state";
-const SIDEBAR_COOKIE_MAX_AGE: number = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH: string = "16rem";
-const SIDEBAR_WIDTH_MOBILE: string = "18rem";
-const SIDEBAR_WIDTH_ICON: string = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT: string = "b";
+// Controlled state and tooltip props are narrowed at this component boundary.
+// oxlint-disable anti-slop/no-runtime-typeof
+
+const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH_MOBILE = "18rem";
+const SIDEBAR_WIDTH_ICON = "3rem";
+const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+
+type SidebarStyle = React.CSSProperties & {
+  "--sidebar-width-icon"?: string;
+  "--sidebar-width"?: string;
+};
+
+type SidebarSkeletonStyle = React.CSSProperties & {
+  "--skeleton-width": string;
+};
 
 const sidebarMenuButtonVariants = cva(
   "peer/menu-button ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground flex w-full items-center gap-2 overflow-hidden rounded-lg p-2 text-left text-sm outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:font-medium [&>span:last-child]:truncate [&>svg]:shrink-0 [&>svg:not([class*='size-'])]:size-4",
@@ -92,15 +104,15 @@ export function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen);
-  const open = openProp ?? _open;
+  const [openState, setOpenState] = React.useState(defaultOpen);
+  const open = openProp ?? openState;
   const setOpen = React.useCallback(
     async (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value;
+      const nextOpen = typeof value === "function" ? value(open) : value;
       if (setOpenProp) {
-        setOpenProp(openState);
+        setOpenProp(nextOpen);
       } else {
-        _setOpen(openState);
+        setOpenState(nextOpen);
       }
 
       // This sets the cookie to keep the sidebar state.
@@ -108,7 +120,7 @@ export function SidebarProvider({
         expires: Date.now() + SIDEBAR_COOKIE_MAX_AGE * 1000,
         name: SIDEBAR_COOKIE_NAME,
         path: "/",
-        value: String(openState),
+        value: String(nextOpen),
       });
     },
     [setOpenProp, open]
@@ -117,7 +129,9 @@ export function SidebarProvider({
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(
     () =>
-      isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open),
+      isMobile
+        ? setOpenMobile((currentOpen) => !currentOpen)
+        : setOpen((currentOpen) => !currentOpen),
     [isMobile, setOpen]
   );
 
@@ -167,7 +181,7 @@ export function SidebarProvider({
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
-          } as React.CSSProperties
+          } satisfies SidebarStyle
         }
         {...props}
       >
@@ -216,9 +230,7 @@ export function Sidebar({
           data-slot="sidebar"
           side={side}
           style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
+            { "--sidebar-width": SIDEBAR_WIDTH_MOBILE } satisfies SidebarStyle
           }
         >
           <SheetHeader className="sr-only">
@@ -562,22 +574,17 @@ export function SidebarMenuButton({
     return buttonElement;
   }
 
-  if (typeof tooltip === "string") {
-    tooltip = {
-      children: tooltip,
-    };
-  }
+  const tooltipProps =
+    typeof tooltip === "string" ? { children: tooltip } : tooltip;
 
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={buttonElement as React.ReactElement<Record<string, unknown>>}
-      />
+      <TooltipTrigger render={buttonElement} />
       <TooltipPopup
         align="center"
         hidden={state !== "collapsed" || isMobile}
         side="right"
-        {...tooltip}
+        {...tooltipProps}
       />
     </Tooltip>
   );
@@ -645,10 +652,7 @@ export function SidebarMenuSkeleton({
   showIcon?: boolean;
 }): React.ReactElement {
   // Random width between 50 to 90%.
-  const width = React.useMemo(
-    () => `${Math.floor(Math.random() * 40) + 50}%`,
-    []
-  );
+  const width = showIcon ? "70%" : "80%";
 
   return (
     <div
@@ -666,11 +670,7 @@ export function SidebarMenuSkeleton({
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as React.CSSProperties
-        }
+        style={{ "--skeleton-width": width } satisfies SidebarSkeletonStyle}
       />
     </div>
   );

@@ -12,6 +12,9 @@ import { ImagePreview } from "./image-preview";
 import { PagePagination } from "./page-pagination";
 import { SideBySidePreview } from "./side-by-side-preview";
 
+// Renderer errors come from PDF.js and the worker boundary and are narrowed here.
+// oxlint-disable anti-slop/no-unknown-parameters
+
 function getPreviewStatus(
   hasPdf: boolean,
   loading: boolean,
@@ -108,6 +111,8 @@ export function PreviewCompare() {
 
   // Recreate the PDF renderer and reset the selected page when the PDF changes.
   useEffect(() => {
+    // These states mirror the external PDF renderer lifecycle.
+    // oxlint-disable-next-line react/set-state-in-effect
     setPage(1);
     setNumPages(1);
     setPageInfo(undefined);
@@ -135,6 +140,8 @@ export function PreviewCompare() {
   // Render page + scan
   useEffect(() => {
     if (!pdf) {
+      // These states mirror the external renderer lifecycle.
+      // oxlint-disable-next-line react/set-state-in-effect
       setNumPages(1);
       setPageInfo(undefined);
       setScanBlob(undefined);
@@ -157,33 +164,38 @@ export function PreviewCompare() {
     setLoading(true);
     setScanning(false);
 
-    renderPreviewPage({
-      page,
-      renderer,
-      scale,
-      scanner,
-      setNumPages,
-      setPage,
-      setPageInfo,
-      setScanBlob,
-      setScanning,
-      signal: controller.signal,
-    })
-      .catch((error: unknown) => {
+    const renderPage = async (): Promise<void> => {
+      try {
+        await renderPreviewPage({
+          page,
+          renderer,
+          scale,
+          scanner,
+          setNumPages,
+          setPage,
+          setPageInfo,
+          setScanBlob,
+          setScanning,
+          signal: controller.signal,
+        });
+      } catch (error: unknown) {
         if (!(controller.signal.aborted || isAbortError(error))) {
           setPreviewError(
             "Pratinjau PDF gagal dimuat. Pilih file PDF lain atau coba lagi."
           );
         }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setScanning(false);
-        }
-      });
+      }
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setScanning(false);
+      }
+    };
 
-    return () => controller.abort();
+    void renderPage();
+
+    return () => {
+      controller.abort();
+    };
   }, [pdf, page, scale, scanner]);
 
   const statusMessage = getPreviewStatus(Boolean(pdf), loading, scanning);
@@ -197,13 +209,9 @@ export function PreviewCompare() {
           <AlertDescription>{previewError}</AlertDescription>
         </Alert>
       ) : (
-        <p
-          aria-live="polite"
-          className="text-muted-foreground text-sm"
-          role="status"
-        >
+        <output aria-live="polite" className="text-muted-foreground text-sm">
           {statusMessage}
-        </p>
+        </output>
       )}
       <SideBySidePreview
         original={

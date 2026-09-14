@@ -1,4 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
+
+// Theme initialization must safely handle SSR and browser-only globals.
+// oxlint-disable anti-slop/no-runtime-typeof
 
 type Theme = "light" | "dark" | "system";
 
@@ -92,18 +95,14 @@ export function setTheme(theme: Theme): void {
   emit();
 }
 
-export function useTheme(): {
+interface ThemeState {
   resolved: "light" | "dark";
   setTheme: (theme: Theme) => void;
   theme: Theme;
-} {
+}
+
+export function useTheme(): ThemeState {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const [, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const resolved = resolveTheme(theme);
   return { resolved, setTheme, theme };
 }

@@ -23,7 +23,8 @@ interface PageLayout {
   width: number;
 }
 
-const IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/;
+const IMAGE_DATA_URL_PATTERN =
+  /^data:(?<mime>image\/(?:png|jpeg|jpg));base64,(?<data>.+)$/u;
 
 export async function buildPDF(options: BuildPDFOptions): Promise<Blob> {
   const { metadata, pages, paper, stamp, watermark } = options;
@@ -146,7 +147,7 @@ function resolvePageSize(
 function applyOrientation(
   size: { height: number; width: number },
   orientation: ScanConfig["paper"]["orientation"]
-): { height: number; width: number } {
+): PageLayout {
   if (orientation === "landscape") {
     return { height: size.width, width: size.height };
   }
@@ -159,7 +160,7 @@ function computeImageBounds(
   pageWidth: number,
   pageHeight: number,
   paper: ScanConfig["paper"]
-): { height: number; width: number; x: number; y: number } {
+) {
   const mode = paper.fit_mode;
   if (mode === "actual") {
     return {
@@ -293,8 +294,9 @@ async function loadImageFromDataUrl(
   if (!match) {
     return undefined;
   }
-  const mime = match[1] === "image/jpg" ? "image/jpeg" : match[1];
-  const bytes = base64ToBytes(match[2] ?? "");
+  const mimeValue = match.groups?.mime;
+  const mime = mimeValue === "image/jpg" ? "image/jpeg" : mimeValue;
+  const bytes = base64ToBytes(match.groups?.data ?? "");
   try {
     if (mime === "image/png") {
       return await pdfDoc.embedPng(bytes);
@@ -309,7 +311,7 @@ function base64ToBytes(data: string): Uint8Array {
   const binary = atob(data);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
+    bytes[i] = binary.codePointAt(i) ?? 0;
   }
   return bytes;
 }

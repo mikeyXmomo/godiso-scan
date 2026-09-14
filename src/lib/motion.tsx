@@ -37,6 +37,8 @@ export function Reveal({
       return;
     }
     if (typeof IntersectionObserver === "undefined") {
+      // Visibility is synchronized with the browser observer fallback.
+      // oxlint-disable-next-line react/set-state-in-effect
       setVisible(true);
       return;
     }
@@ -52,7 +54,7 @@ export function Reveal({
       },
       { rootMargin: "0px 0px -10% 0px", threshold: 0.1 }
     );
-    const node = ref.current as HTMLDivElement | null;
+    const node = ref.current;
     if (node) {
       observer.observe(node);
     }

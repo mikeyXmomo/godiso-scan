@@ -138,10 +138,7 @@ export const defaultStamp: Stamp = {
 };
 
 function cryptoRandomId(): string {
-  if (
-    globalThis.crypto !== undefined &&
-    typeof globalThis.crypto.randomUUID === "function"
-  ) {
+  if (globalThis.crypto !== undefined && globalThis.crypto.randomUUID) {
     return globalThis.crypto.randomUUID();
   }
   return `stamp-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
@@ -258,6 +255,7 @@ export const PAPER_DIMENSIONS_MM: Record<
   letter: { height: 215.9, width: 279.4 },
 };
 
+// SAFETY: Object.fromEntries preserves every non-auto paper key from PAPER_DIMENSIONS_MM.
 export const PAPER_DIMENSIONS_PT: Record<
   Exclude<PaperSize, "auto">,
   { height: number; width: number }

@@ -13,7 +13,9 @@ export function PDFInfo() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle render={<h2 aria-label="PDF yang dipilih" />}>
+        <CardTitle
+          render={<h2 aria-label="PDF yang dipilih">PDF yang dipilih</h2>}
+        >
           PDF yang dipilih
         </CardTitle>
       </CardHeader>
@@ -32,7 +34,7 @@ export function PDFInfo() {
           <div className="text-muted-foreground flex items-center gap-2">
             <HardDrive aria-hidden="true" className="size-4 shrink-0" />
             <dt className="sr-only">Ukuran file</dt>
-            <dd>{filesize(pdf.size) as string}</dd>
+            <dd>{String(filesize(pdf.size))}</dd>
           </div>
         </dl>
       </CardPanel>

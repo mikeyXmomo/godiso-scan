@@ -336,7 +336,7 @@ function HeroSection() {
               </Button>
               <Button
                 className="rounded-full px-6"
-                render={<a href="#cara-kerja" />}
+                render={<a aria-label="Lihat cara kerja" href="#cara-kerja" />}
                 size="xl"
                 variant="outline"
               >
@@ -448,15 +448,14 @@ function ScanPreview() {
         </aside>
 
         <div className="bg-secondary/25 relative flex min-h-[330px] items-center justify-center overflow-hidden p-6 sm:min-h-[390px]">
-          <div
+          <figure
             aria-hidden="true"
             className="from-primary/4 to-primary/8 absolute inset-0 bg-linear-to-br via-transparent"
           />
           <div aria-hidden="true" className="scan-beam" />
-          <div
+          <figure
             aria-label="Pratinjau dokumen yang telah diberi efek scan"
             className="relative aspect-[4/5] w-full max-w-[245px] -rotate-2 rounded-xl bg-white p-5 text-neutral-900 shadow-2xl shadow-neutral-950/20 sm:max-w-[275px]"
-            role="img"
           >
             <div className="flex items-start justify-between border-b border-neutral-200 pb-4">
               <div>
@@ -490,7 +489,7 @@ function ScanPreview() {
             <div className="absolute right-5 bottom-4 font-mono text-[8px] text-neutral-300">
               1 / 4
             </div>
-          </div>
+          </figure>
           <Badge
             className="bg-background/90 text-success-foreground ring-success/30 absolute right-4 bottom-4 rounded-full shadow-sm ring-1"
             variant="outline"
@@ -555,9 +554,9 @@ function StepsSection() {
                       <Icon aria-hidden="true" className="size-5" />
                     </span>
                   </div>
-                  <CardTitle render={<h3 aria-label={step.title} />}>
-                    {step.title}
-                  </CardTitle>
+                  <CardTitle
+                    render={<h3 aria-label={step.title}>{step.title}</h3>}
+                  />
                 </CardHeader>
                 <CardPanel>
                   <p className="text-muted-foreground text-sm leading-6">
@@ -670,9 +669,9 @@ function FeaturesSection() {
                   <span className="flex size-10 items-center justify-center rounded-xl bg-[var(--brand-accent)]/12 text-[var(--brand-accent)]">
                     <Icon aria-hidden="true" className="size-5" />
                   </span>
-                  <CardTitle render={<h3 aria-label={feature.title} />}>
-                    {feature.title}
-                  </CardTitle>
+                  <CardTitle
+                    render={<h3 aria-label={feature.title}>{feature.title}</h3>}
+                  />
                 </CardHeader>
                 <CardPanel>
                   <p className="text-muted-foreground text-sm leading-6">
@@ -723,9 +722,9 @@ function ScanModesSection() {
                       {mode.label}
                     </Badge>
                   </div>
-                  <CardTitle render={<h3 aria-label={mode.title} />}>
-                    {mode.title}
-                  </CardTitle>
+                  <CardTitle
+                    render={<h3 aria-label={mode.title}>{mode.title}</h3>}
+                  />
                 </CardHeader>
                 <CardPanel>
                   <p className="text-muted-foreground text-sm leading-6">
@@ -736,8 +735,10 @@ function ScanModesSection() {
                   {mode.external ? (
                     <Button
                       className="w-full"
+                      aria-label={`Lihat ${mode.title} di GitHub`}
                       render={
                         <a
+                          aria-label={`Lihat ${mode.title} di GitHub`}
                           href={mode.href}
                           rel="noopener noreferrer"
                           target="_blank"

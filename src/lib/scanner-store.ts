@@ -3,6 +3,9 @@ import { create } from "zustand";
 import { defaultConfig } from "@/utils/scan-renderer/config.types";
 import type { ScanConfig } from "@/utils/scan-renderer/config.types";
 
+// The setter intentionally accepts either a config value or an updater function.
+// oxlint-disable anti-slop/no-runtime-typeof
+
 interface ScannerState {
   config: ScanConfig;
   pdf: File | undefined;

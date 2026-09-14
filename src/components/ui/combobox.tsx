@@ -9,10 +9,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 export const ComboboxContext: React.Context<{
-  chipsRef: React.RefObject<Element | null> | null;
+  chipsRef: React.RefObject<HTMLDivElement | null> | null;
   multiple: boolean;
 }> = React.createContext<{
-  chipsRef: React.RefObject<Element | null> | null;
+  chipsRef: React.RefObject<HTMLDivElement | null> | null;
   multiple: boolean;
 }>({
   chipsRef: null,
@@ -22,9 +22,13 @@ export const ComboboxContext: React.Context<{
 export function Combobox<Value, Multiple extends boolean | undefined = false>(
   props: ComboboxPrimitive.Root.Props<Value, Multiple>
 ): React.ReactElement {
-  const chipsRef = React.useRef<Element | null>(null);
+  const chipsRef = React.useRef<HTMLDivElement | null>(null);
+  const contextValue = React.useMemo(
+    () => ({ chipsRef, multiple: Boolean(props.multiple) }),
+    [props.multiple]
+  );
   return (
-    <ComboboxContext.Provider value={{ chipsRef, multiple: !!props.multiple }}>
+    <ComboboxContext.Provider value={contextValue}>
       <ComboboxPrimitive.Root {...props} />
     </ComboboxContext.Provider>
   );
@@ -38,7 +42,8 @@ export function ComboboxChipsInput({
   size?: "sm" | "default" | "lg" | number;
   ref?: React.Ref<HTMLInputElement>;
 }): React.ReactElement {
-  const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
+  const sizeValue = size ?? "default";
+  const sizeIsNumber = Number.isFinite(sizeValue);
 
   return (
     <ComboboxPrimitive.Input
@@ -47,9 +52,9 @@ export function ComboboxChipsInput({
         sizeValue === "sm" ? "ps-1.5" : "ps-2",
         className
       )}
-      data-size={typeof sizeValue === "string" ? sizeValue : undefined}
+      data-size={sizeIsNumber ? undefined : sizeValue}
       data-slot="combobox-chips-input"
-      size={typeof sizeValue === "number" ? sizeValue : undefined}
+      size={sizeIsNumber ? sizeValue : undefined}
       {...props}
     />
   );
@@ -73,7 +78,7 @@ export function ComboboxInput({
   triggerProps?: ComboboxPrimitive.Trigger.Props;
   clearProps?: ComboboxPrimitive.Clear.Props;
 }): React.ReactElement {
-  const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
+  const sizeValue = size ?? "default";
 
   return (
     <ComboboxPrimitive.InputGroup
@@ -379,7 +384,7 @@ export function ComboboxChips({
         className
       )}
       data-slot="combobox-chips"
-      ref={chipsRef as React.Ref<HTMLDivElement> | null}
+      ref={chipsRef}
       {...props}
     >
       {startAddon && (

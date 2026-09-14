@@ -6,6 +6,7 @@ import { SCAN_PRESETS } from "@/utils/scan-renderer/config.types";
 import type { ScanPreset } from "@/utils/scan-renderer/config.types";
 
 type PresetKey = keyof ScanPreset["values"];
+type PresetValue = ScanPreset["values"][PresetKey];
 
 const PRESET_KEYS: readonly PresetKey[] = [
   "blur",
@@ -20,7 +21,7 @@ const PRESET_KEYS: readonly PresetKey[] = [
 ];
 
 function configMatchesPreset(
-  configKey: (key: PresetKey) => unknown,
+  configKey: (key: PresetKey) => PresetValue,
   preset: ScanPreset
 ): boolean {
   return PRESET_KEYS.every((key) => configKey(key) === preset.values[key]);

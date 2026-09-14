@@ -21,6 +21,9 @@ import type {
   PaperSize,
 } from "@/utils/scan-renderer/config.types";
 
+// Base UI select values are validated before they update the typed scanner config.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof
+
 const PAPER_LABELS: Record<PaperSize, string> = {
   a3: "A3",
   a4: "A4",
@@ -42,6 +45,30 @@ const ORIENTATION_LABELS: Record<Orientation, string> = {
   landscape: "Landscape",
   portrait: "Portrait",
 };
+
+function isPaperSize(value: string): value is PaperSize {
+  return paperSizes.some((paperSize) => paperSize === value);
+}
+
+function isFitMode(value: string): value is FitMode {
+  return fitModes.some((fitMode) => fitMode === value);
+}
+
+function isOrientation(value: string): value is Orientation {
+  return orientations.some((orientation) => orientation === value);
+}
+
+function getPaperLabel(value: string): string {
+  return isPaperSize(value) ? PAPER_LABELS[value] : value;
+}
+
+function getFitLabel(value: string): string {
+  return isFitMode(value) ? FIT_LABELS[value] : value;
+}
+
+function getOrientationLabel(value: string): string {
+  return isOrientation(value) ? ORIENTATION_LABELS[value] : value;
+}
 
 export function PaperSettingsCard() {
   const paper = useScannerStore((s) => s.config.paper);
@@ -76,8 +103,8 @@ export function PaperSettingsCard() {
 
   const handlePaperSizeChange = useCallback(
     (value: unknown) => {
-      if (typeof value === "string") {
-        setPaperSize(value as PaperSize);
+      if (typeof value === "string" && isPaperSize(value)) {
+        setPaperSize(value);
       }
     },
     [setPaperSize]
@@ -85,8 +112,8 @@ export function PaperSettingsCard() {
 
   const handleFitModeChange = useCallback(
     (value: unknown) => {
-      if (typeof value === "string") {
-        setFitMode(value as FitMode);
+      if (typeof value === "string" && isFitMode(value)) {
+        setFitMode(value);
       }
     },
     [setFitMode]
@@ -94,8 +121,8 @@ export function PaperSettingsCard() {
 
   const handleOrientationChange = useCallback(
     (value: unknown) => {
-      if (typeof value === "string") {
-        setOrientation(value as Orientation);
+      if (typeof value === "string" && isOrientation(value)) {
+        setOrientation(value);
       }
     },
     [setOrientation]
@@ -112,7 +139,7 @@ export function PaperSettingsCard() {
           <Select onValueChange={handlePaperSizeChange} value={paper.size}>
             <SelectTrigger aria-label="Ukuran kertas">
               <SelectValue>
-                {(value: string) => PAPER_LABELS[value as PaperSize] ?? value}
+                {(value: string) => getPaperLabel(value)}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup>
@@ -135,9 +162,7 @@ export function PaperSettingsCard() {
           >
             <SelectTrigger aria-label="Orientasi kertas">
               <SelectValue>
-                {(value: string) =>
-                  ORIENTATION_LABELS[value as Orientation] ?? value
-                }
+                {(value: string) => getOrientationLabel(value)}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup>
@@ -156,9 +181,7 @@ export function PaperSettingsCard() {
           </FieldDescription>
           <Select onValueChange={handleFitModeChange} value={paper.fit_mode}>
             <SelectTrigger aria-label="Penempatan konten">
-              <SelectValue>
-                {(value: string) => FIT_LABELS[value as FitMode] ?? value}
-              </SelectValue>
+              <SelectValue>{(value: string) => getFitLabel(value)}</SelectValue>
             </SelectTrigger>
             <SelectPopup>
               {fitModes.map((mode) => (

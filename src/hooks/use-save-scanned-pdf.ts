@@ -7,7 +7,7 @@ import { CanvasScanner } from "@/utils/scan-renderer/canvas-scan/scanner";
 import type { ScanConfig } from "@/utils/scan-renderer/config.types";
 import { ScanCacher } from "@/utils/scan-renderer/scan-cacher";
 
-const PDF_EXTENSION_PATTERN = /\.[^/.]+$/;
+const PDF_EXTENSION_PATTERN = /\.[^/.]+$/u;
 
 export function useSaveScannedPDF() {
   const [saving, setSaving] = useState(false);
@@ -53,10 +53,12 @@ export function useSaveScannedPDF() {
         });
         const filename = `${pdf.name.replace(PDF_EXTENSION_PATTERN, "")}-scan.pdf`;
         const file = new File([pdfBlob], filename, { type: "application/pdf" });
+        setSaving(false);
         setScannedPDF(file);
         return file;
-      } finally {
+      } catch (error: unknown) {
         setSaving(false);
+        throw error;
       }
     },
     []

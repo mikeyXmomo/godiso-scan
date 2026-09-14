@@ -15,13 +15,13 @@ export function SideBySidePreview({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle render={<h2 aria-label="Asli" />}>Asli</CardTitle>
+          <CardTitle render={<h2 aria-label="Asli">Asli</h2>}>Asli</CardTitle>
         </CardHeader>
         <CardPanel>{original}</CardPanel>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle render={<h2 aria-label="Hasil scan" />}>
+          <CardTitle render={<h2 aria-label="Hasil scan">Hasil scan</h2>}>
             Hasil scan
           </CardTitle>
         </CardHeader>

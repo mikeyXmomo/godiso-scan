@@ -98,12 +98,17 @@ function StampEditor({ index, stamp }: StampEditorProps) {
   }, [handleImage]);
 
   const handleFileInput = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.currentTarget.files?.[0];
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
       if (file) {
-        readAsDataUrl(file).then(handleImage, () => {});
+        try {
+          await handleImage(await readAsDataUrl(file));
+        } catch {
+          // The file could not be read; keep the current stamp image.
+        }
       }
-      event.currentTarget.value = "";
+      input.value = "";
     },
     [handleImage]
   );
@@ -114,7 +119,7 @@ function StampEditor({ index, stamp }: StampEditorProps) {
   );
 
   const handlePickClick = useCallback(() => {
-    pickImage().catch(() => {});
+    void pickImage();
   }, [pickImage]);
 
   const handleAllPagesChange = useCallback(
@@ -124,7 +129,7 @@ function StampEditor({ index, stamp }: StampEditorProps) {
 
   const handlePageNumber = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = Number.parseInt(event.currentTarget.value, 10);
+      const value = Math.trunc(Number(event.currentTarget.value));
       updateStamp({ page: Number.isFinite(value) && value > 0 ? value : 1 });
     },
     [updateStamp]
@@ -321,7 +326,7 @@ function SliderField({
 }: SliderFieldProps) {
   const handleValueChange = useCallback(
     (nextValue: number | readonly number[]) => {
-      if (typeof nextValue === "number") {
+      if (!Array.isArray(nextValue)) {
         onChange(nextValue);
       }
     },
@@ -356,7 +361,7 @@ interface OpacityFieldProps {
 function OpacityField({ label, onChange, value }: OpacityFieldProps) {
   const handleValueChange = useCallback(
     (nextValue: number | readonly number[]) => {
-      if (typeof nextValue === "number") {
+      if (!Array.isArray(nextValue)) {
         onChange(nextValue);
       }
     },
@@ -383,16 +388,22 @@ function OpacityField({ label, onChange, value }: OpacityFieldProps) {
 }
 
 function readAsDataUrl(file: File): Promise<string> {
+  // FileReader reports completion through load/error events.
+  // oxlint-disable-next-line promise/avoid-new
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
+    reader.addEventListener("load", () => {
+      const { result } = reader;
+      if (result === null) {
         reject(new Error("Gagal membaca file"));
+        return;
       }
-    };
-    reader.onerror = () => reject(new Error("Gagal membaca file"));
+      // SAFETY: readAsDataURL always produces a string result.
+      resolve(result as string);
+    });
+    reader.addEventListener("error", () =>
+      reject(new Error("Gagal membaca file"))
+    );
     reader.readAsDataURL(file);
   });
 }

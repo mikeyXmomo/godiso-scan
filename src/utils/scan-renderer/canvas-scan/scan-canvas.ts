@@ -14,6 +14,7 @@ export async function scanCanvas(
   const imgPromise = createImageBitmap(page);
   const noiseImagePromise = createImageBitmap(noise);
 
+  // SAFETY: HTMLCanvasElement and OffscreenCanvas both return their respective 2D context here.
   const ctx = canvas.getContext("2d") as
     | CanvasRenderingContext2D
     | OffscreenCanvasRenderingContext2D;

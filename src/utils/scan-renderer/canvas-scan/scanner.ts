@@ -1,6 +1,8 @@
 import type { ScanConfig } from "../config.types";
 import type { ScanRenderer } from "../types";
 import { createNoiseBlob } from "./create-noise-blob";
+// Vite provides the worker constructor through the virtual ?worker module.
+// oxlint-disable-next-line import/default
 import ScanWorker from "./scan.worker?worker";
 
 // to avoid web worker cold start
@@ -38,21 +40,28 @@ export class CanvasScanner implements ScanRenderer {
     const noiseBlob = await getNoiseBlob(this.config.noise);
 
     try {
+      // Worker completion is delivered through message/error events.
+      // oxlint-disable-next-line promise/avoid-new
       const blob = await new Promise<Blob>((resolve, reject) => {
-        worker.onmessage = (e) => {
+        const handleMessage = (e: MessageEvent<Blob>) => {
           resolve(e.data);
           worker.terminate();
         };
-        worker.onerror = (e) => {
+        const handleError = (e: ErrorEvent) => {
           console.error(e);
           reject(e);
           worker.terminate();
         };
-        worker.postMessage({
-          config: JSON.parse(JSON.stringify(this.config)),
+        worker.addEventListener("message", handleMessage, { once: true });
+        worker.addEventListener("error", handleError, { once: true });
+        const workerMessage = {
+          config: structuredClone(this.config),
           noise: noiseBlob,
           page: image,
-        });
+        };
+        // DedicatedWorkerGlobalScope.postMessage has no targetOrigin parameter.
+        // oxlint-disable-next-line unicorn/require-post-message-target-origin
+        worker.postMessage(workerMessage);
       });
 
       return { blob };

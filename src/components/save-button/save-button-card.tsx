@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
+// File-save errors come from a browser API and are narrowed before use.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof
+
 interface SaveButtonCardProps {
   canGenerate: boolean;
   finishedPages?: number;
@@ -43,6 +46,8 @@ export function SaveButtonCard({
 
   useEffect(() => {
     if (pdf) {
+      // Reset the browser-save error when the generated PDF changes.
+      // oxlint-disable-next-line react/set-state-in-effect
       setDownloadError(undefined);
     }
   }, [pdf]);
@@ -69,9 +74,8 @@ export function SaveButtonCard({
           "PDF hasil scan tidak dapat disimpan. Periksa izin browser, lalu coba lagi."
         );
       }
-    } finally {
-      setDownloading(false);
     }
+    setDownloading(false);
   }, [downloading, pdf]);
 
   const handleGenerate = useCallback(() => {
@@ -109,13 +113,9 @@ export function SaveButtonCard({
             value={progressValue}
           />
         ) : null}
-        <p
-          aria-live="polite"
-          className="text-muted-foreground text-sm"
-          role="status"
-        >
+        <output aria-live="polite" className="text-muted-foreground text-sm">
           {compactStatus}
-        </p>
+        </output>
       </div>
     );
   }
@@ -133,15 +133,14 @@ export function SaveButtonCard({
           <Download aria-hidden="true" className="size-4" />
           Unduh PDF hasil scan
         </Button>
-        <p
+        <output
           aria-live="polite"
           className="text-muted-foreground text-center text-sm"
-          role="status"
         >
           {downloading
             ? "Menyimpan PDF hasil scan…"
             : "PDF hasil scan siap diunduh."}
-        </p>
+        </output>
         {downloadError ? (
           <Alert aria-live="assertive" variant="error">
             <CircleAlert />

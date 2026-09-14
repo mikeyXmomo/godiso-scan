@@ -1,10 +1,12 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+// Vite provides the worker URL through the virtual ?url module.
+// oxlint-disable-next-line import/default
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-GlobalWorkerOptions.workerSrc = workerSrc;
-
 import type { PDFPageInfo, PDFRenderer } from "./types";
+
+GlobalWorkerOptions.workerSrc = workerSrc;
 
 export class PDF implements PDFRenderer {
   private readonly pdf: File;
@@ -69,11 +71,13 @@ export class PDF implements PDFRenderer {
     }
 
     await pdfPage.render({
-      canvas: canvas as HTMLCanvasElement,
+      canvas,
       canvasContext: ctx,
       viewport,
     }).promise;
 
+    // HTMLCanvasElement.toBlob completes through its callback API.
+    // oxlint-disable-next-line promise/avoid-new
     const blob: Blob = await new Promise((resolve, reject) => {
       canvas.toBlob((pageBlob) => {
         if (pageBlob) {

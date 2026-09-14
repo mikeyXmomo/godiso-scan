@@ -2,6 +2,9 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
+// SSR-safe media-query parsing requires runtime checks and an event subscription callback.
+// oxlint-disable anti-slop/no-runtime-typeof, promise/prefer-await-to-callbacks
+
 const BREAKPOINTS = {
   "2xl": 1536,
   "3xl": 1600,
@@ -19,6 +22,10 @@ type BreakpointQuery =
   | `max-${Breakpoint}`
   | `${Breakpoint}:max-${Breakpoint}`;
 
+function isBreakpoint(value: string): value is Breakpoint {
+  return value in BREAKPOINTS;
+}
+
 function resolveMin(value: Breakpoint | number): string {
   const px = typeof value === "number" ? value : BREAKPOINTS[value];
   return `(min-width: ${px}px)`;
@@ -29,15 +36,13 @@ function resolveMax(value: Breakpoint | number): string {
   return `(max-width: ${px - 1}px)`;
 }
 
-function parseQuery(
-  query: BreakpointQuery | MediaQueryInput | (string & {})
-): string {
+function parseQuery(query: BreakpointQuery | MediaQueryInput | string): string {
   if (typeof query !== "string") {
     const parts: string[] = [];
-    if (query.min != null) {
+    if (query.min !== undefined) {
       parts.push(resolveMin(query.min));
     }
-    if (query.max != null) {
+    if (query.max !== undefined) {
       parts.push(resolveMax(query.max));
     }
     if (query.pointer === "coarse") {
@@ -60,11 +65,11 @@ function parseQuery(
   for (const segment of query.split(":")) {
     if (segment.startsWith("max-")) {
       const bp = segment.slice(4);
-      if (bp in BREAKPOINTS) {
-        parts.push(resolveMax(bp as Breakpoint));
+      if (isBreakpoint(bp)) {
+        parts.push(resolveMax(bp));
       }
-    } else if (segment in BREAKPOINTS) {
-      parts.push(resolveMin(segment as Breakpoint));
+    } else if (isBreakpoint(segment)) {
+      parts.push(resolveMin(segment));
     }
   }
 
@@ -83,14 +88,14 @@ export interface MediaQueryInput {
 }
 
 export function useMediaQuery(
-  query: BreakpointQuery | MediaQueryInput | (string & {})
+  query: BreakpointQuery | MediaQueryInput | string
 ): boolean {
   const mediaQuery = parseQuery(query);
 
   const subscribe = useCallback(
     (callback: () => void) => {
       if (typeof window === "undefined") {
-        return () => {};
+        return () => null;
       }
       const mql = window.matchMedia(mediaQuery);
       mql.addEventListener("change", callback);

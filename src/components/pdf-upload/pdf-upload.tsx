@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { useScannerStore } from "@/lib/scanner-store";
 
+// File-picker errors come from a browser API and are narrowed before use.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof
+
 function isAbortError(error: unknown): boolean {
   return (
     typeof error === "object" &&

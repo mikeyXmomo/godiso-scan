@@ -8,7 +8,7 @@ import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group";
 import { useRender } from "@base-ui/react/use-render";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import type React from "react";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,8 +41,9 @@ export function Drawer({
 }: DrawerPrimitive.Root.Props & {
   position?: DrawerPosition;
 }): React.ReactElement {
+  const contextValue = useMemo(() => ({ position }), [position]);
   return (
-    <DrawerContext.Provider value={{ position }}>
+    <DrawerContext.Provider value={contextValue}>
       <DrawerPrimitive.Root
         swipeDirection={swipeDirection ?? directionMap[position]}
         {...props}
@@ -137,6 +138,8 @@ export function DrawerViewport({
   );
 }
 
+// The popup class names intentionally cover four positions and three variants.
+// oxlint-disable-next-line eslint/complexity
 export function DrawerPopup({
   className,
   children,

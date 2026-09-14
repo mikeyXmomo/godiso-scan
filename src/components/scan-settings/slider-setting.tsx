@@ -33,7 +33,7 @@ export function SliderSetting({
     NonNullable<ComponentProps<typeof Slider>["onValueChange"]>
   >(
     (nextValue) => {
-      if (typeof nextValue === "number") {
+      if (!Array.isArray(nextValue)) {
         onChange(nextValue);
       }
     },

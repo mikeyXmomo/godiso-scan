@@ -22,6 +22,8 @@ export function ImagePreview({
 
   useEffect(() => {
     if (!image) {
+      // The object URL state mirrors an external browser resource managed by this effect.
+      // oxlint-disable-next-line react/set-state-in-effect
       setUrl(null);
       return;
     }
